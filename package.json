@@ -68,6 +68,11 @@
       "svelte": "./dist/entries/generative.js",
       "default": "./dist/entries/generative.js"
     },
+    "./charts": {
+      "types": "./dist/entries/charts.d.ts",
+      "svelte": "./dist/entries/charts.js",
+      "default": "./dist/entries/charts.js"
+    },
     "./data": {
       "types": "./dist/entries/data.d.ts",
       "svelte": "./dist/entries/data.js",

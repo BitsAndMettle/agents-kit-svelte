@@ -48,7 +48,8 @@ const NO_DEMO_DEFAULTS = [
 	'src/lib/beautiful/',
 	'src/lib/skills/',
 	'src/lib/intelligent-ui/',
-	'src/lib/agents-ui/'
+	'src/lib/agents-ui/',
+	'src/lib/charts/'
 ];
 /** UI defaults that are not demo data. */
 const ALLOWED_DEFAULTS = new Set(['DEFAULT_PHRASES', 'DEFAULT_PROGRESS', 'DEFAULT_FOLLOW_THRESHOLD_PX']);

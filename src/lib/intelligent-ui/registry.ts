@@ -19,6 +19,9 @@ import GitHubCommitCard from '../github/GitHubCommitCard.svelte';
 import GitHubIssueCard from '../github/GitHubIssueCard.svelte';
 import GitHubPullRequestCard from '../github/GitHubPullRequestCard.svelte';
 import AgentGenerativeSurface from './AgentGenerativeSurface.svelte';
+import AgentHandoffGantt from '../charts/AgentHandoffGantt.svelte';
+import GenerativeChart from '../charts/GenerativeChart.svelte';
+import ModelPhaseStream from '../charts/ModelPhaseStream.svelte';
 
 /** Sends an intent from a rendered node back to the renderer's `onIntent`. */
 export type UIIntentEmitter = (action: string, detail?: string) => void;
@@ -120,6 +123,25 @@ export const defaultUIRegistry: UIRegistry = {
 	'agent-evaluator': { component: AgentEvaluator },
 	'stack-trace': { component: StackTrace, required: ['trace'] },
 	'schema-display': { component: SchemaDisplay, required: ['path'] },
+	'generative-chart': {
+		component: GenerativeChart,
+		required: ['spec'],
+		props: (props, emit) => ({
+			...props,
+			onExplain: (point: { x: string | number; y: number; series: string }) =>
+				emit('explain', `${point.series} at ${point.x}: ${point.y}`)
+		})
+	},
+	'agent-handoff-gantt': {
+		component: AgentHandoffGantt,
+		required: ['lanes', 'spans'],
+		props: (props, emit) => ({ ...props, onSelectSpan: (span: { id: string }) => emit('select-span', span.id) })
+	},
+	'model-phase-stream': {
+		component: ModelPhaseStream,
+		required: ['phases', 'series'],
+		props: (props, emit) => ({ ...props, onSelectEvent: (event: { id: string }) => emit('select-event', event.id) })
+	},
 	'generative-surface': {
 		component: AgentGenerativeSurface,
 		required: ['content'],
