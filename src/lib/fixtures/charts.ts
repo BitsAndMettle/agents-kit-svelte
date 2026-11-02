@@ -3,14 +3,22 @@
  * verified, with a failed first attempt, a rate-limit fallback and an escalated review.
  * Import from `agents-kit-svelte/fixtures`; components never fall back to it.
  */
+import type { GitHubIncidentData, GitHubIssueData, GitHubPullRequestData, GitHubReleaseData } from '../types';
 import type {
 	ChartSpec,
+	FeatureSummary,
+	LineageEdge,
+	LineageNode,
 	HandoffLane,
 	HandoffLink,
 	HandoffSpan,
 	ModelEvent,
 	ModelSeries,
-	PhaseBand
+	PhaseBand,
+	BurnPoint,
+	RunMark,
+	TimelineItem,
+	TimelineMilestone
 } from '../charts/types';
 
 /** Total length of the sample run, in seconds. */
@@ -272,3 +280,264 @@ export const SAMPLE_CHART_SPECS: Record<'latency' | 'tokens' | 'passRate', Chart
 		annotations: [{ x: 4, label: 'Regression', note: 'Attempt 4 broke the token refresh.' }]
 	}
 };
+
+// --- Features and lineage ---
+
+const feature = (number: number, title: string, state: GitHubIssueData['state'], extra: Partial<GitHubIssueData> = {}): GitHubIssueData => ({
+	number,
+	title,
+	repo: 'acme/billing',
+	state,
+	author: 'greg',
+	createdAt: 'Oct 28',
+	labels: [{ name: 'feature: sso', tone: 'accent' }],
+	riskTier: 'T3',
+	size: 'M',
+	...extra
+});
+
+const pr = (number: number, title: string, state: GitHubPullRequestData['state'], additions: number, deletions: number, linkedIssueNumber: number, passing = true): GitHubPullRequestData => ({
+	number,
+	title,
+	repo: 'acme/billing',
+	state,
+	author: 'claude-sonnet',
+	headBranch: `trailside/${linkedIssueNumber}-auto-run`,
+	baseBranch: 'main',
+	additions,
+	deletions,
+	changedFilesCount: 4,
+	riskTier: 'T3',
+	refereeStatus: passing ? 'pass' : 'pending',
+	refereeSummary: passing ? 'Referee review (T3, two lenses): PASS.' : 'Waiting on checks.',
+	updatedAt: state === 'merged' ? 'Nov 1' : '12m ago',
+	linkedIssueNumber,
+	checks: [
+		{ id: 'c1', name: 'check-and-test', workflow: 'CI', status: passing ? 'passed' : 'running', duration: '1m 58s' },
+		{ id: 'c2', name: 'auth e2e (Playwright)', workflow: 'CI', status: passing ? 'passed' : 'running', duration: '3m 12s' }
+	]
+});
+
+/** One Feature at a glance, for `FeatureCard`. */
+export const SAMPLE_FEATURE: FeatureSummary = {
+	id: 'F-12',
+	title: 'SSO for the billing portal',
+	summary: 'Sign in with the company IdP, cache sessions to cut checkout latency, and let admins manage SSO.',
+	riskTier: 'T3',
+	status: 'in-progress',
+	owner: 'Greg',
+	cards: { done: 3, running: 1, failed: 0, planned: 1 },
+	criteriaMet: 9,
+	criteriaTotal: 14,
+	attempts: 6,
+	pullRequests: 4,
+	tokensSpent: 412_000,
+	tokenBudget: 600_000,
+	progress: [0, 14, 21, 21, 43, 50, 57, 64],
+	agents: ['claude-opus', 'claude-sonnet', 'gpt-codex'],
+	updatedLabel: 'Updated 4m ago'
+};
+
+/** More Features, for a board or a grid of `FeatureCard`s. */
+export const SAMPLE_FEATURES: FeatureSummary[] = [
+	SAMPLE_FEATURE,
+	{
+		id: 'F-9',
+		title: 'Usage-based invoices',
+		summary: 'Meter API calls per workspace and bill them monthly.',
+		riskTier: 'T2',
+		status: 'shipped',
+		owner: 'Mira',
+		cards: { done: 6, running: 0, failed: 0, planned: 0 },
+		criteriaMet: 11,
+		criteriaTotal: 11,
+		attempts: 8,
+		pullRequests: 6,
+		tokensSpent: 388_000,
+		tokenBudget: 450_000,
+		progress: [9, 27, 36, 55, 73, 82, 100],
+		agents: ['claude-sonnet', 'claude-haiku'],
+		updatedLabel: 'Shipped Oct 30'
+	},
+	{
+		id: 'F-14',
+		title: 'Dunning emails for failed payments',
+		summary: 'Retry cards on a schedule and email the account owner before suspending.',
+		riskTier: 'T1',
+		status: 'blocked',
+		owner: 'Tomas',
+		cards: { done: 1, running: 0, failed: 2, planned: 2 },
+		criteriaMet: 2,
+		criteriaTotal: 9,
+		attempts: 5,
+		pullRequests: 1,
+		tokensSpent: 251_000,
+		tokenBudget: 260_000,
+		progress: [0, 11, 22, 22, 22],
+		agents: ['gpt-codex'],
+		updatedLabel: 'Blocked on email provider keys'
+	}
+];
+
+/** What each lineage node opens: the GitHub record behind it, or the run for an attempt. */
+export type SampleLineageData =
+	| { type: 'issue'; issue: GitHubIssueData }
+	| { type: 'pr'; pr: GitHubPullRequestData }
+	| { type: 'release'; release: GitHubReleaseData }
+	| { type: 'incident'; incident: GitHubIncidentData }
+	| { type: 'run'; card: number; attempt: number }
+	| { type: 'feature' };
+
+export const SAMPLE_LINEAGE_NODES: LineageNode[] = [
+	{ id: 'f12', kind: 'feature', label: 'SSO for the billing portal', detail: 'F-12 · T3', status: 'running', data: { type: 'feature' } },
+
+	{ id: 'c214', kind: 'card', label: 'SSO login', detail: '#214', status: 'done', data: { type: 'issue', issue: feature(214, 'SSO login for the billing portal', 'closed', { criteriaCompleted: 4, criteriaTotal: 4, linkedPrNumber: 301 }) } },
+	{ id: 'c215', kind: 'card', label: 'Session cache', detail: '#215', status: 'done', data: { type: 'issue', issue: feature(215, 'Cache verified SSO sessions until expiry', 'closed', { criteriaCompleted: 3, criteriaTotal: 3, linkedPrNumber: 302 }) } },
+	{ id: 'c216', kind: 'card', label: 'Logout and token refresh', detail: '#216', status: 'running', data: { type: 'issue', issue: feature(216, 'Logout clears the session; re-login refreshes the token', 'in-progress', { assignedAgent: 'claude-sonnet', attemptNumber: 2, criteriaCompleted: 1, criteriaTotal: 3, worktreeBranch: 'trailside/216-auto-run' }) } },
+	{ id: 'c217', kind: 'card', label: 'Admin SSO settings', detail: '#217', status: 'planned', data: { type: 'issue', issue: feature(217, 'Admins can set the IdP and enforce SSO', 'open', { criteriaCompleted: 0, criteriaTotal: 2 }) } },
+	{ id: 'c219', kind: 'card', label: 'Stale session after key rotation', detail: '#219 · hotfix', status: 'done', data: { type: 'issue', issue: feature(219, 'Sessions stay valid after the IdP rotates its signing key', 'closed', { labels: [{ name: 'incident', tone: 'danger' }], criteriaCompleted: 2, criteriaTotal: 2, linkedPrNumber: 307 }) } },
+
+	{ id: 'a214-1', kind: 'attempt', label: 'Attempt 1', detail: 'sonnet · 1:16', status: 'superseded', data: { type: 'run', card: 214, attempt: 1 } },
+	{ id: 'a214-2', kind: 'attempt', label: 'Attempt 2', detail: 'sonnet · 0:56', status: 'done', data: { type: 'run', card: 214, attempt: 2 } },
+	{ id: 'a215-1', kind: 'attempt', label: 'Attempt 1', detail: 'sonnet · 1:32', status: 'done', data: { type: 'run', card: 215, attempt: 1 } },
+	{ id: 'a216-1', kind: 'attempt', label: 'Attempt 1', detail: 'codex · 2:04', status: 'failed', data: { type: 'run', card: 216, attempt: 1 } },
+	{ id: 'a216-2', kind: 'attempt', label: 'Attempt 2', detail: 'sonnet · running', status: 'running', data: { type: 'run', card: 216, attempt: 2 } },
+	{ id: 'a219-1', kind: 'attempt', label: 'Attempt 1', detail: 'opus · 0:41', status: 'done', data: { type: 'run', card: 219, attempt: 1 } },
+
+	{ id: 'p301', kind: 'pr', label: 'feat(auth): SSO login', detail: '#301 · +171 −44', status: 'merged', data: { type: 'pr', pr: pr(301, 'feat(auth): SSO login for the billing portal', 'merged', 171, 44, 214) } },
+	{ id: 'p302', kind: 'pr', label: 'feat(auth): session cache', detail: '#302 · +64 −9', status: 'merged', data: { type: 'pr', pr: pr(302, 'feat(auth): cache verified sessions until exp', 'merged', 64, 9, 215) } },
+	{ id: 'p305', kind: 'pr', label: 'feat(auth): logout + refresh', detail: '#305 · +88 −12', status: 'open', data: { type: 'pr', pr: pr(305, 'feat(auth): clear sessions on logout and refresh on re-login', 'open', 88, 12, 216, false) } },
+	{ id: 'p307', kind: 'pr', label: 'fix(auth): refetch JWKS', detail: '#307 · +23 −4', status: 'merged', data: { type: 'pr', pr: pr(307, 'fix(auth): refetch the JWKS when a key id is unknown', 'merged', 23, 4, 219) } },
+
+	{
+		id: 'r280',
+		kind: 'release',
+		label: 'v2.8.0',
+		detail: 'Oct 31',
+		status: 'shipped',
+		data: {
+			type: 'release',
+			release: {
+				tag: 'v2.8.0',
+				previousTag: 'v2.7.4',
+				name: 'v2.8.0 · Sign in with SSO',
+				target: 'main @ 4c1e9a2',
+				groups: [{ id: 'features', title: 'Features', items: [{ text: 'Sign in to billing with your company IdP', pr: 301, author: 'claude-sonnet' }, { text: 'Faster checkout with cached sessions', pr: 302, author: 'claude-sonnet' }] }],
+				assets: [{ name: 'billing-2.8.0.tar.gz', size: '6.1 MB' }]
+			}
+		}
+	},
+	{
+		id: 'r281',
+		kind: 'release',
+		label: 'v2.8.1',
+		detail: 'Nov 1',
+		status: 'shipped',
+		data: {
+			type: 'release',
+			release: {
+				tag: 'v2.8.1',
+				previousTag: 'v2.8.0',
+				name: 'v2.8.1 · Key rotation fix',
+				target: 'main @ 8d02f11',
+				groups: [{ id: 'fixes', title: 'Bug fixes', items: [{ text: 'Sessions survive the IdP rotating its signing key', pr: 307, author: 'claude-opus' }] }],
+				assets: [{ name: 'billing-2.8.1.tar.gz', size: '6.1 MB' }]
+			}
+		}
+	},
+	{
+		id: 'i42',
+		kind: 'incident',
+		label: 'Logins failing after key rotation',
+		detail: 'INC-42 · SEV2',
+		status: 'resolved',
+		data: {
+			type: 'incident',
+			incident: {
+				id: 'INC-42',
+				title: 'SSO logins failing after IdP key rotation',
+				severity: 'SEV2',
+				service: 'billing-auth',
+				metricLabel: 'Login errors (%)',
+				series: [0.2, 0.3, 0.2, 0.2, 9.4, 14.1, 13.8, 12.6, 3.1, 0.4, 0.3, 0.2],
+				threshold: 2,
+				suspect: { sha: '4c1e9a2', message: 'feat(auth): SSO login for the billing portal', pr: 301, deployedAt: 'Oct 31 16:02' },
+				steps: [
+					{ status: 'investigating', label: 'Alert fired', detail: 'Login errors crossed 2% · paged billing-oncall' },
+					{ status: 'identified', label: 'Cause found', detail: 'The IdP rotated its key; the JWKS was cached forever' },
+					{ status: 'mitigated', label: 'Hotfix card opened', detail: 'Card 219 dispatched to claude-opus (T3)' },
+					{ status: 'resolved', label: 'Resolved', detail: 'v2.8.1 refetches the JWKS on an unknown key id' }
+				]
+			}
+		}
+	}
+];
+
+export const SAMPLE_LINEAGE_EDGES: LineageEdge[] = [
+	{ from: 'f12', to: 'c214', rel: 'spawned' },
+	{ from: 'f12', to: 'c215', rel: 'spawned' },
+	{ from: 'f12', to: 'c216', rel: 'spawned' },
+	{ from: 'f12', to: 'c217', rel: 'spawned' },
+	{ from: 'f12', to: 'c219', rel: 'spawned' },
+	{ from: 'c214', to: 'a214-1', rel: 'attempted' },
+	{ from: 'c214', to: 'a214-2', rel: 'retried' },
+	{ from: 'c215', to: 'a215-1', rel: 'attempted' },
+	{ from: 'c216', to: 'a216-1', rel: 'attempted' },
+	{ from: 'c216', to: 'a216-2', rel: 'retried' },
+	{ from: 'c219', to: 'a219-1', rel: 'attempted' },
+	{ from: 'a214-2', to: 'p301', rel: 'opened' },
+	{ from: 'a215-1', to: 'p302', rel: 'opened' },
+	{ from: 'a216-2', to: 'p305', rel: 'opened' },
+	{ from: 'a219-1', to: 'p307', rel: 'opened' },
+	{ from: 'p301', to: 'r280', rel: 'shipped-in' },
+	{ from: 'p302', to: 'r280', rel: 'shipped-in' },
+	{ from: 'p307', to: 'r281', rel: 'shipped-in' },
+	{ from: 'r280', to: 'i42', rel: 'caused' },
+	{ from: 'i42', to: 'c219', rel: 'fixed-by', backlink: true }
+];
+
+/** Day 0 of the F-12 timeline. */
+export const SAMPLE_FEATURE_START = '2026-10-20';
+/** Today on the F-12 timeline, in days from the start. */
+export const SAMPLE_TIMELINE_TODAY = 13;
+
+/** F-12's cards: planned windows against what happened, in days from `SAMPLE_FEATURE_START`. */
+export const SAMPLE_TIMELINE_ITEMS: TimelineItem[] = [
+	{ id: 'c214', label: 'SSO login', detail: '#214 · 2 attempts', status: 'done', planned: [0, 5], actual: [0, 6] },
+	{ id: 'c215', label: 'Session cache', detail: '#215', status: 'done', planned: [3, 8], actual: [4, 8] },
+	{ id: 'c216', label: 'Logout and token refresh', detail: '#216 · attempt 2', status: 'running', planned: [6, 11], actual: [8], forecast: 15 },
+	{ id: 'c217', label: 'Admin SSO settings', detail: '#217 · waiting on 216', status: 'planned', planned: [10, 15] },
+	{ id: 'c219', label: 'Stale session after key rotation', detail: '#219 · hotfix', status: 'done', planned: [11.7, 12.2], actual: [11.7, 12] }
+];
+
+export const SAMPLE_TIMELINE_MILESTONES: TimelineMilestone[] = [
+	{ id: 'r280', t: 11, label: 'v2.8.0 shipped', kind: 'release' },
+	{ id: 'i42', t: 11.6, label: 'INC-42: logins failing', kind: 'incident' },
+	{ id: 'r281', t: 12, label: 'v2.8.1 shipped', kind: 'release' },
+	{ id: 'due', t: 16, label: 'Billing portal launch', kind: 'deadline' }
+];
+
+/** Token budget for the sample run. */
+export const SAMPLE_TOKEN_BUDGET = 20_000;
+
+/** Cumulative tokens spent across every model in the sample run, sampled every 4 s. */
+export const SAMPLE_BURN_POINTS: BurnPoint[] = (() => {
+	let spent = 0;
+	return SAMPLE_TIMES.map((t, i) => {
+		if (i > 0) for (const s of SAMPLE_MODEL_SERIES) spent += (s.points[i - 1]?.value ?? 0) * 4;
+		return { t, spent };
+	});
+})();
+
+/** The moments of the sample run, for the scrubber and the burn chart. */
+export const SAMPLE_RUN_MARKS: RunMark[] = [
+	{ id: 'h1', t: 38, label: 'Planner hands plan.md to the implementer', kind: 'handoff' },
+	{ id: 'e1', t: 64, label: 'Rate limited: fell back to claude-haiku', kind: 'decision' },
+	{ id: 'e2', t: 76, label: 'Back on claude-sonnet', kind: 'decision' },
+	{ id: 'h2', t: 118, label: 'Diff +142 −38 sent for a test run', kind: 'handoff' },
+	{ id: 'h3', t: 146, label: '2 tests failed: retrying the implementation', kind: 'error' },
+	{ id: 'h4', t: 206, label: 'Tests green: diff +171 −44 sent for review', kind: 'handoff' },
+	{ id: 'e3', t: 232, label: 'Review escalated to claude-opus (risk T3)', kind: 'decision' },
+	{ id: 'h5', t: 250, label: 'Review approved', kind: 'handoff' },
+	{ id: 'done', t: 282, label: 'Verified: all 4 criteria met', kind: 'done' }
+];

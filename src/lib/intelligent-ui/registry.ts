@@ -22,6 +22,11 @@ import AgentGenerativeSurface from './AgentGenerativeSurface.svelte';
 import AgentHandoffGantt from '../charts/AgentHandoffGantt.svelte';
 import GenerativeChart from '../charts/GenerativeChart.svelte';
 import ModelPhaseStream from '../charts/ModelPhaseStream.svelte';
+import FeatureCard from '../charts/FeatureCard.svelte';
+import FeatureLineage from '../charts/FeatureLineage.svelte';
+import FeatureTimeline from '../charts/FeatureTimeline.svelte';
+import RunReplayScrubber from '../charts/RunReplayScrubber.svelte';
+import TokenBurnChart from '../charts/TokenBurnChart.svelte';
 
 /** Sends an intent from a rendered node back to the renderer's `onIntent`. */
 export type UIIntentEmitter = (action: string, detail?: string) => void;
@@ -148,6 +153,48 @@ export const defaultUIRegistry: UIRegistry = {
 			...props,
 			onSelectEvent: (event: { id: string }) => emit('select-event', event.id),
 			onSelectPhase: (phase: { id: string }) => emit('select-phase', phase.id)
+		})
+	},
+	'feature-card': {
+		component: FeatureCard,
+		required: ['feature'],
+		props: (props, emit) => ({
+			...props,
+			onOpen: (feature: { id: string }) => emit('open-feature', feature.id),
+			onSelectCards: (state: string) => emit('select-cards', state)
+		})
+	},
+	'feature-lineage': {
+		component: FeatureLineage,
+		required: ['nodes', 'edges'],
+		props: (props, emit) => ({
+			...props,
+			onSelectNode: (node: { id: string }) => emit('select-node', node.id)
+		})
+	},
+	'feature-timeline': {
+		component: FeatureTimeline,
+		required: ['items', 'today'],
+		props: (props, emit) => ({
+			...props,
+			onSelectItem: (item: { id: string }) => emit('select-item', item.id),
+			onSelectMilestone: (milestone: { id: string }) => emit('select-milestone', milestone.id)
+		})
+	},
+	'token-burn-chart': {
+		component: TokenBurnChart,
+		required: ['points'],
+		props: (props, emit) => ({
+			...props,
+			onSelectMark: (mark: { id: string }) => emit('select-mark', mark.id)
+		})
+	},
+	'run-replay-scrubber': {
+		component: RunReplayScrubber,
+		required: ['duration'],
+		props: (props, emit) => ({
+			...props,
+			onSelectMark: (mark: { id: string }) => emit('select-mark', mark.id)
 		})
 	},
 	'generative-surface': {
