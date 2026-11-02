@@ -20,7 +20,7 @@ export interface CatalogItemMeta {
 }
 
 export const CATALOG_ITEMS: CatalogItemMeta[] = [
-	// 1. beUI Agents (20 components)
+	// 1. beUI Agents (21 components)
 	{
 		slug: 'chat-workbench',
 		name: 'ChatWorkbench',
@@ -569,6 +569,35 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   <ReasoningText {phrases} interval={1800} />
 </p>`
 	},
+	{
+		slug: 'agent-work-trace',
+		name: 'AgentWorkTrace',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/AgentWorkTrace.svelte',
+		upstreamSource: 'Agents Kit Svelte · PR Flow',
+		description:
+			'A collapsible trace of what the agent did: findings, edits, nested test runs and pushes on one connected line, with clickable file chips. While running, the header shimmers with the current step and a timer; when done, it reads “Worked for 5s”.',
+		usageSnippet: `<script lang="ts">
+  import { AgentWorkTrace, type WorkStep } from 'agents-kit-svelte';
+
+  let steps = $state<WorkStep[]>([
+    { id: 'find', label: 'Checkout sent you to sign in after a refresh', status: 'done' },
+    { id: 'cause', label: 'The redirect drops the refreshed cookie', status: 'done', files: ['src/middleware.ts'] },
+    { id: 'edit', label: 'Edited middleware.ts', kind: 'edit', status: 'done' },
+    { id: 'tests', label: 'Running 11 of 12 e2e tests', kind: 'run', status: 'running', nested: true }
+  ]);
+  let elapsed = $state(4);
+  let expanded = $state(true);
+</script>
+
+<AgentWorkTrace
+  {steps}
+  status="running"
+  {elapsed}
+  bind:expanded
+  onSelectFile={(path) => console.log('open', path)}
+/>`
+	},
 
 	// 2. Beautiful UI (11 components)
 	{
@@ -826,7 +855,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 3. GitHub Cards & Layouts (15 components)
+	// 3. GitHub Cards & Layouts (18 components)
 	{
 		slug: 'github-issue-card',
 		name: 'GitHubIssueCard',
@@ -1200,6 +1229,113 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   incident={SAMPLE_INCIDENT}
   live
   onRevert={(prNumber, sha) => (reverted = prNumber)}
+/>`
+	},
+	{
+		slug: 'github-pr-action-bar',
+		name: 'GitHubPrActionBar',
+		category: 'GitHub Cards & Layouts',
+		sveltePath: 'src/lib/github/GitHubPrActionBar.svelte',
+		upstreamSource: 'Agents Kit Svelte · PR Flow',
+		description:
+			'The bar that docks above the composer once a branch has changes: a Create PR button that spins while the agent opens it and turns into the PR number, next to a GitHub-style +/− diff stat that opens a per-file menu.',
+		usageSnippet: `<script lang="ts">
+  import { GitHubPrActionBar, type DiffStat, type PrActionStatus } from 'agents-kit-svelte';
+
+  const diff: DiffStat = {
+    additions: 482,
+    deletions: 37,
+    files: [
+      { path: 'src/lib/session.ts', additions: 214, deletions: 22 },
+      { path: 'src/lib/session.test.ts', additions: 268, deletions: 15 }
+    ]
+  };
+  let status = $state<PrActionStatus>('idle');
+
+  function create() {
+    status = 'creating';
+    setTimeout(() => (status = 'created'), 1500);
+  }
+</script>
+
+<GitHubPrActionBar
+  {diff}
+  {status}
+  prNumber={128}
+  onCreate={create}
+  onOpenPr={(n) => console.log('open PR', n)}
+  onSelectFile={(path) => console.log('open', path)}
+/>`
+	},
+	{
+		slug: 'github-pr-graph',
+		name: 'GitHubPullRequestGraph',
+		category: 'GitHub Cards & Layouts',
+		sveltePath: 'src/lib/github/GitHubPullRequestGraph.svelte',
+		upstreamSource: 'Agents Kit Svelte · PR Flow',
+		description:
+			'A pull request card with a commit graph: the base branch on the left, each branch forking off it with a coloured lane and chip, and a dashed line from the head to a “Merge into main” node that spins while checking and fills purple once merged.',
+		usageSnippet: `<script lang="ts">
+  import { GitHubPullRequestGraph, type PrGraphLane, type PrGraphCommit, type PrMergeState } from 'agents-kit-svelte';
+
+  const lanes: PrGraphLane[] = [
+    { id: 'main', branch: 'main', base: true },
+    { id: 'session', branch: 'feat/session-refresh' }
+  ];
+  const commits: PrGraphCommit[] = [
+    { sha: 'd29f50a', message: 'Add session refresh tests', lane: 'session', author: 'You', age: 'now' },
+    { sha: 'c70a92e', message: 'Refresh sessions near expiry', lane: 'session', author: 'You', age: '25m' },
+    { sha: '9c2d4a1', message: 'Bump next to 16.3', lane: 'main', author: 'Sam', age: '3h' }
+  ];
+  let mergeState = $state<PrMergeState>('checking');
+</script>
+
+<GitHubPullRequestGraph
+  title="Refresh sessions before they expire"
+  number={128}
+  {lanes}
+  {commits}
+  head="session"
+  {mergeState}
+  footer={{ label: 'Checks 2/5', tone: 'running' }}
+  onSelectCommit={(commit) => console.log('open', commit.sha)}
+/>`
+	},
+	{
+		slug: 'github-checks-waterfall',
+		name: 'GitHubChecksWaterfall',
+		category: 'GitHub Cards & Layouts',
+		sveltePath: 'src/lib/github/GitHubChecksWaterfall.svelte',
+		upstreamSource: 'Agents Kit Svelte · PR Flow',
+		description:
+			'CI checks as a live waterfall: one bar per check on a shared time axis, a status ring in the header, the failing assertion inline with expected and received, and Fix and Merge buttons that hand the next step to the agent.',
+		usageSnippet: `<script lang="ts">
+  import { GitHubChecksWaterfall, type CheckRun, type ChecksPhase } from 'agents-kit-svelte';
+
+  let checks = $state<CheckRun[]>([
+    { id: 'lint', name: 'lint', status: 'passed', start: 1, duration: 11 },
+    { id: 'unit', name: 'unit', status: 'running', start: 2 },
+    {
+      id: 'e2e',
+      name: 'e2e',
+      status: 'failed',
+      start: 0,
+      duration: 33,
+      failure: { location: 'e2e/checkout.spec.ts:42', title: 'keeps the cart after a refresh', expected: '/checkout', received: '/sign-in' }
+    }
+  ]);
+  let now = $state(24);
+  let phase = $state<ChecksPhase>('checks');
+</script>
+
+<GitHubChecksWaterfall
+  prNumber={128}
+  commit={{ sha: 'd29f50a', message: 'Add session refresh tests' }}
+  {checks}
+  {now}
+  {phase}
+  onFix={(failed) => (phase = 'fixing')}
+  onMerge={() => (phase = 'merging')}
 />`
 	},
 
