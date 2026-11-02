@@ -2,9 +2,10 @@
 	import AgentHandoffGantt from '$lib/charts/AgentHandoffGantt.svelte';
 	import GenerativeChart from '$lib/charts/GenerativeChart.svelte';
 	import ModelPhaseStream from '$lib/charts/ModelPhaseStream.svelte';
+	import RunReplayScrubber from '$lib/charts/RunReplayScrubber.svelte';
+	import TokenBurnChart from '$lib/charts/TokenBurnChart.svelte';
 	import { eventsAt, handoffsAt, seriesAt, spansAt } from '$lib/charts/replay';
-	import { formatClock } from '$lib/charts/scale';
-	import type { ChartPoint, ChartSpec } from '$lib/charts/types';
+	import type { ChartPoint, ChartSpec, RunMark } from '$lib/charts/types';
 	import RunDetailSheet, { type RunDetail } from './RunDetailSheet.svelte';
 	import {
 		SAMPLE_CHART_SPECS,
@@ -14,21 +15,18 @@
 		SAMPLE_MODEL_EVENTS,
 		SAMPLE_MODEL_SERIES,
 		SAMPLE_PHASE_BANDS,
-		SAMPLE_RUN_DURATION
+		SAMPLE_BURN_POINTS,
+		SAMPLE_RUN_DURATION,
+		SAMPLE_RUN_MARKS,
+		SAMPLE_TOKEN_BUDGET
 	} from '$lib/fixtures/charts';
-	import { buttonClass } from '$lib/ui/styles';
 	import { cn } from '$lib/ui/cn';
 	import { rise } from '$lib/state/motion.svelte';
-	import { Pause, Play, RotateCcw, Sparkles } from '@lucide/svelte';
-	import { onMount } from 'svelte';
-	import { prefersReducedMotion } from 'svelte/motion';
+	import { Sparkles } from '@lucide/svelte';
 
-	/** Playback speed: seconds of run per real second. */
-	const SPEEDS = [4, 8, 16] as const;
-
-	let t = $state(SAMPLE_RUN_DURATION);
+	let t = $state(0);
 	let playing = $state(false);
-	let speed = $state<(typeof SPEEDS)[number]>(8);
+	let speed = $state(8);
 	let linked = $state<string | null>(null);
 	let detail = $state<RunDetail | null>(null);
 	let selectedId = $derived(detail?.kind === 'handoff' ? detail.link.id : detail?.kind === 'span' ? detail.span.id : null);
@@ -45,42 +43,20 @@
 	let laneHighlight = $derived(SAMPLE_HANDOFF_LANES.find((l) => l.id === linked || l.model === linked)?.id ?? null);
 	let modelHighlight = $derived(SAMPLE_HANDOFF_LANES.find((l) => l.id === linked || l.model === linked)?.model ?? linked);
 
-	let frame = 0;
-	let last = 0;
-	function tick(ts: number): void {
-		if (!playing) return;
-		const dt = last ? (ts - last) / 1000 : 0;
-		last = ts;
-		t = Math.min(SAMPLE_RUN_DURATION, t + dt * speed);
-		if (t >= SAMPLE_RUN_DURATION) {
-			playing = false;
-			return;
-		}
-		frame = requestAnimationFrame(tick);
-	}
-	function play(): void {
-		if (t >= SAMPLE_RUN_DURATION) t = 0;
-		playing = true;
-		last = 0;
-		frame = requestAnimationFrame(tick);
-	}
-	function pause(): void {
-		playing = false;
-		cancelAnimationFrame(frame);
-	}
-	function restart(): void {
-		pause();
-		t = 0;
-		play();
-	}
-	onMount(() => {
-		if (!prefersReducedMotion.current) restart();
-		return () => cancelAnimationFrame(frame);
-	});
+	let burn = $derived(SAMPLE_BURN_POINTS.filter((p) => p.t <= t));
 
 	function open(next: RunDetail): void {
-		pause();
+		playing = false;
 		detail = next;
+	}
+	/** A moment on the scrubber or burn chart opens the handoff or routing decision behind it. */
+	function openMark(mark: RunMark): void {
+		playing = false;
+		t = Math.max(t, mark.t);
+		const link = SAMPLE_HANDOFFS.find((h) => h.id === mark.id);
+		const event = SAMPLE_MODEL_EVENTS.find((e) => e.id === mark.id);
+		if (link) open({ kind: 'handoff', link });
+		else if (event) open({ kind: 'event', event });
 	}
 
 	const ANSWERS: Record<string, (p: ChartPoint) => string> = {
@@ -120,35 +96,17 @@
 		</p>
 	</div>
 
-	<section aria-label="Run playback" class="flex flex-wrap items-center gap-3 rounded-card border border-card-border bg-card-bg px-4 py-3 ak-shadow-btn">
-		{#if playing}
-			<button type="button" class={buttonClass('primary', 'sm')} onclick={pause}><Pause class="size-3.5" aria-hidden="true" />Pause</button>
-		{:else}
-			<button type="button" class={buttonClass('primary', 'sm')} onclick={play}><Play class="size-3.5" aria-hidden="true" />{t >= SAMPLE_RUN_DURATION ? 'Replay run' : 'Play'}</button>
-		{/if}
-		<button type="button" class={buttonClass('ghost', 'icon-sm')} onclick={restart} aria-label="Restart"><RotateCcw class="size-3.5" aria-hidden="true" /></button>
-		<label class="flex min-w-48 flex-1 items-center gap-3 text-xs text-fg-light">
-			<span class="sr-only">Run time</span>
-			<input
-				type="range"
-				min="0"
-				max={SAMPLE_RUN_DURATION}
-				step="1"
-				value={t}
-				oninput={(event) => {
-					pause();
-					t = Number(event.currentTarget.value);
-				}}
-				class="w-full accent-[var(--ak-color-accent)]"
-			/>
-			<span class="w-24 shrink-0 text-right whitespace-nowrap font-mono tabular-nums text-fg-main">{formatClock(t)} / {formatClock(SAMPLE_RUN_DURATION)}</span>
-		</label>
-		<div class="flex items-center gap-1 rounded-full bg-canvas-secondary p-0.5" role="group" aria-label="Speed">
-			{#each SPEEDS as s (s)}
-				<button type="button" aria-pressed={speed === s} onclick={() => (speed = s)} class={cn('rounded-full px-2 py-0.5 font-mono text-[11px] transition-colors', speed === s ? 'bg-card-bg text-fg-main ak-shadow-btn' : 'text-fg-light hover:text-fg-main')}>{s}×</button>
-			{/each}
-		</div>
-	</section>
+	<RunReplayScrubber
+		duration={SAMPLE_RUN_DURATION}
+		bind:now={t}
+		bind:playing
+		bind:speed
+		phases={SAMPLE_PHASE_BANDS}
+		marks={SAMPLE_RUN_MARKS}
+		autoplay
+		onSelectMark={openMark}
+		class="sticky top-[4.75rem] z-30"
+	/>
 
 	<AgentHandoffGantt
 		title="Add SSO to the billing portal · card 214"
@@ -178,6 +136,19 @@
 		onSelectEvent={(event) => open({ kind: 'event', event })}
 		onSelectPhase={(phase) => open({ kind: 'phase', phase })}
 		onSelectPoint={(point) => open({ kind: 'point', point })}
+	/>
+
+	<TokenBurnChart
+		title="Token burn against budget"
+		points={burn}
+		budget={SAMPLE_TOKEN_BUDGET}
+		end={SAMPLE_RUN_DURATION}
+		marks={SAMPLE_RUN_MARKS}
+		onSelectMark={openMark}
+		onSelectPoint={(point) => {
+			playing = false;
+			t = point.t;
+		}}
 	/>
 
 	<section aria-label="Generative chart" class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">

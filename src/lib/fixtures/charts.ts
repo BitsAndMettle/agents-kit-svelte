@@ -14,7 +14,11 @@ import type {
 	HandoffSpan,
 	ModelEvent,
 	ModelSeries,
-	PhaseBand
+	PhaseBand,
+	BurnPoint,
+	RunMark,
+	TimelineItem,
+	TimelineMilestone
 } from '../charts/types';
 
 /** Total length of the sample run, in seconds. */
@@ -490,4 +494,50 @@ export const SAMPLE_LINEAGE_EDGES: LineageEdge[] = [
 	{ from: 'p307', to: 'r281', rel: 'shipped-in' },
 	{ from: 'r280', to: 'i42', rel: 'caused' },
 	{ from: 'i42', to: 'c219', rel: 'fixed-by', backlink: true }
+];
+
+/** Day 0 of the F-12 timeline. */
+export const SAMPLE_FEATURE_START = '2026-10-20';
+/** Today on the F-12 timeline, in days from the start. */
+export const SAMPLE_TIMELINE_TODAY = 13;
+
+/** F-12's cards: planned windows against what happened, in days from `SAMPLE_FEATURE_START`. */
+export const SAMPLE_TIMELINE_ITEMS: TimelineItem[] = [
+	{ id: 'c214', label: 'SSO login', detail: '#214 · 2 attempts', status: 'done', planned: [0, 5], actual: [0, 6] },
+	{ id: 'c215', label: 'Session cache', detail: '#215', status: 'done', planned: [3, 8], actual: [4, 8] },
+	{ id: 'c216', label: 'Logout and token refresh', detail: '#216 · attempt 2', status: 'running', planned: [6, 11], actual: [8], forecast: 15 },
+	{ id: 'c217', label: 'Admin SSO settings', detail: '#217 · waiting on 216', status: 'planned', planned: [10, 15] },
+	{ id: 'c219', label: 'Stale session after key rotation', detail: '#219 · hotfix', status: 'done', planned: [11.7, 12.2], actual: [11.7, 12] }
+];
+
+export const SAMPLE_TIMELINE_MILESTONES: TimelineMilestone[] = [
+	{ id: 'r280', t: 11, label: 'v2.8.0 shipped', kind: 'release' },
+	{ id: 'i42', t: 11.6, label: 'INC-42: logins failing', kind: 'incident' },
+	{ id: 'r281', t: 12, label: 'v2.8.1 shipped', kind: 'release' },
+	{ id: 'due', t: 16, label: 'Billing portal launch', kind: 'deadline' }
+];
+
+/** Token budget for the sample run. */
+export const SAMPLE_TOKEN_BUDGET = 20_000;
+
+/** Cumulative tokens spent across every model in the sample run, sampled every 4 s. */
+export const SAMPLE_BURN_POINTS: BurnPoint[] = (() => {
+	let spent = 0;
+	return SAMPLE_TIMES.map((t, i) => {
+		if (i > 0) for (const s of SAMPLE_MODEL_SERIES) spent += (s.points[i - 1]?.value ?? 0) * 4;
+		return { t, spent };
+	});
+})();
+
+/** The moments of the sample run, for the scrubber and the burn chart. */
+export const SAMPLE_RUN_MARKS: RunMark[] = [
+	{ id: 'h1', t: 38, label: 'Planner hands plan.md to the implementer', kind: 'handoff' },
+	{ id: 'e1', t: 64, label: 'Rate limited: fell back to claude-haiku', kind: 'decision' },
+	{ id: 'e2', t: 76, label: 'Back on claude-sonnet', kind: 'decision' },
+	{ id: 'h2', t: 118, label: 'Diff +142 −38 sent for a test run', kind: 'handoff' },
+	{ id: 'h3', t: 146, label: '2 tests failed: retrying the implementation', kind: 'error' },
+	{ id: 'h4', t: 206, label: 'Tests green: diff +171 −44 sent for review', kind: 'handoff' },
+	{ id: 'e3', t: 232, label: 'Review escalated to claude-opus (risk T3)', kind: 'decision' },
+	{ id: 'h5', t: 250, label: 'Review approved', kind: 'handoff' },
+	{ id: 'done', t: 282, label: 'Verified: all 4 criteria met', kind: 'done' }
 ];

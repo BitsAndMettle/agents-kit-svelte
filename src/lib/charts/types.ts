@@ -186,3 +186,47 @@ export interface FeatureSummary {
 	/** Free text such as `Updated 4m ago`. */
 	updatedLabel?: string;
 }
+
+/** One card (or any work item) on a `FeatureTimeline`. Times are days from the Feature's start. */
+export interface TimelineItem {
+	id: string;
+	label: string;
+	/** Short secondary text, e.g. the card number. */
+	detail?: string;
+	status: 'planned' | 'running' | 'done' | 'failed' | 'blocked';
+	/** The planned window, `[startDay, endDay]`. */
+	planned: [number, number];
+	/** When work actually started, and when it finished (leave the end out while it runs). */
+	actual?: [number, number?];
+	/** Forecast finish day for work still running. */
+	forecast?: number;
+	/** Anything your click handler needs. */
+	data?: unknown;
+}
+
+/** A dated marker on a `FeatureTimeline`: a release, a deadline or an incident. */
+export interface TimelineMilestone {
+	id: string;
+	/** Day from the Feature's start. */
+	t: number;
+	label: string;
+	kind?: 'release' | 'deadline' | 'incident';
+}
+
+/** One sample of cumulative token spend for `TokenBurnChart`. */
+export interface BurnPoint {
+	/** Seconds (or any unit) since the run started. */
+	t: number;
+	/** Tokens spent so far. */
+	spent: number;
+}
+
+/** A labelled moment on a `TokenBurnChart` or `RunReplayScrubber`. */
+export interface RunMark {
+	id: string;
+	t: number;
+	label: string;
+	kind?: 'handoff' | 'tool' | 'decision' | 'error' | 'done';
+	/** Anything your click handler needs. */
+	data?: unknown;
+}

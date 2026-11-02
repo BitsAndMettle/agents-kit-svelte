@@ -1,8 +1,17 @@
 <script lang="ts">
 	import FeatureCard from '$lib/charts/FeatureCard.svelte';
 	import FeatureLineage from '$lib/charts/FeatureLineage.svelte';
+	import FeatureTimeline from '$lib/charts/FeatureTimeline.svelte';
 	import type { FeatureSummary, LineageNode } from '$lib/charts/types';
-	import { SAMPLE_FEATURES, SAMPLE_LINEAGE_EDGES, SAMPLE_LINEAGE_NODES } from '$lib/fixtures/charts';
+	import {
+		SAMPLE_FEATURES,
+		SAMPLE_FEATURE_START,
+		SAMPLE_LINEAGE_EDGES,
+		SAMPLE_LINEAGE_NODES,
+		SAMPLE_TIMELINE_ITEMS,
+		SAMPLE_TIMELINE_MILESTONES,
+		SAMPLE_TIMELINE_TODAY
+	} from '$lib/fixtures/charts';
 	import { cn } from '$lib/ui/cn';
 	import { rise } from '$lib/state/motion.svelte';
 	import LineageDetailSheet from './LineageDetailSheet.svelte';
@@ -35,7 +44,7 @@
 		</p>
 	</div>
 
-	<section aria-label='Features' class={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-3', open && 'xl:grid-cols-2 2xl:grid-cols-3')}>
+	<section aria-label="Features" class={cn('grid gap-4 md:grid-cols-2 lg:grid-cols-3', open && 'xl:grid-cols-2 2xl:grid-cols-3')}>
 		{#each SAMPLE_FEATURES as feature, i (feature.id)}
 			<div in:rise={{ y: 8, duration: 260, delay: i * 80 }}>
 				<FeatureCard
@@ -51,6 +60,16 @@
 	{#if note}
 		<p class="rounded-card bg-canvas-secondary px-4 py-2.5 text-[13px] text-fg-main" in:rise={{ y: 4, duration: 160 }}>{note}</p>
 	{/if}
+
+	<FeatureTimeline
+		title="F-12 timeline · planned vs actual"
+		items={SAMPLE_TIMELINE_ITEMS}
+		milestones={SAMPLE_TIMELINE_MILESTONES}
+		today={SAMPLE_TIMELINE_TODAY}
+		start={SAMPLE_FEATURE_START}
+		onSelectItem={(item) => (open = SAMPLE_LINEAGE_NODES.find((n) => n.id === item.id) ?? open)}
+		onSelectMilestone={(m) => (open = SAMPLE_LINEAGE_NODES.find((n) => n.id === m.id) ?? open)}
+	/>
 
 	<FeatureLineage
 		title="F-12 lineage · SSO for the billing portal"

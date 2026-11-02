@@ -2095,7 +2095,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 8. Charts & Timelines (5 components)
+	// 8. Charts & Timelines (8 components)
 	{
 		slug: 'generative-chart',
 		name: 'GenerativeChart',
@@ -2244,6 +2244,85 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 </script>
 
 <FeatureLineage title="F-12 lineage" {nodes} {edges} onSelectNode={(node) => console.log('open', node.id)} />`
+	},
+	{
+		slug: 'feature-timeline',
+		name: 'FeatureTimeline',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/FeatureTimeline.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'A Feature’s cards, planned against what actually happened, with a marching forecast for work still running, releases and incidents along the top, and the ship date it adds up to. Sort by slip to see what is late.',
+		usageSnippet: `<script lang="ts">
+  import { FeatureTimeline, type TimelineItem, type TimelineMilestone } from 'agents-kit-svelte';
+
+  const items: TimelineItem[] = [
+    { id: 'c214', label: 'SSO login', status: 'done', planned: [0, 5], actual: [0, 6] },
+    { id: 'c216', label: 'Logout and refresh', status: 'running', planned: [6, 11], actual: [8], forecast: 15 },
+    { id: 'c217', label: 'Admin SSO settings', status: 'planned', planned: [10, 15] }
+  ];
+  const milestones: TimelineMilestone[] = [{ id: 'v280', t: 11, label: 'v2.8.0', kind: 'release' }];
+</script>
+
+<FeatureTimeline
+  title="F-12 timeline"
+  {items}
+  {milestones}
+  today={13}
+  start="2026-10-20"
+  onSelectItem={(item) => console.log('open card', item.id)}
+/>`
+	},
+	{
+		slug: 'token-burn-chart',
+		name: 'TokenBurnChart',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/TokenBurnChart.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'Tokens spent against a budget, with the current burn rate, a projection to the end of the run, and a pulsing marker where the budget runs out. Pins handoffs, retries and escalations on the line.',
+		usageSnippet: `<script lang="ts">
+  import { TokenBurnChart, type BurnPoint, type RunMark } from 'agents-kit-svelte';
+
+  const points: BurnPoint[] = [
+    { t: 0, spent: 0 },
+    { t: 60, spent: 3200 },
+    { t: 120, spent: 8600 },
+    { t: 180, spent: 14100 }
+  ];
+  const marks: RunMark[] = [{ id: 'retry', t: 146, label: 'Tests failed: retrying', kind: 'error' }];
+</script>
+
+<TokenBurnChart
+  title="Token burn"
+  {points}
+  {marks}
+  budget={20000}
+  end={284}
+  onSelectMark={(mark) => console.log('open', mark.id)}
+/>`
+	},
+	{
+		slug: 'run-replay-scrubber',
+		name: 'RunReplayScrubber',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/RunReplayScrubber.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'A transport bar for replaying an agent run: play, pause, speed, drag to scrub, and skip between handoffs, retries and decisions. The track is coloured by phase and a caption says what is happening now. Bind `now` and feed it to your charts.',
+		usageSnippet: `<script lang="ts">
+  import { RunReplayScrubber, type PhaseBand, type RunMark } from 'agents-kit-svelte';
+
+  let now = $state(0);
+  const phases: PhaseBand[] = [
+    { id: 'plan', label: 'Plan', start: 0, end: 40 },
+    { id: 'implement', label: 'Implement', start: 40, end: 148 }
+  ];
+  const marks: RunMark[] = [{ id: 'h1', t: 38, label: 'Plan handed to the implementer', kind: 'handoff' }];
+</script>
+
+<RunReplayScrubber duration={148} bind:now {phases} {marks} />
+<p>Replaying at {Math.round(now)} s</p>`
 	},
 
 	// 9. Voice & Effects (3 components)
