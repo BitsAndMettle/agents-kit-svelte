@@ -2095,7 +2095,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 8. Charts & Timelines (3 components)
+	// 8. Charts & Timelines (5 components)
 	{
 		slug: 'generative-chart',
 		name: 'GenerativeChart',
@@ -2185,6 +2185,65 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 </script>
 
 <ModelPhaseStream title="Model throughput" {phases} {series} {events} />`
+	},
+	{
+		slug: 'feature-card',
+		name: 'FeatureCard',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/FeatureCard.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'One Feature at a glance: acceptance criteria met with a progress sparkline, its cards split by state, attempts, PRs, and tokens against budget. Click a segment of the cards bar to filter, or open the Feature.',
+		usageSnippet: `<script lang="ts">
+  import { FeatureCard, type FeatureSummary } from 'agents-kit-svelte';
+
+  const feature: FeatureSummary = {
+    id: 'F-12',
+    title: 'SSO for the billing portal',
+    status: 'in-progress',
+    riskTier: 'T3',
+    cards: { done: 3, running: 1, failed: 0, planned: 1 },
+    criteriaMet: 9,
+    criteriaTotal: 14,
+    attempts: 6,
+    pullRequests: 4,
+    tokensSpent: 412000,
+    tokenBudget: 600000,
+    progress: [10, 25, 30, 45, 64]
+  };
+</script>
+
+<FeatureCard
+  {feature}
+  onOpen={(f) => console.log('open', f.id)}
+  onSelectCards={(state) => console.log('filter cards', state)}
+/>`
+	},
+	{
+		slug: 'feature-lineage',
+		name: 'FeatureLineage',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/FeatureLineage.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'Where a Feature came from and everything it turned into: cards, agent attempts, PRs, releases and incidents as a graph. Hover a node to trace its ancestry, fold a branch away, and click a node to open what is behind it.',
+		usageSnippet: `<script lang="ts">
+  import { FeatureLineage, type LineageNode, type LineageEdge } from 'agents-kit-svelte';
+
+  const nodes: LineageNode[] = [
+    { id: 'f12', kind: 'feature', label: 'SSO for the billing portal', status: 'running' },
+    { id: 'c214', kind: 'card', label: 'SSO login', detail: '#214', status: 'done' },
+    { id: 'a214', kind: 'attempt', label: 'Attempt 1', detail: 'sonnet', status: 'done' },
+    { id: 'p301', kind: 'pr', label: 'feat(auth): SSO login', detail: '#301', status: 'merged' }
+  ];
+  const edges: LineageEdge[] = [
+    { from: 'f12', to: 'c214', rel: 'spawned' },
+    { from: 'c214', to: 'a214', rel: 'attempted' },
+    { from: 'a214', to: 'p301', rel: 'opened' }
+  ];
+</script>
+
+<FeatureLineage title="F-12 lineage" {nodes} {edges} onSelectNode={(node) => console.log('open', node.id)} />`
 	},
 
 	// 9. Voice & Effects (3 components)

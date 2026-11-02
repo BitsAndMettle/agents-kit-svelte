@@ -35,6 +35,7 @@
 		LayoutTemplate,
 		BookOpenText,
 		ChartGantt,
+		Network,
 		MessagesSquare,
 		RotateCcw,
 		Scale,
@@ -118,6 +119,8 @@
 		GenerativeChart,
 		AgentHandoffGantt,
 		ModelPhaseStream,
+		FeatureCard,
+		FeatureLineage,
 		Terminal,
 		TestResults,
 		ThinkingShimmer,
@@ -130,7 +133,7 @@
 		WebPreview
 	} from '$lib';
 	import { SAMPLE_SKILLS, SAMPLE_SKILL_MANIFEST, SAMPLE_SKILL_PROPOSAL, SAMPLE_SKILL_STEPS } from '$lib/entries/fixtures';
-	import { SAMPLE_CHART_SPECS, SAMPLE_HANDOFFS, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS } from '$lib/fixtures/charts';
+	import { SAMPLE_CHART_SPECS, SAMPLE_FEATURE, SAMPLE_HANDOFFS, SAMPLE_LINEAGE_EDGES, SAMPLE_LINEAGE_NODES, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS } from '$lib/fixtures/charts';
 	import { CATALOG_ITEMS, type CatalogCategory } from '$site/catalog-registry';
 	import { holdHeight } from '$site/hold-height';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -853,6 +856,15 @@
 			cta: 'Try the charts'
 		},
 		{
+			href: `${base}/features/`,
+			icon: Network,
+			eyebrow: 'Features & lineage',
+			title: 'Feature cards and lineage',
+			description:
+				'A Feature, its cards, every agent attempt, the PRs they opened and the releases they shipped in, as a graph you can trace and fold.',
+			cta: 'Try the features'
+		},
+		{
 			href: `${base}/intelligent-ui/`,
 			icon: LayoutTemplate,
 			eyebrow: 'Generative surfaces',
@@ -947,7 +959,7 @@
 			</a>
 		</div>
 
-		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each APP_EXAMPLES as example (example.href)}
 				<a
 					href={example.href}
@@ -1581,6 +1593,12 @@
 								<AgentHandoffGantt title="Add SSO to the billing portal" lanes={SAMPLE_HANDOFF_LANES} spans={SAMPLE_HANDOFF_SPANS} handoffs={SAMPLE_HANDOFFS} />
 							{:else if item.slug === 'model-phase-stream'}
 								<ModelPhaseStream title="Model throughput by phase" phases={SAMPLE_PHASE_BANDS} series={SAMPLE_MODEL_SERIES} events={SAMPLE_MODEL_EVENTS} />
+							{:else if item.slug === 'feature-card'}
+								<div class="mx-auto max-w-md">
+									<FeatureCard feature={SAMPLE_FEATURE} />
+								</div>
+							{:else if item.slug === 'feature-lineage'}
+								<FeatureLineage title="F-12 lineage" nodes={SAMPLE_LINEAGE_NODES} edges={SAMPLE_LINEAGE_EDGES} />
 							{:else if item.slug === 'border-beam'}
 								<BorderBeam />
 							{:else if item.slug === 'svelte5-motion-lab'}

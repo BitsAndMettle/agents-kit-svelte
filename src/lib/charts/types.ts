@@ -131,3 +131,58 @@ export interface ChartPoint {
 	y: number;
 	series: string;
 }
+
+// --- Features and lineage ---
+
+/** What a node in a Feature's lineage is. */
+export type LineageNodeKind = 'feature' | 'card' | 'attempt' | 'pr' | 'release' | 'incident';
+
+/** Where a lineage node stands. Each kind uses the ones that fit it. */
+export type LineageStatus = 'planned' | 'running' | 'done' | 'failed' | 'superseded' | 'open' | 'merged' | 'shipped' | 'resolved';
+
+/** One thing a Feature turned into: a card, an attempt at it, a PR, a release, an incident. */
+export interface LineageNode {
+	id: string;
+	kind: LineageNodeKind;
+	label: string;
+	/** Short second line, e.g. `#214`, `claude-sonnet · 0:56`, `+171 −44`. */
+	detail?: string;
+	status?: LineageStatus;
+	/** Anything your click handler needs. The graph never reads it. */
+	data?: unknown;
+}
+
+/** How one lineage node led to another. */
+export type LineageRelation = 'spawned' | 'attempted' | 'retried' | 'opened' | 'shipped-in' | 'caused' | 'fixed-by' | 'supersedes';
+
+export interface LineageEdge {
+	from: string;
+	to: string;
+	rel: LineageRelation;
+	/** Drawn as a loop back to an earlier column without moving the target, e.g. an incident pointing at the card that fixes it. */
+	backlink?: boolean;
+}
+
+/** One Feature at a glance, for `FeatureCard`. */
+export interface FeatureSummary {
+	id: string;
+	title: string;
+	summary?: string;
+	riskTier?: 'T0' | 'T1' | 'T2' | 'T3' | 'T4';
+	status: 'planned' | 'in-progress' | 'shipped' | 'blocked';
+	owner?: string;
+	/** Cards by state, drawn as a segmented bar. */
+	cards: { done: number; running: number; failed: number; planned: number };
+	criteriaMet: number;
+	criteriaTotal: number;
+	attempts: number;
+	pullRequests: number;
+	tokensSpent: number;
+	tokenBudget?: number;
+	/** Acceptance criteria met after each attempt, 0 to 100, drawn as a sparkline. */
+	progress?: number[];
+	/** Agents or models that have worked on it. */
+	agents?: string[];
+	/** Free text such as `Updated 4m ago`. */
+	updatedLabel?: string;
+}
