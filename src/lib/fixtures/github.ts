@@ -4,6 +4,10 @@
  */
 
 import type {
+	CheckRun,
+	DiffStat,
+	PrGraphCommit,
+	PrGraphLane,
 	GitHubBentoStat,
 	GitHubBranchData,
 	GitHubCheckItem,
@@ -460,4 +464,55 @@ export const SAMPLE_REVIEW_THREAD: GitHubReviewThreadData = {
 export const SAMPLE_BENTO_STATS: GitHubBentoStat[] = [
 	{ label: 'Open Agent PRs', value: '3 / 3', detail: 'PR 2136, PR 2150, PR 2153 (All PASS)' },
 	{ label: 'Check Gates', value: '98.4%', detail: '427 unit assertions · 5 viewports', tone: 'success' }
+];
+
+/** Sample diff for `GitHubPrActionBar`. */
+export const SAMPLE_PR_DIFF: DiffStat = {
+	additions: 482,
+	deletions: 37,
+	files: [
+		{ path: 'src/middleware.ts', additions: 64, deletions: 12 },
+		{ path: 'src/lib/session/refresh.ts', additions: 118, deletions: 0 },
+		{ path: 'src/lib/session/token.ts', additions: 41, deletions: 19 },
+		{ path: 'e2e/session-refresh.spec.ts', additions: 203, deletions: 0 },
+		{ path: 'e2e/checkout.spec.ts', additions: 56, deletions: 6 }
+	]
+};
+
+/** Sample branches for `GitHubPullRequestGraph`. */
+export const SAMPLE_PR_GRAPH_LANES: PrGraphLane[] = [
+	{ id: 'main', branch: 'main', base: true },
+	{ id: 'session', branch: 'feat/session-refresh' },
+	{ id: 'analytics', branch: 'feat/checkout-analytics' }
+];
+
+/** Sample commits for `GitHubPullRequestGraph`, newest first. */
+export const SAMPLE_PR_GRAPH_COMMITS: PrGraphCommit[] = [
+	{ sha: 'd29f50a', message: 'Add session refresh tests', lane: 'session', author: 'You', age: 'now' },
+	{ sha: 'c70a92e', message: 'Refresh sessions near expiry', lane: 'session', author: 'You', age: '25m' },
+	{ sha: 'e83c51b', message: 'Add analytics consent banner', lane: 'analytics', author: 'Sam', age: '32m' },
+	{ sha: '1f8e3b0', message: 'Read session expiry from the token', lane: 'session', author: 'You', age: '40m' },
+	{ sha: '62b0e4c', message: 'Track checkout funnel events', lane: 'analytics', author: 'Sam', age: '2h' },
+	{ sha: '9c2d4a1', message: 'Bump next to 16.3', lane: 'main', author: 'Sam', age: '3h' }
+];
+
+/** Sample suite for `GitHubChecksWaterfall`: four passed, e2e failed. Seconds since the suite started. */
+export const SAMPLE_CHECK_RUNS: CheckRun[] = [
+	{ id: 'lint', name: 'lint', status: 'passed', start: 1, duration: 11 },
+	{ id: 'typecheck', name: 'typecheck', status: 'passed', start: 1, duration: 21 },
+	{ id: 'unit', name: 'unit', status: 'passed', start: 2, duration: 34 },
+	{ id: 'preview', name: 'Vercel Preview', status: 'passed', start: 0, duration: 40 },
+	{
+		id: 'e2e',
+		name: 'e2e',
+		status: 'failed',
+		start: 41,
+		duration: 33,
+		failure: {
+			location: 'e2e/checkout.spec.ts:42',
+			title: 'checkout › keeps the cart after a session refresh',
+			expected: '/checkout',
+			received: '/sign-in?next=%2Fcheckout'
+		}
+	}
 ];

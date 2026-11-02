@@ -500,7 +500,11 @@ export type DynamicUINodeType =
 	| 'agent-orchestrator'
 	| 'agent-evaluator'
 	| 'stack-trace'
-	| 'schema-display';
+	| 'schema-display'
+	| 'github-pr-action-bar'
+	| 'github-pr-graph'
+	| 'github-checks-waterfall'
+	| 'agent-work-trace';
 
 export interface DynamicUINode {
 	id: string;
@@ -508,4 +512,102 @@ export interface DynamicUINode {
 	component: DynamicUINodeType | (string & {});
 	title?: string;
 	props: Record<string, unknown>;
+}
+
+/* ------------------------------------------------------------------ */
+/* Pull request flow: create, graph, checks waterfall, agent work trace */
+/* ------------------------------------------------------------------ */
+
+/** Lines changed in one file, listed under `GitHubPrActionBar`'s diff stat. */
+export interface DiffStatFile {
+	path: string;
+	additions: number;
+	deletions: number;
+}
+
+/** Lines added and removed across a change, with optional per-file detail. */
+export interface DiffStat {
+	additions: number;
+	deletions: number;
+	files?: DiffStatFile[];
+}
+
+/** Where `GitHubPrActionBar` is in opening a pull request. */
+export type PrActionStatus = 'idle' | 'creating' | 'created';
+
+/** One lane of `GitHubPullRequestGraph`: a branch drawn as a coloured line. */
+export interface PrGraphLane {
+	id: string;
+	/** Branch name, shown as a chip on the lane's newest commit. */
+	branch: string;
+	/** Any CSS colour. Defaults to the chart palette, then grey for the base lane. */
+	color?: string;
+	/** The base branch (e.g. `main`); drawn grey and dashed above its newest commit. */
+	base?: boolean;
+}
+
+/** A commit row in `GitHubPullRequestGraph`, newest first. */
+export interface PrGraphCommit {
+	sha: string;
+	message: string;
+	/** Id of the lane the commit sits on. */
+	lane: string;
+	author: string;
+	/** Relative time, e.g. `now`, `25m`, `2h`. */
+	age: string;
+}
+
+/** Whether the pull request can merge into its base. */
+export type PrMergeState = 'checking' | 'clean' | 'conflict' | 'merged';
+
+/** Lifecycle state of a pull request. */
+export type PrState = 'draft' | 'open' | 'merged' | 'closed';
+
+/** Status of one CI check run. */
+export type CheckRunStatus = 'queued' | 'running' | 'passed' | 'failed' | 'skipped';
+
+/** Why a check failed, shown under its bar in `GitHubChecksWaterfall`. */
+export interface CheckRunFailure {
+	/** Where it failed, e.g. `e2e/checkout.spec.ts:42`. */
+	location?: string;
+	/** The failing test or step, e.g. `checkout › keeps the cart after a session refresh`. */
+	title: string;
+	expected?: string;
+	received?: string;
+	/** Free text when there is no expected/received pair. */
+	message?: string;
+}
+
+/** One CI check on a commit. Times are seconds since the suite started. */
+export interface CheckRun {
+	id: string;
+	name: string;
+	status: CheckRunStatus;
+	/** When it started. Queued checks leave it out. */
+	start?: number;
+	/** How long it took. Running checks leave it out and grow to `now`. */
+	duration?: number;
+	failure?: CheckRunFailure;
+	/** Link to the run's logs. */
+	url?: string;
+}
+
+/** What the agent is doing with the pull request, shown in the checks header. */
+export type ChecksPhase = 'checks' | 'fixing' | 'merging' | 'merged';
+
+/** Kind of step in `AgentWorkTrace`; sets the marker. */
+export type WorkStepKind = 'note' | 'edit' | 'run' | 'push' | 'result';
+
+/** One step in `AgentWorkTrace`. */
+export interface WorkStep {
+	id: string;
+	label: string;
+	/** Muted text after the label, e.g. `Pushed 4a1c9e`. */
+	detail?: string;
+	kind?: WorkStepKind;
+	status: 'pending' | 'running' | 'done' | 'failed';
+	/** Files the step touched, shown as chips. */
+	files?: string[];
+	/** Draws the step on a short branch off the main line, e.g. a test run inside an edit. */
+	nested?: boolean;
 }

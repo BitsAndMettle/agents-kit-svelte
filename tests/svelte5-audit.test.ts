@@ -77,8 +77,8 @@ test('every single .svelte component in src/lib/ has a dedicated 1-to-1 showcase
 		relative(rootDir, f).replace(/\\/g, '/')
 	);
 
-	assert.equal(libSvelteFiles.length, 85, 'Expected 85 .svelte components in src/lib/');
-	assert.equal(CATALOG_ITEMS.length, 85, 'Expected 85 catalog items in CATALOG_ITEMS');
+	assert.equal(libSvelteFiles.length, 89, 'Expected 89 .svelte components in src/lib/');
+	assert.equal(CATALOG_ITEMS.length, 89, 'Expected 89 catalog items in CATALOG_ITEMS');
 
 	const catalogPaths = new Set(CATALOG_ITEMS.map((item) => item.sveltePath));
 	for (const relPath of libSvelteFiles) {

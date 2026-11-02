@@ -3,6 +3,7 @@
  * Import from `agents-kit-svelte/fixtures`. Components never fall back to it.
  */
 
+import type { WorkStep } from '../types';
 import type { SidebarResource } from '../agents/AISidebar.svelte';
 import type { SchemaParameterItem, SchemaPropertyItem } from '../ai-elements/SchemaDisplay.svelte';
 import type { PlanMilestone } from '../ai-elements/PlanCard.svelte';
@@ -310,4 +311,14 @@ export const SAMPLE_PREVIEW_LOGS: PreviewConsoleLog[] = [
 		message: '[Stream] Connected to G0 read contract event source (revision 18)',
 		timestamp: '14:22:11'
 	}
+];
+
+/** Sample steps for `AgentWorkTrace`: an agent fixing a failed e2e check. */
+export const SAMPLE_WORK_STEPS: WorkStep[] = [
+	{ id: 'w1', label: 'Checkout sent you to sign in after a refresh', status: 'done' },
+	{ id: 'w2', label: 'The redirect drops the refreshed cookie', status: 'done', files: ['src/middleware.ts', 'e2e/checkout.spec.ts'] },
+	{ id: 'w3', label: 'Edited middleware.ts', kind: 'edit', status: 'done' },
+	{ id: 'w4', label: '12 e2e tests passed', kind: 'run', status: 'done', nested: true },
+	{ id: 'w5', label: 'Pushed 4a1c9e to #128', kind: 'push', status: 'done' },
+	{ id: 'w6', label: 'Fixed the checkout test', detail: 'Pushed 4a1c9e', kind: 'result', status: 'done' }
 ];
