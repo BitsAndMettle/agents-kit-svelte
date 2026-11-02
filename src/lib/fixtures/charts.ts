@@ -32,12 +32,152 @@ export const SAMPLE_HANDOFF_SPANS: HandoffSpan[] = [
 	{ id: 'verify-2', lane: 'verifier', phase: 'verify', start: 254, end: 282, status: 'done', label: 'Verify', attempt: 2, tokens: 10_300 }
 ];
 
+/** A file changed in a handoff's diff, in the shape `FileDiff` takes. */
+export interface SampleDiffFile {
+	filename: string;
+	patch: string;
+	additions: number;
+	deletions: number;
+}
+
+const DIFF_ATTEMPT_1: SampleDiffFile[] = [
+	{
+		filename: 'src/lib/auth/sso.ts',
+		additions: 96,
+		deletions: 21,
+		patch: [
+			'@@ -1,9 +1,24 @@',
+			" import { createRemoteJWKSet, jwtVerify } from 'jose';",
+			"+import { sessionCache } from './session-cache';",
+			' ',
+			' export async function verifySsoToken(token: string) {',
+			'-	const { payload } = await jwtVerify(token, jwks);',
+			'-	return payload;',
+			'+	const cached = sessionCache.get(token);',
+			'+	if (cached) return cached;',
+			'+	const { payload } = await jwtVerify(token, jwks, { issuer: ISSUER });',
+			'+	sessionCache.set(token, payload, payload.exp);',
+			'+	return payload;',
+			' }'
+		].join('\n')
+	},
+	{
+		filename: 'src/lib/auth/session-cache.ts',
+		additions: 46,
+		deletions: 17,
+		patch: [
+			'@@ -0,0 +1,14 @@',
+			'+const entries = new Map<string, { value: unknown; expires: number }>();',
+			'+',
+			'+export const sessionCache = {',
+			'+	get(key: string) {',
+			'+		const hit = entries.get(key);',
+			'+		return hit && hit.expires > Date.now() / 1000 ? hit.value : undefined;',
+			'+	},',
+			'+	set(key: string, value: unknown, expires = 0) {',
+			'+		entries.set(key, { value, expires });',
+			'+	}',
+			'+};'
+		].join('\n')
+	}
+];
+
+const DIFF_ATTEMPT_2: SampleDiffFile[] = [
+	{
+		filename: 'src/lib/auth/session-cache.ts',
+		additions: 18,
+		deletions: 4,
+		patch: [
+			'@@ -8,7 +8,15 @@ export const sessionCache = {',
+			' 	set(key: string, value: unknown, expires = 0) {',
+			' 		entries.set(key, { value, expires });',
+			' 	},',
+			'+	/** Drops a session so the next request refreshes its token. */',
+			'+	invalidate(key: string) {',
+			'+		entries.delete(key);',
+			'+	}',
+			' };'
+		].join('\n')
+	},
+	{
+		filename: 'src/routes/auth/callback/+server.ts',
+		additions: 11,
+		deletions: 2,
+		patch: [
+			'@@ -14,6 +14,9 @@ export async function GET({ url, cookies }) {',
+			' 	const token = await exchangeCode(url.searchParams.get(\'code\'));',
+			'-	cookies.set(\'session\', token, COOKIE_OPTIONS);',
+			'+	const previous = cookies.get(\'session\');',
+			'+	if (previous) sessionCache.invalidate(previous);',
+			'+	cookies.set(\'session\', token, COOKIE_OPTIONS);',
+			' 	throw redirect(303, \'/billing\');'
+		].join('\n')
+	}
+];
+
 export const SAMPLE_HANDOFFS: HandoffLink[] = [
-	{ id: 'h1', from: 'plan-1', to: 'impl-1', artifact: 'plan.md', reason: 'Plan approved: 4 steps across 6 files.' },
-	{ id: 'h2', from: 'impl-1', to: 'verify-1', artifact: 'diff +142 −38', reason: 'Implementation done; asking for the test run.' },
-	{ id: 'h3', from: 'verify-1', to: 'impl-2', artifact: '2 failing tests', reason: 'session.test.ts expects a refreshed token after SSO login.' },
-	{ id: 'h4', from: 'impl-2', to: 'review-1', artifact: 'diff +171 −44', reason: 'Tests green; requesting review.' },
-	{ id: 'h5', from: 'review-1', to: 'verify-2', artifact: 'review: approve', reason: 'One nit fixed inline, then approved.' }
+	{
+		id: 'h1',
+		from: 'plan-1',
+		to: 'impl-1',
+		artifact: 'plan.md',
+		kind: 'file',
+		reason: 'Plan approved: 4 steps across 6 files.',
+		data: [
+			'# Add SSO to the billing portal',
+			'',
+			'1. Verify SSO tokens against the IdP JWKS (`src/lib/auth/sso.ts`).',
+			'2. Cache verified sessions until `exp` to cut IdP calls on checkout.',
+			'3. Swap the password form for the SSO button on `/billing/login`.',
+			'4. Cover login, refresh and logout in `session.test.ts`.',
+			'',
+			'Risk: T3 (auth). Needs review before merge.'
+		].join('\n')
+	},
+	{ id: 'h2', from: 'impl-1', to: 'verify-1', artifact: 'diff +142 −38', kind: 'diff', reason: 'Implementation done; asking for the test run.', data: DIFF_ATTEMPT_1 },
+	{
+		id: 'h3',
+		from: 'verify-1',
+		to: 'impl-2',
+		artifact: '2 failing tests',
+		kind: 'tests',
+		reason: 'session.test.ts expects a refreshed token after SSO login.',
+		data: [
+			{
+				id: 'session',
+				name: 'session.test.ts',
+				status: 'failed',
+				tests: [
+					{ id: 't1', name: 'verifies a valid SSO token', status: 'passed', durationMs: 42 },
+					{ id: 't2', name: 'rejects a token from another issuer', status: 'passed', durationMs: 18 },
+					{ id: 't3', name: 'refreshes the session after re-login', status: 'failed', durationMs: 61, errorMessage: 'Expected a new token, received the cached one' },
+					{ id: 't4', name: 'logout clears the cached session', status: 'failed', durationMs: 23, errorMessage: 'sessionCache.invalidate is not a function' }
+				]
+			},
+			{
+				id: 'billing',
+				name: 'billing-login.test.ts',
+				status: 'passed',
+				tests: [{ id: 't5', name: 'shows the SSO button', status: 'passed', durationMs: 104 }]
+			}
+		]
+	},
+	{ id: 'h4', from: 'impl-2', to: 'review-1', artifact: 'diff +171 −44', kind: 'diff', reason: 'Tests green; requesting review.', data: [...DIFF_ATTEMPT_1, ...DIFF_ATTEMPT_2] },
+	{
+		id: 'h5',
+		from: 'review-1',
+		to: 'verify-2',
+		artifact: 'review: approve',
+		kind: 'review',
+		reason: 'One nit fixed inline, then approved.',
+		data: [
+			'**Approved** with one nit, fixed inline.',
+			'',
+			'- `session-cache.ts:4`: compare `exp` in seconds, not milliseconds. Fixed.',
+			'- The callback now invalidates the old session before setting the new cookie. Good.',
+			'- Escalated to claude-opus for a second look because the diff touches auth middleware.'
+		].join('\n')
+	}
 ];
 
 export const SAMPLE_PHASE_BANDS: PhaseBand[] = [

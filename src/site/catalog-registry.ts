@@ -2103,7 +2103,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/charts/GenerativeChart.svelte',
 		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
 		description:
-			'A line, area or bar chart drawn from one JSON spec an agent emits. It draws in, rescales smoothly as data streams, pins the agent’s callouts to points and sends a clicked point back as a question.',
+			'A line, area or bar chart drawn from one JSON spec an agent emits. It draws in, rescales smoothly as data streams, pins the agent’s callouts to points, and hands a clicked point to your onSelectPoint.',
 		usageSnippet: `<script lang="ts">
   import { GenerativeChart, type ChartSpec, type ChartPoint } from 'agents-kit-svelte';
 
@@ -2123,12 +2123,12 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
     annotations: [{ x: 2, series: 'After', label: 'Cache shipped' }]
   };
 
-  function explain(point: ChartPoint) {
-    console.log('Ask the agent about', point);
+  function openDetail(point: ChartPoint) {
+    console.log('Open details for', point);
   }
 </script>
 
-<GenerativeChart {spec} height={240} onExplain={explain} />`
+<GenerativeChart {spec} height={240} onSelectPoint={openDetail} actionLabel="Click to open the build" />`
 	},
 	{
 		slug: 'agent-handoff-gantt',
@@ -2149,10 +2149,18 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
     { id: 'plan', lane: 'planner', phase: 'plan', start: 0, end: 38, status: 'done', label: 'Plan' },
     { id: 'impl', lane: 'implementer', phase: 'implement', start: 42, status: 'running', label: 'Implement' }
   ];
-  const handoffs: HandoffLink[] = [{ id: 'h1', from: 'plan', to: 'impl', artifact: 'plan.md' }];
+  const handoffs: HandoffLink[] = [{ id: 'h1', from: 'plan', to: 'impl', artifact: 'plan.md', kind: 'file' }];
 </script>
 
-<AgentHandoffGantt title="Card #214" {lanes} {spans} {handoffs} now={96} />`
+<AgentHandoffGantt
+  title="Card #214"
+  {lanes}
+  {spans}
+  {handoffs}
+  now={96}
+  onSelectSpan={(span) => console.log('span', span.id)}
+  onSelectHandoff={(handoff) => console.log('open', handoff.artifact)}
+/>`
 	},
 	{
 		slug: 'model-phase-stream',

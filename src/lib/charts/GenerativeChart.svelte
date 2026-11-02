@@ -18,8 +18,10 @@
 		highlight?: string | null;
 		/** Called when the person hovers a legend item or leaves it (`null`). */
 		onHighlight?: (series: string | null) => void;
-		/** Called when the person clicks a point or presses Enter on it. Shows an "Ask about this" hint. */
-		onExplain?: (point: ChartPoint) => void;
+		/** Called when the person clicks a point or presses Enter on it: open a detail view, ask the agent, filter. */
+		onSelectPoint?: (point: ChartPoint) => void;
+		/** Hint shown in the tooltip when `onSelectPoint` is set. */
+		actionLabel?: string;
 		class?: string;
 	}
 
@@ -28,7 +30,8 @@
 		height = 240,
 		highlight = null,
 		onHighlight,
-		onExplain,
+		onSelectPoint,
+		actionLabel = 'Click for details',
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -202,7 +205,7 @@
 			setActive(Math.min(xs.length - 1, Math.max(0, (activeIndex ?? (delta > 0 ? -1 : xs.length)) + delta)));
 		} else if (event.key === 'Enter' && activeIndex !== null) {
 			const point = pointAt(activeIndex);
-			if (point) onExplain?.(point);
+			if (point) onSelectPoint?.(point);
 		} else if (event.key === 'Escape') {
 			activeIndex = null;
 		}
@@ -211,7 +214,7 @@
 	function handleClick(): void {
 		if (activeIndex === null) return;
 		const point = pointAt(activeIndex);
-		if (point) onExplain?.(point);
+		if (point) onSelectPoint?.(point);
 	}
 
 	function toggleSeries(name: string): void {
@@ -290,7 +293,7 @@
 		<svg
 			{width}
 			{height}
-			class="block touch-none overflow-visible outline-none focus-visible:rounded-control focus-visible:ring-2 focus-visible:ring-accent-primary/40"
+			class={cn('block touch-none overflow-visible outline-none focus-visible:rounded-control focus-visible:ring-2 focus-visible:ring-accent-primary/40', onSelectPoint && activeIndex !== null && 'cursor-pointer')}
 			role="slider"
 			aria-label={summary}
 			aria-valuemin={0}
@@ -413,8 +416,8 @@
 						</p>
 					{/if}
 				{/each}
-				{#if onExplain}
-					<p class="mt-1.5 flex items-center gap-1 border-t border-canvas-border pt-1.5 text-accent-primary"><Sparkles class="size-3" aria-hidden="true" />Click to ask about this</p>
+				{#if onSelectPoint}
+					<p class="mt-1.5 flex items-center gap-1 border-t border-canvas-border pt-1.5 text-accent-primary"><Sparkles class="size-3" aria-hidden="true" />{actionLabel}</p>
 				{/if}
 			</div>
 		{/if}

@@ -5,10 +5,10 @@
 	import { cubicOut } from 'svelte/easing';
 	import { draw, fade } from 'svelte/transition';
 	import type { TransitionConfig } from 'svelte/transition';
-	import { ArrowRightLeft, Clock } from '@lucide/svelte';
+	import { ArrowRightLeft, Clock, FileCode, FileDiff, FileText, FlaskConical, MessageSquare } from '@lucide/svelte';
 	import { motionDuration, rise } from '../state/motion.svelte';
 	import { formatClock, formatCompact, niceStep, phaseColor, scaleLinear, ticks } from './scale';
-	import type { HandoffLane, HandoffLink, HandoffSpan } from './types';
+	import type { HandoffArtifactKind, HandoffLane, HandoffLink, HandoffSpan } from './types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		/** One row per agent or model, top to bottom. */
@@ -25,8 +25,14 @@
 		highlight?: string | null;
 		/** Called with a lane id when the person hovers its row, and `null` when they leave. */
 		onHighlight?: (laneId: string | null) => void;
-		/** Called when the person clicks a span or presses Enter on it. */
+		/** Called when the person clicks a span or presses Enter on it. Spans are only clickable when set. */
 		onSelectSpan?: (span: HandoffSpan) => void;
+		/** Called when the person clicks a handoff's arrow or label, e.g. to open the diff it passed. */
+		onSelectHandoff?: (handoff: HandoffLink, from: HandoffSpan, to: HandoffSpan) => void;
+		/** Called when the person clicks a lane's name. */
+		onSelectLane?: (lane: HandoffLane) => void;
+		/** Id of the span or handoff to show as selected, e.g. the one whose detail panel is open. */
+		selected?: string | null;
 		class?: string;
 	}
 
@@ -39,6 +45,9 @@
 		highlight = null,
 		onHighlight,
 		onSelectSpan,
+		onSelectHandoff,
+		onSelectLane,
+		selected = null,
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -141,6 +150,17 @@
 		})
 	);
 
+	/** Labels that would overlap a neighbour shrink to their icon until hovered or selected. */
+	let compact = $derived.by(() => {
+		const ids = new Set<string>();
+		routes.forEach((a, i) =>
+			routes.forEach((b, j) => {
+				if (i !== j && Math.abs(a.mx - b.mx) < 110 && Math.abs(a.my - b.my) < 16) ids.add((a.mx < b.mx ? a : b).link.id);
+			})
+		);
+		return ids;
+	});
+
 	/** Grows a bar in from its left edge. */
 	function grow(_node: Element, { delay = 0 }: { delay?: number } = {}): TransitionConfig {
 		return {
@@ -154,6 +174,24 @@
 	function select(span: HandoffSpan): void {
 		onSelectSpan?.(span);
 	}
+	function selectHandoff(link: HandoffLink): void {
+		const from = spanById.get(link.from);
+		const to = spanById.get(link.to);
+		if (from && to) onSelectHandoff?.(link, from, to);
+	}
+	function handleLaneKey(event: KeyboardEvent, lane: HandoffLane): void {
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			onSelectLane?.(lane);
+		}
+	}
+	const KIND_ICONS: Record<HandoffArtifactKind, typeof FileText> = {
+		file: FileText,
+		diff: FileDiff,
+		tests: FlaskConical,
+		review: MessageSquare,
+		note: FileCode
+	};
 	function handleSpanKey(event: KeyboardEvent, span: HandoffSpan): void {
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
@@ -220,9 +258,26 @@
 					onpointerleave={() => setLane(null)}
 				>
 					<rect x="0" y={top} width={width} height={LANE_H} class={cn('transition-colors duration-200', laneFocus === lane.id ? 'fill-canvas-secondary' : 'fill-transparent')} rx="8" />
-					<text x="10" y={top + LANE_H / 2 - (lane.model ? 3 : -4)} class="fill-fg-main text-[12px] font-medium">{lane.label}</text>
-					{#if lane.model}
-						<text x="10" y={top + LANE_H / 2 + 11} class="fill-fg-light font-mono text-[10px]">{lane.model}</text>
+					{#if onSelectLane}
+						<g
+							role="button"
+							tabindex="0"
+							aria-label="{lane.label}{lane.model ? `, ${lane.model}` : ''}"
+							class="group/lane cursor-pointer outline-none"
+							onclick={() => onSelectLane?.(lane)}
+							onkeydown={(event) => handleLaneKey(event, lane)}
+						>
+							<rect x="2" y={top + 4} width={LABEL_W - 12} height={LANE_H - 8} rx="6" class="fill-transparent transition-colors group-hover/lane:fill-card-bg group-focus-visible/lane:fill-card-bg group-focus-visible/lane:stroke-accent-primary/50" />
+							<text x="10" y={top + LANE_H / 2 - (lane.model ? 3 : -4)} class="fill-fg-main text-[12px] font-medium underline-offset-2 group-hover/lane:underline">{lane.label}</text>
+							{#if lane.model}
+								<text x="10" y={top + LANE_H / 2 + 11} class="fill-fg-light font-mono text-[10px]">{lane.model}</text>
+							{/if}
+						</g>
+					{:else}
+						<text x="10" y={top + LANE_H / 2 - (lane.model ? 3 : -4)} class="fill-fg-main text-[12px] font-medium">{lane.label}</text>
+						{#if lane.model}
+							<text x="10" y={top + LANE_H / 2 + 11} class="fill-fg-light font-mono text-[10px]">{lane.model}</text>
+						{/if}
 					{/if}
 				</g>
 			{/each}
@@ -238,7 +293,7 @@
 					role="button"
 					tabindex="0"
 					aria-label="{span.label ?? span.phase}, {statusLabel(span)}, {formatClock(span.start)} to {formatClock(spanEnd(span))}"
-					class="cursor-pointer outline-none"
+					class={cn('outline-none', onSelectSpan ? 'cursor-pointer' : 'cursor-default')}
 					onpointerenter={() => (hoverSpan = span.id)}
 					onpointerleave={() => (hoverSpan = null)}
 					onfocus={() => (hoverSpan = span.id)}
@@ -257,10 +312,13 @@
 							style:opacity={spanOpacity(span)}
 							style:fill-opacity={span.status === 'failed' ? 0.28 : ghost ? 0.5 : 0.9}
 							style:stroke={span.status === 'failed' ? 'var(--ak-color-danger)' : phaseColor(span.phase, i)}
-							stroke-width={lit.has(span.id) ? 2 : 1}
+							stroke-width={lit.has(span.id) || selected === span.id ? 2 : 1}
 							stroke-dasharray={ghost ? '3 3' : undefined}
 							class="transition-[opacity,y,height,stroke-width] duration-300 ease-out"
 						/>
+						{#if selected === span.id}
+							<rect x={bx - 3} y={by - 3} width={bw + 6} height={bh + 6} rx="8" fill="none" class="stroke-fg-main" stroke-width="1.5" in:fade={{ duration: motionDuration(140) }} />
+						{/if}
 						{#if span.status === 'running'}
 							<rect x={bx + bw - 3} y={by} width="3" height={bh} rx="1.5" class="animate-pulse fill-card-bg/80" />
 						{/if}
@@ -286,16 +344,17 @@
 			{#each routes as route (route.link.id)}
 				<g
 					role="presentation"
-					class="cursor-default"
+					class={onSelectHandoff ? 'cursor-pointer' : 'cursor-default'}
 					onpointerenter={() => (hoverLink = route.link.id)}
 					onpointerleave={() => (hoverLink = null)}
+					onclick={() => selectHandoff(route.link)}
 				>
 					<path d={route.d} fill="none" stroke="transparent" stroke-width="12" />
 					<path
 						d={route.d}
 						fill="none"
 						class="stroke-fg-light transition-opacity duration-200"
-						stroke-width={hoverLink === route.link.id ? 2 : 1.5}
+						stroke-width={hoverLink === route.link.id || selected === route.link.id ? 2 : 1.5}
 						stroke-linecap="round"
 						marker-end="url(#ak-handoff-head)"
 						style:opacity={linkOpacity(route.link)}
@@ -316,6 +375,12 @@
 
 		<!-- Handoff artifact pills -->
 		{#each routes as route (route.link.id)}
+			{@const Icon = KIND_ICONS[route.link.kind ?? 'file']}
+			{@const pillClass = cn(
+				'pointer-events-auto flex max-w-44 items-center gap-1 rounded-full border bg-card-bg px-2 py-0.5 font-mono text-[10px] shadow-soft-sm outline-none transition-[transform,color,border-color] duration-200',
+				hoverLink === route.link.id || selected === route.link.id ? 'scale-110 border-fg-light/50 text-fg-main' : 'border-card-border text-fg-light',
+				selected === route.link.id && 'ring-2 ring-accent-primary/40'
+			)}
 			<div
 				class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
 				style:left="{route.mx}px"
@@ -323,17 +388,30 @@
 				style:opacity={linkOpacity(route.link) > 0.5 ? 1 : 0.25}
 				in:rise={{ y: 4, duration: 200, delay: 380 }}
 			>
-				<span
-					role="presentation"
-					onpointerenter={() => (hoverLink = route.link.id)}
-					onpointerleave={() => (hoverLink = null)}
-					class={cn(
-						'pointer-events-auto block max-w-40 cursor-default truncate rounded-full border border-card-border bg-card-bg px-2 py-0.5 font-mono text-[10px] shadow-soft-sm transition-[transform,opacity] duration-200',
-						hoverLink === route.link.id ? 'scale-110 text-fg-main' : 'text-fg-light'
-					)}
-				>{route.link.artifact}</span>
+				{#if onSelectHandoff}
+					<button
+						type="button"
+						class={cn(pillClass, 'cursor-pointer focus-visible:ring-2 focus-visible:ring-accent-primary/50')}
+						aria-label="Open {route.link.artifact}"
+						onpointerenter={() => (hoverLink = route.link.id)}
+						onpointerleave={() => (hoverLink = null)}
+						onfocus={() => (hoverLink = route.link.id)}
+						onblur={() => (hoverLink = null)}
+						onclick={() => selectHandoff(route.link)}
+					><Icon class="size-3 shrink-0" aria-hidden="true" />{#if !compact.has(route.link.id) || hoverLink === route.link.id || selected === route.link.id}<span class="truncate">{route.link.artifact}</span>{/if}</button>
+				{:else}
+					<span
+						role="presentation"
+						class={pillClass}
+						onpointerenter={() => (hoverLink = route.link.id)}
+						onpointerleave={() => (hoverLink = null)}
+					><Icon class="size-3 shrink-0" aria-hidden="true" />{#if !compact.has(route.link.id) || hoverLink === route.link.id || selected === route.link.id}<span class="truncate">{route.link.artifact}</span>{/if}</span>
+				{/if}
 				{#if hoverLink === route.link.id && route.link.reason}
-					<span class="absolute top-full left-1/2 mt-1.5 block w-max max-w-56 -translate-x-1/2 rounded-chip bg-fg-main px-2 py-1 text-[11px] text-fg-inverse" in:rise={{ y: 3, duration: 140 }}>{route.link.reason}</span>
+					<span class="absolute top-full left-1/2 mt-1.5 block w-max max-w-56 -translate-x-1/2 rounded-chip bg-fg-main px-2 py-1 text-[11px] text-fg-inverse" in:rise={{ y: 3, duration: 140 }}>
+						{route.link.reason}
+						{#if onSelectHandoff}<span class="mt-0.5 block text-fg-inverse/60">Click to open</span>{/if}
+					</span>
 				{/if}
 			</div>
 		{/each}
@@ -358,6 +436,7 @@
 					{#if tipSpan.tokens}<dt class="text-fg-light">Tokens</dt><dd class="text-right text-fg-main">{formatCompact(tipSpan.tokens)}</dd>{/if}
 					<dt class="text-fg-light">Status</dt><dd class={cn('text-right', tipSpan.status === 'failed' ? 'text-status-danger' : 'text-fg-main')}>{statusLabel(tipSpan)}</dd>
 				</dl>
+				{#if onSelectSpan}<p class="mt-1.5 border-t border-canvas-border pt-1.5 text-accent-primary">Click for details</p>{/if}
 			</div>
 		{/if}
 	</div>

@@ -4,7 +4,8 @@
 	import ModelPhaseStream from '$lib/charts/ModelPhaseStream.svelte';
 	import { eventsAt, handoffsAt, seriesAt, spansAt } from '$lib/charts/replay';
 	import { formatClock } from '$lib/charts/scale';
-	import type { ChartPoint, ChartSpec, HandoffSpan, ModelEvent } from '$lib/charts/types';
+	import type { ChartPoint, ChartSpec } from '$lib/charts/types';
+	import RunDetailSheet, { type RunDetail } from './RunDetailSheet.svelte';
 	import {
 		SAMPLE_CHART_SPECS,
 		SAMPLE_HANDOFFS,
@@ -29,7 +30,8 @@
 	let playing = $state(false);
 	let speed = $state<(typeof SPEEDS)[number]>(8);
 	let linked = $state<string | null>(null);
-	let selected = $state<string>('');
+	let detail = $state<RunDetail | null>(null);
+	let selectedId = $derived(detail?.kind === 'handoff' ? detail.link.id : detail?.kind === 'span' ? detail.span.id : null);
 	let specKey = $state<keyof typeof SAMPLE_CHART_SPECS>('latency');
 	let asked = $state<{ point: ChartPoint; answer: string } | null>(null);
 
@@ -76,12 +78,9 @@
 		return () => cancelAnimationFrame(frame);
 	});
 
-	function describeSpan(span: HandoffSpan): void {
-		const lane = SAMPLE_HANDOFF_LANES.find((l) => l.id === span.lane);
-		selected = `${lane?.label} ran ${span.phase} from ${formatClock(span.start)} to ${formatClock(span.end ?? t)}${span.tokens ? `, using ${span.tokens.toLocaleString()} tokens` : ''}.`;
-	}
-	function describeEvent(event: ModelEvent): void {
-		selected = `${formatClock(event.t)}: ${event.reason ?? event.kind}`;
+	function open(next: RunDetail): void {
+		pause();
+		detail = next;
 	}
 
 	const ANSWERS: Record<string, (p: ChartPoint) => string> = {
@@ -92,7 +91,7 @@
 		tokens: (p) => `${p.series} spent ${p.y.toLocaleString()} tokens in ${p.x}. ${p.x === 'Retry' ? 'That is the cost of the two failing tests on the first attempt.' : 'That is within this phase’s usual range.'}`,
 		passRate: (p) => `Attempt ${p.x} met ${p.y}% of the criteria. ${Number(p.x) === 4 ? 'It regressed because the token refresh broke; attempt 5 fixed it.' : ''}`
 	};
-	function explain(point: ChartPoint): void {
+	function askAbout(point: ChartPoint): void {
 		asked = { point, answer: ANSWERS[specKey]?.(point) ?? '' };
 	}
 
@@ -108,7 +107,7 @@
 	<title>Charts & timelines · Agents Kit Svelte</title>
 </svelte:head>
 
-<div class="mx-auto max-w-7xl space-y-6 px-4 py-10 sm:px-6">
+<div class={cn('mx-auto max-w-7xl space-y-6 px-4 py-10 transition-[padding] duration-300 ease-out sm:px-6', detail && 'xl:mr-[36rem] xl:max-w-none')}>
 	<div class="max-w-2xl">
 		<p class="text-xs font-medium text-accent-primary">Charts & Timelines</p>
 		<h1 class="mt-2 font-display text-[2.25rem] leading-tight font-normal tracking-[-0.02em] text-fg-main">
@@ -116,7 +115,8 @@
 		</h1>
 		<p class="mt-3 text-sm leading-6 text-fg-light">
 			Replay one agent run on a feature card, from plan to verified. Hover a lane or a model to light it in both
-			charts, hover a handoff to see what was passed, and drag across the stream to zoom.
+			charts. Click a handoff to open what was passed (the diff, the failing tests, the plan), click a bar for its
+			details, and drag across the stream to zoom.
 		</p>
 	</div>
 
@@ -158,7 +158,13 @@
 		now={live ? t : undefined}
 		highlight={laneHighlight}
 		onHighlight={(id) => (linked = id)}
-		onSelectSpan={describeSpan}
+		selected={selectedId}
+		onSelectSpan={(span) => open({ kind: 'span', span })}
+		onSelectHandoff={(link) => open({ kind: 'handoff', link })}
+		onSelectLane={(lane) => {
+			const latest = [...SAMPLE_HANDOFF_SPANS].reverse().find((s) => s.lane === lane.id && s.start <= t);
+			if (latest) open({ kind: 'span', span: spans.find((s) => s.id === latest.id) ?? latest });
+		}}
 	/>
 
 	<ModelPhaseStream
@@ -169,12 +175,10 @@
 		now={live ? t : undefined}
 		highlight={modelHighlight}
 		onHighlight={(model) => (linked = model)}
-		onSelectEvent={describeEvent}
+		onSelectEvent={(event) => open({ kind: 'event', event })}
+		onSelectPhase={(phase) => open({ kind: 'phase', phase })}
+		onSelectPoint={(point) => open({ kind: 'point', point })}
 	/>
-
-	{#if selected}
-		<p class="rounded-card bg-canvas-secondary px-4 py-2.5 text-[13px] text-fg-main" in:rise={{ y: 4, duration: 160 }}>{selected}</p>
-	{/if}
 
 	<section aria-label="Generative chart" class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
 		<div class="space-y-3">
@@ -192,7 +196,7 @@
 				{/each}
 			</div>
 			{#key specKey}
-				<GenerativeChart {spec} onExplain={explain} height={260} />
+				<GenerativeChart {spec} onSelectPoint={askAbout} actionLabel="Click to ask the agent" height={260} />
 			{/key}
 		</div>
 		<div class="flex flex-col gap-3">
@@ -211,3 +215,12 @@
 		</div>
 	</section>
 </div>
+
+<RunDetailSheet
+	{detail}
+	lanes={SAMPLE_HANDOFF_LANES}
+	{spans}
+	{handoffs}
+	onOpen={(next) => (detail = next)}
+	onClose={() => (detail = null)}
+/>

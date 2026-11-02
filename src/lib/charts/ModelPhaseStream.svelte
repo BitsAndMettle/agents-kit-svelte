@@ -6,7 +6,7 @@
 	import { ArrowDownRight, ArrowUpRight, Repeat, ZoomOut } from '@lucide/svelte';
 	import { motionDuration, rise } from '../state/motion.svelte';
 	import { areaPath, formatClock, formatCompact, linePath, niceMax, scaleLinear, seriesColor, stack, ticks } from './scale';
-	import type { ModelEvent, ModelSeries, PhaseBand } from './types';
+	import type { ModelEvent, ModelPoint, ModelSeries, PhaseBand } from './types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		/** Shaded phase bands behind the stream. */
@@ -28,6 +28,10 @@
 		onHighlight?: (model: string | null) => void;
 		/** Called when the person clicks a routing marker. */
 		onSelectEvent?: (event: ModelEvent) => void;
+		/** Called when the person clicks the stream (without dragging): the model under the pointer at that time. */
+		onSelectPoint?: (point: ModelPoint) => void;
+		/** Called when the person clicks a phase's label. */
+		onSelectPhase?: (phase: PhaseBand) => void;
 		class?: string;
 	}
 
@@ -42,6 +46,8 @@
 		highlight = null,
 		onHighlight,
 		onSelectEvent,
+		onSelectPoint,
+		onSelectPhase,
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -54,6 +60,7 @@
 	let hoverEvent = $state<string | null>(null);
 	let activeT = $state<number | null>(null);
 	let brush = $state<{ from: number; to: number } | null>(null);
+	let pointerY = $state<number | null>(null);
 	let zoom = $state<[number, number] | null>(null);
 
 	let xs = $derived([...new Set(series.flatMap((s) => s.points.map((p) => p.t)))].sort((a, b) => a - b));
@@ -130,6 +137,7 @@
 	}
 	function handleMove(event: PointerEvent): void {
 		const px = localX(event);
+		pointerY = event.clientY - (event.currentTarget as SVGElement).getBoundingClientRect().top - PAD.top;
 		if (brush) brush = { ...brush, to: px };
 		activeT = nearestT(px);
 	}
@@ -138,8 +146,32 @@
 			const a = x.invert(Math.min(brush.from, brush.to));
 			const b = x.invert(Math.max(brush.from, brush.to));
 			zoom = [a, b];
+		} else if (brush && activeT !== null) {
+			const point = pointAt(activeT);
+			if (point) onSelectPoint?.(point);
 		}
 		brush = null;
+	}
+
+	/** The model whose layer is under the pointer at `t`, else the busiest one. */
+	function pointAt(t: number): ModelPoint | null {
+		const phase = phases.find((p) => t >= p.start && t < p.end);
+		const j = xs.indexOf(t);
+		let best: ModelPoint | null = null;
+		series.forEach((s, i) => {
+			const value = maps[i]?.get(t) ?? 0;
+			if (value <= 0) return;
+			const band = layers[i]?.[j];
+			if (band && pointerY !== null && pointerY <= y(band[1]) && pointerY >= y(band[2])) {
+				best = { t, model: s.model, value, phase };
+			}
+		});
+		if (best) return best;
+		series.forEach((s, i) => {
+			const value = maps[i]?.get(t) ?? 0;
+			if (value > 0 && (!best || value > best.value)) best = { t, model: s.model, value, phase };
+		});
+		return best;
 	}
 	function resetZoom(): void {
 		zoom = null;
@@ -151,6 +183,9 @@
 			const i = activeT === null ? -1 : xs.indexOf(activeT);
 			const next = event.key === 'ArrowRight' ? Math.min(xs.length - 1, i + 1) : Math.max(0, i < 0 ? xs.length - 1 : i - 1);
 			activeT = xs[next];
+		} else if (event.key === 'Enter' && activeT !== null) {
+			const point = pointAt(activeT);
+			if (point) onSelectPoint?.(point);
 		} else if (event.key === 'Escape') {
 			activeT = null;
 			zoom = null;
@@ -239,7 +274,7 @@
 				{#each phases as phase (phase.id)}
 					{@const px0 = Math.max(0, x(phase.start))}
 					{@const px1 = Math.min(innerW, x(phase.end))}
-					{#if px1 - px0 > 40}
+					{#if px1 - px0 > 40 && !onSelectPhase}
 						<text x={px0 + 6} y={-PAD.top + 16} class={cn('text-[10px] font-medium uppercase tracking-wide transition-colors duration-300', activePhase === phase.id ? 'fill-accent-primary' : 'fill-fg-light')}>{phase.label}</text>
 					{/if}
 				{/each}
@@ -292,6 +327,24 @@
 			</g>
 		</svg>
 
+		{#if onSelectPhase}
+			{#each phases as phase (phase.id)}
+				{@const px0 = Math.max(0, x(phase.start))}
+				{@const px1 = Math.min(innerW, x(phase.end))}
+				{#if px1 - px0 > 40}
+					<button
+						type="button"
+						onclick={() => onSelectPhase?.(phase)}
+						class={cn(
+							'absolute top-1 z-10 rounded-full px-1.5 py-0.5 text-[10px] font-medium tracking-wide uppercase transition-colors hover:bg-card-bg hover:text-fg-main hover:shadow-soft-sm focus-visible:ring-2 focus-visible:ring-accent-primary/50 focus-visible:outline-none',
+							activePhase === phase.id ? 'text-accent-primary' : 'text-fg-light'
+						)}
+						style:left="{PAD.left + px0 + 2}px"
+					>{phase.label}</button>
+				{/if}
+			{/each}
+		{/if}
+
 		<!-- Marker buttons (HTML so they are focusable and get icons) -->
 		{#each visibleEvents as ev (ev.id)}
 			{@const Icon = eventIcon(ev.kind)}
@@ -341,6 +394,7 @@
 						</p>
 					{/if}
 				{/each}
+				{#if onSelectPoint}<p class="mt-1.5 border-t border-canvas-border pt-1.5 text-accent-primary">Click for details · drag to zoom</p>{/if}
 			</div>
 		{/if}
 	</div>

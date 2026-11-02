@@ -32,7 +32,12 @@ export interface HandoffSpan {
 	label?: string;
 	attempt?: number;
 	tokens?: number;
+	/** Anything your click handler needs, e.g. a run or log id. The chart never reads it. */
+	data?: unknown;
 }
+
+/** What kind of thing a handoff passed. Sets the icon on its label. */
+export type HandoffArtifactKind = 'file' | 'diff' | 'tests' | 'review' | 'note';
 
 /** Work passed from one span to another. */
 export interface HandoffLink {
@@ -41,7 +46,10 @@ export interface HandoffLink {
 	to: string;
 	/** What was passed, e.g. `plan.md`, `diff +142 −38`, `2 failing tests`. */
 	artifact: string;
+	kind?: HandoffArtifactKind;
 	reason?: string;
+	/** Anything your click handler needs to open the artifact, e.g. a patch or a file path. */
+	data?: unknown;
 }
 
 /** A shaded phase band behind `ModelPhaseStream`. */
@@ -50,6 +58,15 @@ export interface PhaseBand {
 	label: string;
 	start: number;
 	end: number;
+	data?: unknown;
+}
+
+/** A model's reading at one sample time, passed to `ModelPhaseStream`'s `onSelectPoint`. */
+export interface ModelPoint {
+	t: number;
+	model: string;
+	value: number;
+	phase?: PhaseBand;
 }
 
 /** One model's throughput over time in `ModelPhaseStream`. */

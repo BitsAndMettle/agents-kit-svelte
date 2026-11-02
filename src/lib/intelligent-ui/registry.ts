@@ -128,19 +128,27 @@ export const defaultUIRegistry: UIRegistry = {
 		required: ['spec'],
 		props: (props, emit) => ({
 			...props,
-			onExplain: (point: { x: string | number; y: number; series: string }) =>
-				emit('explain', `${point.series} at ${point.x}: ${point.y}`)
+			onSelectPoint: (point: { x: string | number; y: number; series: string }) =>
+				emit('select-point', `${point.series} at ${point.x}: ${point.y}`)
 		})
 	},
 	'agent-handoff-gantt': {
 		component: AgentHandoffGantt,
 		required: ['lanes', 'spans'],
-		props: (props, emit) => ({ ...props, onSelectSpan: (span: { id: string }) => emit('select-span', span.id) })
+		props: (props, emit) => ({
+			...props,
+			onSelectSpan: (span: { id: string }) => emit('select-span', span.id),
+			onSelectHandoff: (handoff: { id: string }) => emit('select-handoff', handoff.id)
+		})
 	},
 	'model-phase-stream': {
 		component: ModelPhaseStream,
 		required: ['phases', 'series'],
-		props: (props, emit) => ({ ...props, onSelectEvent: (event: { id: string }) => emit('select-event', event.id) })
+		props: (props, emit) => ({
+			...props,
+			onSelectEvent: (event: { id: string }) => emit('select-event', event.id),
+			onSelectPhase: (phase: { id: string }) => emit('select-phase', phase.id)
+		})
 	},
 	'generative-surface': {
 		component: AgentGenerativeSurface,
