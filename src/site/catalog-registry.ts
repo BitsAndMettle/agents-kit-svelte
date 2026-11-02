@@ -6,6 +6,7 @@ export type CatalogCategory =
 	| 'Agents UI Orchestration'
 	| 'AI Elements & Coding'
 	| 'Agentic Skills'
+	| 'Charts & Timelines'
 	| 'Voice & Effects';
 
 export interface CatalogItemMeta {
@@ -2094,7 +2095,99 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 8. Voice & Effects (3 components)
+	// 8. Charts & Timelines (3 components)
+	{
+		slug: 'generative-chart',
+		name: 'GenerativeChart',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/GenerativeChart.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'A line, area or bar chart drawn from one JSON spec an agent emits. It draws in, rescales smoothly as data streams, pins the agent’s callouts to points, and hands a clicked point to your onSelectPoint.',
+		usageSnippet: `<script lang="ts">
+  import { GenerativeChart, type ChartSpec, type ChartPoint } from 'agents-kit-svelte';
+
+  const spec: ChartSpec = {
+    kind: 'line',
+    title: 'Checkout p95 latency',
+    x: 'day',
+    y: 'ms',
+    series: 'build',
+    unit: 'ms',
+    data: [
+      { day: 1, build: 'Before', ms: 412 },
+      { day: 2, build: 'Before', ms: 431 },
+      { day: 1, build: 'After', ms: 405 },
+      { day: 2, build: 'After', ms: 318 }
+    ],
+    annotations: [{ x: 2, series: 'After', label: 'Cache shipped' }]
+  };
+
+  function openDetail(point: ChartPoint) {
+    console.log('Open details for', point);
+  }
+</script>
+
+<GenerativeChart {spec} height={240} onSelectPoint={openDetail} actionLabel="Click to open the build" />`
+	},
+	{
+		slug: 'agent-handoff-gantt',
+		name: 'AgentHandoffGantt',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/AgentHandoffGantt.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'A Gantt of one agent run: a lane per agent or model, a bar per phase, and arrows for each handoff labelled with what was passed. Live bars grow to a moving cursor, and retried attempts stay behind as ghosts.',
+		usageSnippet: `<script lang="ts">
+  import { AgentHandoffGantt, type HandoffLane, type HandoffSpan, type HandoffLink } from 'agents-kit-svelte';
+
+  const lanes: HandoffLane[] = [
+    { id: 'planner', label: 'Planner', model: 'claude-opus' },
+    { id: 'implementer', label: 'Implementer', model: 'claude-sonnet' }
+  ];
+  const spans: HandoffSpan[] = [
+    { id: 'plan', lane: 'planner', phase: 'plan', start: 0, end: 38, status: 'done', label: 'Plan' },
+    { id: 'impl', lane: 'implementer', phase: 'implement', start: 42, status: 'running', label: 'Implement' }
+  ];
+  const handoffs: HandoffLink[] = [{ id: 'h1', from: 'plan', to: 'impl', artifact: 'plan.md', kind: 'file' }];
+</script>
+
+<AgentHandoffGantt
+  title="Card #214"
+  {lanes}
+  {spans}
+  {handoffs}
+  now={96}
+  onSelectSpan={(span) => console.log('span', span.id)}
+  onSelectHandoff={(handoff) => console.log('open', handoff.artifact)}
+/>`
+	},
+	{
+		slug: 'model-phase-stream',
+		name: 'ModelPhaseStream',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/ModelPhaseStream.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'Which model ran when, as a stacked stream of throughput over shaded phase bands, with markers for escalations, fallbacks and swaps. Drag to zoom, double-click to reset.',
+		usageSnippet: `<script lang="ts">
+  import { ModelPhaseStream, type PhaseBand, type ModelSeries, type ModelEvent } from 'agents-kit-svelte';
+
+  const phases: PhaseBand[] = [
+    { id: 'plan', label: 'Plan', start: 0, end: 40 },
+    { id: 'build', label: 'Implement', start: 40, end: 120 }
+  ];
+  const series: ModelSeries[] = [
+    { model: 'claude-opus', points: [{ t: 0, value: 60 }, { t: 40, value: 0 }, { t: 120, value: 0 }] },
+    { model: 'claude-sonnet', points: [{ t: 0, value: 0 }, { t: 40, value: 95 }, { t: 120, value: 80 }] }
+  ];
+  const events: ModelEvent[] = [{ id: 'e1', t: 40, kind: 'swap', from: 'claude-opus', to: 'claude-sonnet' }];
+</script>
+
+<ModelPhaseStream title="Model throughput" {phases} {series} {events} />`
+	},
+
+	// 9. Voice & Effects (3 components)
 	{
 		slug: 'voice-wave-visualizer',
 		name: 'VoiceWaveVisualizer',

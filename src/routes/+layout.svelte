@@ -21,6 +21,7 @@
 		{ href: `${base}/claude-code/`, match: `${base}/claude-code`, label: 'AK-S Chat' },
 		{ href: `${base}/github/`, match: `${base}/github`, label: 'GitHub Suite' },
 		{ href: `${base}/skills/`, match: `${base}/skills`, label: 'Skills' },
+		{ href: `${base}/charts/`, match: `${base}/charts`, label: 'Charts' },
 		{ href: `${base}/intelligent-ui/`, match: `${base}/intelligent-ui`, label: 'Playground' },
 		{ href: `${base}/install/`, match: `${base}/install`, label: 'Install' }
 	];

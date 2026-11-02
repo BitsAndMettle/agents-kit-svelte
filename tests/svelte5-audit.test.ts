@@ -30,7 +30,7 @@ function collectFilesByExtension(dir: string, ext = '.svelte'): string[] {
 test('all Svelte components in src/ comply with Svelte 5 Runes, Props typing, and semantic token rules', () => {
 	const srcDir = join(process.cwd(), 'src');
 	const svelteFiles = collectFilesByExtension(srcDir, '.svelte');
-	assert.ok(svelteFiles.length >= 82, `Expected at least 82 .svelte files in src/, found ${svelteFiles.length}`);
+	assert.ok(svelteFiles.length >= 85, `Expected at least 85 .svelte files in src/, found ${svelteFiles.length}`);
 
 	for (const filePath of svelteFiles) {
 		const source = readFileSync(filePath, 'utf8');
@@ -77,8 +77,8 @@ test('every single .svelte component in src/lib/ has a dedicated 1-to-1 showcase
 		relative(rootDir, f).replace(/\\/g, '/')
 	);
 
-	assert.equal(libSvelteFiles.length, 82, 'Expected 82 .svelte components in src/lib/');
-	assert.equal(CATALOG_ITEMS.length, 82, 'Expected 82 catalog items in CATALOG_ITEMS');
+	assert.equal(libSvelteFiles.length, 85, 'Expected 85 .svelte components in src/lib/');
+	assert.equal(CATALOG_ITEMS.length, 85, 'Expected 85 catalog items in CATALOG_ITEMS');
 
 	const catalogPaths = new Set(CATALOG_ITEMS.map((item) => item.sveltePath));
 	for (const relPath of libSvelteFiles) {

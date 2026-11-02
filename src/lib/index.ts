@@ -9,6 +9,7 @@ export * from './entries/github';
 export * from './entries/skills';
 export * from './entries/workflows';
 export * from './entries/generative';
+export * from './entries/charts';
 export * from './entries/data';
 export * from './entries/effects';
 export * from './entries/primitives';

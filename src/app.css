@@ -62,6 +62,14 @@
 		--ak-color-terminal-fg: oklch(0.94 0.008 85);
 		--ak-color-terminal-muted: oklch(0.68 0.014 70);
 
+		/* Charts: categorical series colours, in phase order (plan, implement, review, verify, then two spares) */
+		--ak-chart-1: oklch(0.6 0.13 252);
+		--ak-chart-2: oklch(0.64 0.14 42);
+		--ak-chart-3: oklch(0.58 0.14 305);
+		--ak-chart-4: oklch(0.62 0.12 162);
+		--ak-chart-5: oklch(0.72 0.14 82);
+		--ak-chart-6: oklch(0.58 0.07 215);
+
 		/* Chat. --ak-chat-surface, --ak-chat-accent and --ak-chat-accent-subtle are unset, so they follow the canvas and accent; set them to split the chat off. */
 		--ak-chat-bubble-user: oklch(0.948 0.009 78);
 		--ak-chat-border: oklch(0.905 0.009 78);
@@ -125,6 +133,14 @@
 		--ak-color-terminal-fg: oklch(0.94 0.008 85);
 		--ak-color-terminal-muted: oklch(0.68 0.014 70);
 
+		/* Charts */
+		--ak-chart-1: oklch(0.72 0.12 252);
+		--ak-chart-2: oklch(0.74 0.13 45);
+		--ak-chart-3: oklch(0.72 0.13 305);
+		--ak-chart-4: oklch(0.74 0.12 162);
+		--ak-chart-5: oklch(0.8 0.13 85);
+		--ak-chart-6: oklch(0.72 0.07 215);
+
 		/* Chat. --ak-chat-surface, --ak-chat-accent and --ak-chat-accent-subtle are unset, so they follow the canvas and accent; set them to split the chat off. */
 		--ak-chat-bubble-user: oklch(0.285 0.008 70);
 		--ak-chat-border: oklch(0.335 0.008 70);
@@ -187,6 +203,14 @@
 			--ak-color-terminal-bg: oklch(0.16 0.005 60);
 			--ak-color-terminal-fg: oklch(0.94 0.008 85);
 			--ak-color-terminal-muted: oklch(0.68 0.014 70);
+
+			/* Charts */
+			--ak-chart-1: oklch(0.72 0.12 252);
+			--ak-chart-2: oklch(0.74 0.13 45);
+			--ak-chart-3: oklch(0.72 0.13 305);
+			--ak-chart-4: oklch(0.74 0.12 162);
+			--ak-chart-5: oklch(0.8 0.13 85);
+			--ak-chart-6: oklch(0.72 0.07 215);
 
 			/* Chat. --ak-chat-surface, --ak-chat-accent and --ak-chat-accent-subtle are unset, so they follow the canvas and accent; set them to split the chat off. */
 			--ak-chat-bubble-user: oklch(0.285 0.008 70);

@@ -8,3 +8,4 @@ export * from '../fixtures/github';
 export * from '../fixtures/chat';
 export * from '../fixtures/data';
 export * from '../fixtures/workflows';
+export * from '../fixtures/charts';

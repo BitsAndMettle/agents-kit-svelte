@@ -34,6 +34,7 @@
 		GitPullRequest,
 		LayoutTemplate,
 		BookOpenText,
+		ChartGantt,
 		MessagesSquare,
 		RotateCcw,
 		Scale,
@@ -114,6 +115,9 @@
 		StackTrace,
 		StreamingResponse,
 		Svelte5MotionLab,
+		GenerativeChart,
+		AgentHandoffGantt,
+		ModelPhaseStream,
 		Terminal,
 		TestResults,
 		ThinkingShimmer,
@@ -126,6 +130,7 @@
 		WebPreview
 	} from '$lib';
 	import { SAMPLE_SKILLS, SAMPLE_SKILL_MANIFEST, SAMPLE_SKILL_PROPOSAL, SAMPLE_SKILL_STEPS } from '$lib/entries/fixtures';
+	import { SAMPLE_CHART_SPECS, SAMPLE_HANDOFFS, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS } from '$lib/fixtures/charts';
 	import { CATALOG_ITEMS, type CatalogCategory } from '$site/catalog-registry';
 	import { holdHeight } from '$site/hold-height';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -159,6 +164,7 @@
 		'Agents UI Orchestration',
 		'AI Elements & Coding',
 		'Agentic Skills',
+		'Charts & Timelines',
 		'Voice & Effects'
 	];
 
@@ -499,7 +505,7 @@
 
 	const sampleCommit: GitHubCommitData = {
 		sha: '9f8e7d6c5b4a3210fedcba9876543210abcdef12',
-		message: 'feat(agents-kit): port 82 agent & GitHub UI components to Svelte 5 Runes',
+		message: 'feat(agents-kit): port 85 agent & GitHub UI components to Svelte 5 Runes',
 		author: 'AK-S Agent',
 		branch: 'trailside/2151-drawer-hydration',
 		timestamp: '2m ago',
@@ -582,7 +588,7 @@
 
 	const sampleCheckpoint: CheckpointEntry = {
 		id: 'cp-1',
-		title: 'Verified 82 Svelte 5 components + unit suite',
+		title: 'Verified 85 Svelte 5 components + unit suite',
 		description: 'All static and unit checks green',
 		commitSha: '456f3b4',
 		worktreeBranch: 'trailside/2151-drawer-hydration',
@@ -599,7 +605,7 @@
 			tests: [
 				{
 					id: 'tc-1',
-					name: 'all 82 Svelte components comply with Svelte 5 Runes and semantic tokens',
+					name: 'all 85 Svelte components comply with Svelte 5 Runes and semantic tokens',
 					status: 'passed' as const,
 					durationMs: 6
 				}
@@ -723,7 +729,7 @@
 	}
 
 	const STREAM_TEXT =
-		'All 82 Svelte 5 components verified with svelte-check (0 errors, 0 warnings), and every preview on this page is live.';
+		'All 85 Svelte 5 components verified with svelte-check (0 errors, 0 warnings), and every preview on this page is live.';
 
 	function liveStream(): { text: string; done: boolean } {
 		const words = STREAM_TEXT.split(' ');
@@ -744,7 +750,7 @@
 		'▶ svelte5 audit',
 		'  ✔ every component uses Runes (41ms)',
 		'  ✔ no hex colors in components (12ms)',
-		'✔ all 82 Svelte components pass audit (105ms)'
+		'✔ all 85 Svelte components pass audit (105ms)'
 	];
 
 	/**
@@ -836,6 +842,15 @@
 			description:
 				'Route a request to a skill, watch it run step by step, then edit it or save the improvement it suggests.',
 			cta: 'Try the skills studio'
+		},
+		{
+			href: `${base}/charts/`,
+			icon: ChartGantt,
+			eyebrow: 'Charts & Timelines',
+			title: 'Handoff Gantt and model stream',
+			description:
+				'Replay an agent run: who held the work, what they handed on, which model ran each phase, and charts an agent draws from JSON.',
+			cta: 'Try the charts'
 		},
 		{
 			href: `${base}/intelligent-ui/`,
@@ -932,7 +947,7 @@
 			</a>
 		</div>
 
-		<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 			{#each APP_EXAMPLES as example (example.href)}
 				<a
 					href={example.href}
@@ -1275,7 +1290,7 @@
 									summary="corepack pnpm test"
 									status="success"
 									meta="96ms · 9 passed"
-									output="✔ all 82 Svelte components in src/ comply with Svelte 5 Runes, Props typing, and semantic token rules"
+									output="✔ all 85 Svelte components in src/ comply with Svelte 5 Runes, Props typing, and semantic token rules"
 									defaultOpen={true}
 								/>
 							{:else if item.slug === 'file-diff'}
@@ -1325,7 +1340,7 @@
 										author="AK-S Agent"
 										timestamp="21:16"
 										collapsible={true}
-										text="All 82 Svelte 5 components are live with strict TypeScript Props, OKLCH dark/light tokens, and interactive showcases."
+										text="All 85 Svelte 5 components are live with strict TypeScript Props, OKLCH dark/light tokens, and interactive showcases."
 									/>
 								</div>
 							{:else if item.slug === 'message-scroller'}
@@ -1560,6 +1575,12 @@
 								</div>
 							{:else if item.slug === 'voice-wave-visualizer'}
 								<VoiceWaveVisualizer devices={SAMPLE_VOICE_DEVICES} personas={SAMPLE_VOICE_PERSONAS} defaultPersonaId="sol" defaultMicId="mic-macbook-pro" transcript="Check the failing unit test in chat-helpers and explain why the token ratio threshold triggered a warning." />
+							{:else if item.slug === 'generative-chart'}
+								<GenerativeChart spec={SAMPLE_CHART_SPECS.latency} />
+							{:else if item.slug === 'agent-handoff-gantt'}
+								<AgentHandoffGantt title="Add SSO to the billing portal" lanes={SAMPLE_HANDOFF_LANES} spans={SAMPLE_HANDOFF_SPANS} handoffs={SAMPLE_HANDOFFS} />
+							{:else if item.slug === 'model-phase-stream'}
+								<ModelPhaseStream title="Model throughput by phase" phases={SAMPLE_PHASE_BANDS} series={SAMPLE_MODEL_SERIES} events={SAMPLE_MODEL_EVENTS} />
 							{:else if item.slug === 'border-beam'}
 								<BorderBeam />
 							{:else if item.slug === 'svelte5-motion-lab'}
