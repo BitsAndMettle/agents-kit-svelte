@@ -1,6 +1,6 @@
 {
   "name": "agents-kit-svelte",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Svelte 5 Runes port of agents-ui/agents-kit & Trailside Dynamic Claude Code Chat Component",
   "keywords": [
     "svelte",
