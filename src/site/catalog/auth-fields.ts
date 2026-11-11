@@ -64,7 +64,7 @@ export const AUTH_FIELDS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/fields/OtpInput.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A one-time-code entry drawn as cells over one real input, so paste, autofill and screen readers work. "123 456", "123-456" and full-width digits are cleaned to the allowed characters, whether typed, pasted, autofilled or passed in as a value. It reports the code through onValueChange and onComplete, and can submit its form when complete. Your app checks the code.',
+			'A one-time-code entry drawn as cells over one real input, so paste, autofill and screen readers work. "123 456", "123-456" and full-width digits are cleaned to the allowed characters, whether typed, pasted, autofilled or passed in as a value. Typing into a full code overwrites at the caret, and a selection is replaced by what you type or paste. It reports the code through onValueChange and onComplete, and can submit its form when complete. A Field names it; on its own, give it aria-label or aria-labelledby. Your app checks the code.',
 		usageSnippet: `<script lang="ts">
   import { OtpInput } from 'agents-kit-svelte/auth';
   import { Field } from 'agents-kit-svelte/primitives';
@@ -78,6 +78,8 @@ export const AUTH_FIELDS: CatalogItemMeta[] = [
     <OtpInput bind:value={code} groupSize={3} onComplete={(c) => (complete = c)} />
   </Field>
   <p>{complete ? 'Entered ' + complete : ''}</p>
+  <!-- Outside a Field, name it yourself. -->
+  <OtpInput name="backup" length={8} alphanumeric aria-label="Backup code" />
 </form>`
 	},
 	{
