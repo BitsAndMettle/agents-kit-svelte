@@ -111,6 +111,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --fail-on-warnings",
     "test": "node --test tests/*.test.ts",
     "test:browser": "playwright test",
+    "test:a11y": "playwright test tests/browser/a11y.spec.ts",
     "package": "svelte-kit sync && svelte-package && node scripts/build-theme.mjs && publint",
     "test:install": "node scripts/smoke-install.mjs",
     "changeset": "changeset",
@@ -118,6 +119,7 @@
     "prepublishOnly": "pnpm package"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@changesets/cli": "^3.0.3",
     "@playwright/test": "1.63.0",
     "@sveltejs/adapter-node": "5.5.7",

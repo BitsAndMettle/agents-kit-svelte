@@ -36,3 +36,24 @@ jobs:
 
       - name: Install the packed tarball into a fresh Svelte app and build it
         run: corepack pnpm test:install
+
+  browser:
+    name: "Browser: accessibility and keyboard"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: |
+          corepack enable
+          corepack pnpm install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: corepack pnpm exec playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: corepack pnpm exec playwright test
