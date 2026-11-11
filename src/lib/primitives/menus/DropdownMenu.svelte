@@ -43,6 +43,11 @@
 		 * your extra attributes and `ref`.
 		 */
 		trigger?: Snippet<[Part]>;
+		/**
+		 * Non-interactive content at the top of the menu, above the rows (for example who is
+		 * signed in). It is not a menu item: keyboard navigation skips it.
+		 */
+		header?: Snippet;
 		/** Bindable. */
 		open?: boolean;
 		defaultOpen?: boolean;
@@ -63,6 +68,7 @@
 		items,
 		triggerLabel = 'Options',
 		trigger,
+		header,
 		open = $bindable(),
 		defaultOpen = false,
 		onOpenChange,
@@ -180,5 +186,6 @@
 {/if}
 
 <div {...menu.content} class={cn(MENU_SURFACE, menuClass)}>
+	{#if header}<div role="presentation">{@render header()}</div>{/if}
 	{@render menuEntries(menu, items)}
 </div>
