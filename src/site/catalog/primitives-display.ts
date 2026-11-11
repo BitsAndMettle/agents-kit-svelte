@@ -70,7 +70,9 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
   Body content goes here.
   {#snippet footer()}Updated 2 hours ago{/snippet}
 </Card>
-<Card title="Open the board" href="/board">The whole card is the link.</Card>`
+<Card title="Open the board" href="/board">
+  The whole card is the link, and <a href="/docs">links inside</a> still work.
+</Card>`
 	},
 	{
 		slug: 'separator',
@@ -113,12 +115,12 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/display/Skeleton.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Shimmering placeholders (block, text lines, circle) that stand still for people who prefer reduced motion. Wrap them in a Skeleton with children to set aria-busy and announce the loading state once.',
+			'Shimmering placeholders (block, text lines, circle) that stand still for people who prefer reduced motion. Wrap them in a Skeleton with children to set aria-busy and read the loading state.',
 		usageSnippet: `<script lang="ts">
   import { Skeleton } from 'agents-kit-svelte/primitives';
 </script>
 
-<Skeleton label="Loading profile">
+<Skeleton loadingLabel="Loading profile">
   <Skeleton shape="circle" width="2.5rem" />
   <Skeleton shape="line" lines={3} />
   <Skeleton height="6rem" />
@@ -131,12 +133,12 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/display/Spinner.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'SVG spinner in four sizes that takes the surrounding text colour. It announces its label politely, or goes silent when it sits inside a button that already says it is busy.',
+			'SVG spinner in four sizes that takes the surrounding text colour. It is an image with a label, announced through a live region only when you set announce, or silent when it sits inside a button that already says it is busy.',
 		usageSnippet: `<script lang="ts">
   import { Spinner } from 'agents-kit-svelte/primitives';
 </script>
 
-<Spinner label="Loading runs" />
+<Spinner loadingLabel="Loading runs" announce />
 <button disabled aria-busy="true">
   <Spinner size="sm" decorative /> Saving
 </button>`

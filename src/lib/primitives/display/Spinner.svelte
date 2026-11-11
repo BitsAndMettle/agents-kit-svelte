@@ -9,8 +9,10 @@
 		size?: SpinnerSize;
 		/** `current` takes the surrounding text colour, which suits a spinner inside a button. */
 		tone?: UiTone | 'current';
-		/** Announced politely to assistive technology. Empty text means no announcement. */
-		label?: string;
+		/** Name of the spinner for assistive technology (a plain image label, not a live region). */
+		loadingLabel?: string;
+		/** Also announces the label through a live region once, after it appears. Leave off when many spinners show at once. */
+		announce?: boolean;
 		/** Hides it from assistive technology, for a spinner inside a button that already says it is busy. */
 		decorative?: boolean;
 		class?: string;
@@ -19,7 +21,8 @@
 	let {
 		size = 'md',
 		tone = 'current',
-		label = 'Loading',
+		loadingLabel = 'Loading',
+		announce = false,
 		decorative = false,
 		class: className = '',
 		...rest
@@ -31,11 +34,23 @@
 		md: 'size-5',
 		lg: 'size-8'
 	};
-	let announced = $derived(!decorative && label !== '');
+	let named = $derived(!decorative && !announce && loadingLabel !== '');
+	let announcement = $state('');
+	// A live region only speaks changes, so it starts empty and is filled after mount.
+	$effect(() => {
+		if (!announce || decorative) return;
+		const text = loadingLabel;
+		const timer = setTimeout(() => (announcement = text), 60);
+		return () => {
+			clearTimeout(timer);
+			announcement = '';
+		};
+	});
 </script>
 
 <span {...rest}
-	role={announced ? 'status' : undefined}
+	role={named ? 'img' : undefined}
+	aria-label={named ? loadingLabel : undefined}
 	aria-hidden={decorative ? 'true' : undefined}
 	class={cn('inline-flex shrink-0 align-middle', tone === 'current' ? 'text-current' : STATUS_TEXT_CLASS[tone], className)}
 >
@@ -43,7 +58,7 @@
 		<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.2" stroke-width="3" />
 		<path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
 	</svg>
-	{#if announced}<span class="sr-only">{label}</span>{/if}
+	{#if announce && !decorative}<span role="status" class="sr-only">{announcement}</span>{/if}
 </span>
 
 <style>

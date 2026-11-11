@@ -26,6 +26,6 @@
 		<Avatar name="Ada Lovelace" status="online" statusLabel="Online" size="lg" />
 		<Avatar name="Grace Hopper" status="away" statusLabel="Away" size="lg" />
 		<Avatar name="Linus Torvalds" status="busy" statusLabel="In a meeting" size="lg" />
-		<span class="inline-flex items-center gap-2 text-sm"><Avatar name="Dana Scully" decorative size="sm" /> Dana Scully</span>
+		<span class="inline-flex items-center gap-2 text-sm"><Avatar name="Dana Scully" decorative size="sm" status="online" /> Dana Scully</span>
 	</div>
 </div>

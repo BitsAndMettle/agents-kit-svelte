@@ -16,6 +16,8 @@
 		max?: number;
 		size?: AvatarSize;
 		shape?: 'round' | 'square';
+		/** Spoken text for the hidden people. Defaults to "and 2 more: Ada, Grace". */
+		formatOverflow?: (hidden: AvatarGroupItem[]) => string;
 		class?: string;
 	}
 
@@ -24,6 +26,7 @@
 		max = 4,
 		size = 'md',
 		shape = 'round',
+		formatOverflow = (hidden) => `and ${hidden.length} more: ${hidden.map((item) => item.alt ?? item.name).join(', ')}`,
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -55,7 +58,7 @@
 				class={cn('inline-flex items-center justify-center bg-[color-mix(in_oklch,var(--ak-color-fg)_10%,var(--ak-color-surface))] font-semibold leading-none text-fg-main ring-2 ring-card-bg', COUNT_SIZES[size], radius)}
 			>
 				<span aria-hidden="true">+{hidden.length}</span>
-				<span class="sr-only">and {hidden.length} more: {hidden.map((item) => item.alt ?? item.name).join(', ')}</span>
+				<span class="sr-only">{formatOverflow(hidden)}</span>
 			</span>
 		</li>
 	{/if}

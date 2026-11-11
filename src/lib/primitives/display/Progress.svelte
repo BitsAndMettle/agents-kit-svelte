@@ -16,7 +16,7 @@
 		showValue?: boolean;
 		/** Spoken and shown value text. Defaults to a percentage. */
 		valueText?: string | ((value: number, percent: number) => string);
-		size?: 'sm' | 'md';
+		size?: 'sm' | 'md' | 'lg';
 		class?: string;
 	}
 
@@ -28,7 +28,7 @@
 		label = '',
 		showValue = false,
 		valueText,
-		size = 'sm',
+		size = 'md',
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -61,7 +61,7 @@
 			{#if showValue && !indeterminate}<span aria-hidden="true" class="ml-auto tabular-nums text-fg-light">{text}</span>{/if}
 		</div>
 	{/if}
-	<div class={cn(PROGRESS_TRACK_CLASS, size === 'md' && 'h-2.5', 'relative')}>
+	<div class={cn(PROGRESS_TRACK_CLASS, size === 'lg' && 'h-2.5', size === 'sm' && 'h-1', 'relative')}>
 		{#if indeterminate}
 			<span class={cn(progressFillClass(tone), 'ak-progress-indeterminate absolute w-2/5 transition-none')}></span>
 		{:else}

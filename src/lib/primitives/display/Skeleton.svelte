@@ -13,12 +13,14 @@
 		/** CSS height. Defaults to 1rem for blocks, one text line for lines, and the width for circles. */
 		height?: string;
 		/**
-		 * Pass children to make this the loading container: it sets `aria-busy` and announces `label`,
+		 * Pass children to make this the loading container: it sets `aria-busy` and reads `loadingLabel`,
 		 * and the placeholders inside stay hidden from assistive technology.
 		 */
 		children?: Snippet;
-		/** What the container announces. */
-		label?: string;
+		/** Plain text read for the loading container. */
+		loadingLabel?: string;
+		/** Also announces the label through a live region once, after it appears. */
+		announce?: boolean;
 		class?: string;
 	}
 
@@ -28,7 +30,8 @@
 		width,
 		height,
 		children,
-		label = 'Loading',
+		loadingLabel = 'Loading',
+		announce = false,
 		class: className = '',
 		style,
 		...rest
@@ -44,12 +47,24 @@
 			.filter(Boolean)
 			.join(';')
 	);
+		let announcement = $state('');
+	// A live region only speaks changes, so it starts empty and is filled after mount.
+	$effect(() => {
+		if (!announce) return;
+		const text = loadingLabel;
+		const timer = setTimeout(() => (announcement = text), 60);
+		return () => {
+			clearTimeout(timer);
+			announcement = '';
+		};
+	});
 	let rows = $derived(Math.max(1, Math.floor(lines)));
 </script>
 
 {#if children}
 	<div {...rest} aria-busy="true" class={cn('flex flex-col gap-2', className)} {style}>
-		<span role="status" class="sr-only">{label}</span>
+		<span class="sr-only">{loadingLabel}</span>
+		{#if announce}<span role="status" class="sr-only">{announcement}</span>{/if}
 		{@render children()}
 	</div>
 {:else if shape === 'line' && rows > 1}

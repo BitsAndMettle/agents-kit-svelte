@@ -23,6 +23,8 @@ test('Avatar: status is spoken as text and a named neighbour makes it decorative
 	await expect(section.getByText('In a meeting')).toBeAttached();
 	await expect(section.locator('span.sr-only', { hasText: 'Ada Lovelace' }).first()).toBeAttached();
 	await expect(section.locator('span.sr-only', { hasText: 'Dana Scully' })).toHaveCount(0);
+	// A decorative avatar is silent, status included: only the one with a name and no decorative flag speaks.
+	await expect(section.locator('span.sr-only', { hasText: 'online' })).toHaveCount(1);
 });
 
 test('AvatarGroup: is a list of named people and announces the overflow', async ({ page }) => {
@@ -37,8 +39,11 @@ test('AvatarGroup: is a list of named people and announces the overflow', async 
 test('Card: one tab stop for the link card and the whole card is clickable', async ({ page }) => {
 	const section = await openSection(page, 'card');
 	const linkCard = section.getByRole('link', { name: 'Open the board' });
-	await expect(cardOf(linkCard).locator('a')).toHaveCount(1);
+	// The card itself adds one tab stop (the title link); the link in its body is the only other.
+	await expect(cardOf(linkCard).locator('a')).toHaveCount(2);
 	await linkCard.focus();
+	await press(page, 'Tab');
+	await expect(section.getByRole('link', { name: 'a link in the body' })).toBeFocused();
 	await press(page, 'Tab');
 	await expect(section.getByRole('button', { name: 'Open settings' })).toBeFocused();
 	await press(page, 'Tab');
@@ -52,6 +57,18 @@ test('Card: one tab stop for the link card and the whole card is clickable', asy
 	await section.getByRole('button', { name: 'Open settings' }).focus();
 	await press(page, 'Enter');
 	await expect(buttonCard.getByText('Opened 2 times.')).toBeVisible();
+});
+
+test('Card: a link inside the body of a link card is clickable, empty space still opens the card', async ({ page }) => {
+	const section = await openSection(page, 'card');
+	const inner = section.getByRole('link', { name: 'a link in the body' });
+	await expect(inner).toBeVisible();
+	await inner.click();
+	await expect(page).toHaveURL(/#card-inner$/);
+	const outer = section.getByRole('link', { name: 'Open the board' });
+	const box = (await cardOf(outer).boundingBox())!;
+	await page.mouse.click(box.x + box.width - 8, box.y + box.height - 8);
+	await expect(page).toHaveURL(/#card$/);
 });
 
 test('Card: an action inside the card does not trigger the card', async ({ page }) => {
@@ -99,15 +116,20 @@ test('Progress: value, range and text are exposed to assistive technology', asyn
 	await expect(upload).toHaveAttribute('aria-valuenow', '41');
 });
 
-test('Spinner and Skeleton: status label is announced, busy container hides the placeholders', async ({ page }) => {
+test('Spinner and Skeleton: named images by default, live region only on request and filled after mount', async ({ page }) => {
 	const spinners = await openSection(page, 'spinner');
-	await expect(spinners.getByRole('status').filter({ hasText: 'Loading small' })).toHaveCount(1);
-	await expect(spinners.getByRole('button', { name: 'Saving' }).getByRole('status')).toHaveCount(0);
+	await expect(spinners.getByRole('img', { name: 'Loading small' })).toHaveCount(1);
+	await expect(spinners.getByRole('button', { name: 'Saving' }).getByRole('img')).toHaveCount(0);
+	// Only the opt-in spinner has a live region, and it gets its text after mounting.
+	const live = spinners.getByRole('status');
+	await expect(live).toHaveCount(1);
+	await expect(live).toHaveText('Syncing');
 
 	const skeleton = await openSection(page, 'skeleton');
 	const busy = skeleton.locator('[aria-busy="true"]');
 	await expect(busy).toHaveCount(1);
-	await expect(busy.getByRole('status')).toHaveText('Loading profile');
+	await expect(busy.getByRole('status')).toHaveCount(0);
+	await expect(busy.getByText('Loading profile')).toBeAttached();
 	await expect(busy.locator('[aria-hidden="true"]').first()).toBeAttached();
 });
 
