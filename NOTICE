@@ -8,35 +8,12 @@ NOTICE file, as Section 4(d) of the license requires.
 Credits
 -------
 
-Agents Kit Svelte is a Svelte 5 port of, and is inspired by, Agents Kit for
-React (https://github.com/agents-ui/agents-kit), Copyright (c) 2026 Emiliano.
-Agents Kit is released under the MIT License, reproduced below.
+Agents Kit Svelte was built fresh to match the look of Agents Kit
+(https://github.com/agents-ui/agents-kit) only. No code was copied or
+translated from it.
 
 The warm, soft visual style is inspired by the look and feel of Claude Code
 by Anthropic (https://www.anthropic.com/claude-code). Agents Kit Svelte is an
 independent project and is not affiliated with or endorsed by Anthropic.
 
 Icons are from Lucide (https://lucide.dev), released under the ISC License.
-
--------------------------------------------------------------------------------
-Agents Kit (https://github.com/agents-ui/agents-kit), MIT License
-
-Copyright (c) 2026 Emiliano
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.

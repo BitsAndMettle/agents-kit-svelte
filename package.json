@@ -1,7 +1,7 @@
 {
   "name": "agents-kit-svelte",
   "version": "0.1.0",
-  "description": "Svelte 5 Runes port of agents-ui/agents-kit & Trailside Dynamic Claude Code Chat Component",
+  "description": "Svelte 5 Runes components inspired by the look of agents-ui/agents-kit & Trailside Dynamic Claude Code Chat Component",
   "keywords": [
     "svelte",
     "svelte5",
@@ -13,13 +13,13 @@
     "tailwindcss",
     "ui"
   ],
-  "homepage": "https://rsynapse.github.io/agents-kit-svelte/",
+  "homepage": "https://bitsandmettle.github.io/agents-kit-svelte/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RSynapse/agents-kit-svelte.git"
+    "url": "git+https://github.com/BitsAndMettle/agents-kit-svelte.git"
   },
   "bugs": {
-    "url": "https://github.com/RSynapse/agents-kit-svelte/issues"
+    "url": "https://github.com/BitsAndMettle/agents-kit-svelte/issues"
   },
   "license": "Apache-2.0",
   "private": false,

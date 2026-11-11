@@ -1,6 +1,6 @@
 # Agents Kit Svelte (`agents-kit-svelte`)
 
-A **Svelte 5 Runes** component collection for AI agent interfaces—porting [`agents-ui/agents-kit`](https://agents-ui.github.io/agents-kit/) to Svelte 5 and adding **`ChatWorkbench`**, **GitHub Cards & Reactive Kanban/Bento Layouts**, and a **Schema-Driven Intelligent UI Engine**.
+A **Svelte 5 Runes** component collection for AI agent interfaces—inspired by the look of [`agents-ui/agents-kit`](https://agents-ui.github.io/agents-kit/), built fresh for Svelte 5, with **`ChatWorkbench`**, **GitHub Cards & Reactive Kanban/Bento Layouts**, and a **Schema-Driven Intelligent UI Engine**.
 
 ---
 
@@ -235,7 +235,7 @@ Releases are managed with Changesets; see [RELEASING.md](RELEASING.md).
 
 Agents Kit Svelte stands on other people's work, and we want that to stay visible.
 
-- **Agents Kit for React.** This library is a Svelte 5 port of, and is inspired by, [`agents-ui/agents-kit`](https://github.com/agents-ui/agents-kit) by Emiliano (MIT License). Its copyright and license notice is kept in [NOTICE](NOTICE).
+- **Agents Kit for React.** This library is inspired by the look of [`agents-ui/agents-kit`](https://github.com/agents-ui/agents-kit) by Emiliano. It was built fresh, and no code was copied or translated from it. See [NOTICE](NOTICE).
 - **Claude Code.** The warm, soft visual style is inspired by the look and feel of Claude Code by Anthropic. This is an independent project, not affiliated with or endorsed by Anthropic.
 - **Lucide.** Icons come from [Lucide](https://lucide.dev) (ISC License).
 
@@ -247,4 +247,4 @@ Licensed under the [Apache License 2.0](LICENSE). You can use, change and ship i
 2. keep the [NOTICE](NOTICE) file, which credits Agents Kit Svelte and the projects it builds on, and
 3. say that you changed files, if you did.
 
-A visible credit is appreciated too, for example: "UI components from [Agents Kit Svelte](https://github.com/rsynapse/agents-kit-svelte), a Svelte port of Agents Kit."
+A visible credit is appreciated too, for example: "UI components from [Agents Kit Svelte](https://github.com/BitsAndMettle/agents-kit-svelte), inspired by the look of Agents Kit."
