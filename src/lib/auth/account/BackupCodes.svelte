@@ -24,6 +24,7 @@
 
 <script lang="ts">
 	import type { HTMLAttributes } from 'svelte/elements';
+	import { untrack } from 'svelte';
 	import { Copy, Download, RefreshCw } from '@lucide/svelte';
 	import { isThenable } from './promise';
 	import { cn } from '../../ui/cn';
@@ -41,10 +42,10 @@
 		filename?: string;
 		/** A first line for the downloaded file, e.g. the app name. */
 		heading?: string;
-		/** Runs after the codes were copied. */
-		onCopy?: () => void;
-		/** Runs after the file was saved. */
-		onDownload?: () => void;
+		/** Runs after the codes were copied. Return a promise to show loading on the button. */
+		onCopy?: () => unknown;
+		/** Runs after the file was saved. Return a promise to show loading on the button. */
+		onDownload?: () => unknown;
 		/** Shows a "Regenerate" button. Confirming (in an AlertDialog) calls this; return a promise to show loading in the dialog. Your app replaces `codes`. */
 		onRegenerate?: () => unknown;
 		/** Adds the "I have saved these codes" checkbox and a Continue button that stays disabled until it is checked. */
@@ -101,6 +102,20 @@
 	let acknowledged = $state(false);
 	let confirming = $state(false);
 	let regenerateOpen = $state(false);
+	let copying = $state(false);
+	let downloading = $state(false);
+
+	// New codes are codes never saved: the acknowledgement and the "Copied" note belong to the old set.
+	// Compared by content, so a parent that hands back an equal array does not reset them.
+	const signature = $derived(JSON.stringify(codes));
+	let seen = untrack(() => signature);
+	$effect.pre(() => {
+		if (signature === seen) return;
+		seen = signature;
+		acknowledged = false;
+		announcement = '';
+		failed = false;
+	});
 
 	const usedSet = $derived(new Set(used));
 
@@ -118,10 +133,25 @@
 			return;
 		}
 		announcement = text.copied;
-		onCopy?.();
+		await after(onCopy, (on) => (copying = on));
 	}
 
-	function download(): void {
+	/** Runs a callback and shows loading while a promise it returned is pending. A rejection is the app's to report. */
+	async function after(callback: (() => unknown) | undefined, loading: (on: boolean) => void): Promise<void> {
+		try {
+			const result = callback?.();
+			if (isThenable(result)) {
+				loading(true);
+				await result;
+			}
+		} catch {
+			// The app reports its own failure.
+		} finally {
+			loading(false);
+		}
+	}
+
+	async function download(): Promise<void> {
 		failed = false;
 		const body = (heading ? `${heading}\n\n` : '') + `${joined()}\n`;
 		const url = URL.createObjectURL(new Blob([body], { type: 'text/plain' }));
@@ -134,7 +164,7 @@
 		link.remove();
 		setTimeout(() => URL.revokeObjectURL(url), 1000);
 		announcement = text.downloaded;
-		onDownload?.();
+		await after(onDownload, (on) => (downloading = on));
 	}
 
 	async function proceed(): Promise<void> {
@@ -165,11 +195,11 @@
 			{/each}
 		</ol>
 		<div class="flex flex-wrap items-center gap-2">
-			<Button size="sm" variant="secondary" onclick={copy}>
+			<Button size="sm" variant="secondary" loading={copying} onclick={copy}>
 				{#snippet leading()}<Copy aria-hidden="true" />{/snippet}
 				{text.copy}
 			</Button>
-			<Button size="sm" variant="secondary" onclick={download}>
+			<Button size="sm" variant="secondary" loading={downloading} onclick={download}>
 				{#snippet leading()}<Download aria-hidden="true" />{/snippet}
 				{text.download}
 			</Button>

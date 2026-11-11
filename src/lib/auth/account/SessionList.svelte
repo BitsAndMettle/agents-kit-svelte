@@ -13,7 +13,11 @@
 		revoke: string;
 		/** Accessible name of a row's button. */
 		revokeFor: (label: string) => string;
+		/** Polite message on a row whose revoke failed (the callback threw or its promise rejected). */
+		revokeFailed: string;
 		revokeOthers: string;
+		/** Polite message when "Sign out of all other sessions" failed. */
+		revokeOthersFailed: string;
 		cancel: string;
 		confirmRevokeTitle: (label: string) => string;
 		confirmRevokeDescription: string;
@@ -85,7 +89,9 @@
 		empty: 'No active sessions.',
 		revoke: 'Revoke',
 		revokeFor: (label) => `Revoke ${label}`,
+		revokeFailed: 'The device could not be signed out. Try again.',
 		revokeOthers: 'Sign out of all other sessions',
+		revokeOthersFailed: 'The other devices could not be signed out. Try again.',
 		cancel: 'Cancel',
 		confirmRevokeTitle: (label) => `Revoke ${label}?`,
 		confirmRevokeDescription: 'That device is signed out and has to sign in again.',
@@ -103,12 +109,15 @@
 	let root = $state<HTMLElement>();
 	let heading = $state<HTMLElement>();
 	let revoking = $state<Record<string, boolean>>({});
+	let failed = $state<Record<string, boolean>>({});
 	let revokingOthers = $state(false);
+	let failedOthers = $state(false);
 	/** What the dialog is asking about: one session, or all the others. */
 	let asking = $state<{ id: string; label: string } | 'others' | null>(null);
 	let dialogOpen = $state(false);
-	/** Where focus should go once the revoked row is gone. */
-	let restore: { id: string; index: number } | 'others' | null = null;
+	/** Per revoke in flight: where focus should go once that row is gone (its position among the other sessions). */
+	const restores = new Map<string, number>();
+	let restoreOthers = false;
 
 	const others = $derived(sessions.filter((session) => !session.current));
 	const askingOthers = $derived(asking === 'others' || asking === null);
@@ -119,23 +128,29 @@
 
 	// A revoked row's button leaves with the row, which would drop focus to the page.
 	$effect(() => {
-		const ids = sessions.map((session) => session.id);
-		const pending = restore;
-		if (!pending) return;
-		if (pending !== 'others' && ids.includes(pending.id)) return;
-		restore = null;
+		const ids = new Set(sessions.map((session) => session.id));
+		let index: number | undefined;
+		for (const [id, at] of restores) {
+			if (ids.has(id)) continue;
+			restores.delete(id);
+			index = at;
+		}
+		const all = restoreOthers && sessions.every((session) => session.current);
+		if (all) restoreOthers = false;
+		if (index === undefined && !all) return;
 		void tick().then(() => {
 			const active = document.activeElement;
 			if (active && active !== document.body) return;
 			const buttons = rowButtons();
-			const target = pending === 'others' || buttons.length === 0 ? heading : buttons[Math.min(pending.index, buttons.length - 1)];
+			const target = all || index === undefined || buttons.length === 0 ? heading : buttons[Math.min(index, buttons.length - 1)];
 			target?.focus();
 		});
 	});
 
 	async function revoke(id: string): Promise<void> {
 		const index = others.findIndex((session) => session.id === id);
-		restore = { id, index: Math.max(0, index) };
+		restores.set(id, Math.max(0, index));
+		failed[id] = false;
 		try {
 			const result = onRevoke?.(id);
 			if (isThenable(result)) {
@@ -143,15 +158,17 @@
 				await result;
 			}
 		} catch {
-			// The app reports its own failure; the row stays and can be tried again.
-			restore = null;
+			// The row stays and can be tried again; say so politely.
+			restores.delete(id);
+			failed[id] = true;
 		} finally {
 			delete revoking[id];
 		}
 	}
 
 	async function revokeAll(): Promise<void> {
-		restore = 'others';
+		restoreOthers = true;
+		failedOthers = false;
 		try {
 			const result = onRevokeOthers?.();
 			if (isThenable(result)) {
@@ -159,8 +176,8 @@
 				await result;
 			}
 		} catch {
-			// The app reports its own failure.
-			restore = null;
+			restoreOthers = false;
+			failedOthers = true;
 		} finally {
 			revokingOthers = false;
 		}
@@ -186,6 +203,11 @@
 		if (session.lastActive === undefined || clock.value === undefined) return '';
 		return formatLastActive(session.lastActive, clock.value);
 	}
+
+	/** True on the server and the first client render, until the clock has a time: the line keeps its height meanwhile. */
+	function awaitingClock(session: AuthSession): boolean {
+		return !session.current && session.lastActive !== undefined && clock.value === undefined;
+	}
 </script>
 
 <section {...rest} bind:this={root} aria-labelledby={headingId} class={cn(SURFACE.card, className)}>
@@ -195,6 +217,7 @@
 			<Button size="sm" variant="secondary" loading={revokingOthers} onclick={() => ask('others')}>{text.revokeOthers}</Button>
 		{/if}
 	</div>
+	<p role="status" class={cn('m-0 border-b border-canvas-border px-4 py-2 text-xs font-medium text-fg-main', !failedOthers && 'sr-only border-0 p-0')}>{failedOthers ? text.revokeOthersFailed : ''}</p>
 	{#if sessions.length === 0}
 		<p class="m-0 px-4 py-6 text-center text-[13px] text-fg-light">{text.empty}</p>
 	{:else}
@@ -202,6 +225,7 @@
 			{#each sessions as session (session.id)}
 				{@const Icon = ICONS[session.kind ?? 'unknown']}
 				{@const active = lastActiveText(session)}
+				{@const waiting = awaitingClock(session)}
 				<li class="flex items-center gap-3 border-b border-canvas-border px-4 py-3 last:border-b-0">
 					<span aria-hidden="true" class="inline-flex size-9 shrink-0 items-center justify-center rounded-control bg-canvas-secondary text-fg-light [&_svg]:size-4">
 						<Icon />
@@ -211,13 +235,14 @@
 							<span class="min-w-0 break-words">{session.label}</span>
 							{#if session.current}<Badge tone="accent" size="sm">{text.thisDevice}</Badge>{/if}
 						</p>
-						{#if session.location || active}
+						{#if session.location || active || waiting}
 							<p class="m-0 mt-0.5 text-xs text-fg-light">
 								{#if session.location}<span>{session.location}</span>{/if}
-								{#if session.location && active}<span aria-hidden="true"> · </span>{/if}
-								{#if active}<span>{active}</span>{/if}
+								{#if session.location && (active || waiting)}<span aria-hidden="true"> · </span>{/if}
+								{#if active}<span>{active}</span>{:else if waiting}<span aria-hidden="true" data-last-active-placeholder="" class="inline-block h-3 w-20 rounded-sm bg-canvas-secondary align-middle"></span>{/if}
 							</p>
 						{/if}
+						<span role="status" class={cn('block text-xs font-medium text-fg-main', !failed[session.id] && 'sr-only')}>{failed[session.id] ? text.revokeFailed : ''}</span>
 					</div>
 					{#if !session.current}
 						<Button

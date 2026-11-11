@@ -17,18 +17,19 @@
 </script>
 
 <script lang="ts">
+	import { LoaderCircle } from '@lucide/svelte';
+	import { actionClass } from '../../primitives/actions/shared';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { isThenable } from './promise';
 	import { cn } from '../../ui/cn';
 	import { Alert } from '../../primitives/display';
-	import { Button } from '../../primitives/actions';
 	import type { TimeInput } from '../../core/time';
 	import { Cooldown } from '../shared';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		/** The address that is not verified yet. */
 		email: string;
-		/** Choosing "Resend". Return a promise to show loading on the button; a rejection shows a failure message. */
+		/** Choosing "Resend"; the button is hidden without it. Return a promise to show loading on the button; a rejection shows a failure message. */
 		onResend?: () => unknown;
 		/** When the next resend is allowed (from your server's response). The button waits until then. */
 		resendAvailableAt?: TimeInput;
@@ -61,10 +62,11 @@
 	let outcome = $state<'sent' | 'failed' | null>(null);
 
 	async function resend(): Promise<void> {
-		if (pending || cooldown.active) return;
+		// aria-disabled leaves the button focusable, so the click is guarded here.
+		if (pending || cooldown.active || !onResend) return;
 		outcome = null;
 		try {
-			const result = onResend?.();
+			const result = onResend();
 			if (isThenable(result)) {
 				pending = true;
 				await result;
@@ -81,9 +83,13 @@
 <div {...rest} class={cn('w-full', className)}>
 	<Alert tone="warning" title={text.title} description={text.message(email)} onDismiss={onDismiss ? () => onDismiss() : undefined} dismissLabel={text.dismiss}>
 		{#snippet actions()}
-			<Button size="xs" variant="secondary" loading={pending} disabled={cooldown.active} onclick={resend}>
-				{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}
-			</Button>
+			{#if onResend}
+				<!-- aria-disabled from markup (also on the server) keeps the button focusable during a wait; Button would drop it. -->
+				<button type="button" onclick={resend} aria-disabled={pending || cooldown.active ? 'true' : undefined} aria-busy={pending || undefined} data-loading={pending || undefined} class={cn(actionClass('secondary', 'xs', false), pending && 'cursor-progress', cooldown.active && 'cursor-not-allowed opacity-60')}>
+					<span class={cn('inline-flex items-center justify-center gap-[inherit]', pending && 'opacity-0')}>{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}</span>
+					{#if pending}<span class="absolute inset-0 flex items-center justify-center" aria-hidden="true"><LoaderCircle class="animate-spin motion-reduce:animate-none" /></span>{/if}
+				</button>
+			{/if}
 			{#if onChangeEmail}
 				<button type="button" onclick={() => onChangeEmail()} class="rounded-sm text-[13px] font-medium text-fg-main underline underline-offset-2 hover:text-accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary/70">
 					{text.changeEmail}

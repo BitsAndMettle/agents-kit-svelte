@@ -13,10 +13,10 @@
 	let log = $state('');
 
 	/** A slow server call. */
-	const wait = () => new Promise<void>((resolve) => setTimeout(resolve, 800));
+	const wait = (ms = 1000) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 	async function revoke(id: string) {
-		await wait();
+		await wait(id === 'phone' ? 2500 : 1000);
 		sessions = sessions.filter((session) => session.id !== id);
 		log = `Revoked ${id}`;
 	}
@@ -24,6 +24,15 @@
 		await wait();
 		sessions = sessions.filter((session) => session.current);
 		log = 'Revoked all others';
+	}
+	let failing = $state<AuthSession[]>([
+		{ id: 'this', label: 'Chrome on Windows', kind: 'desktop', current: true },
+		{ id: 'flaky', label: 'Brave on Android', kind: 'mobile', location: 'Oslo, Norway', lastActive: start - 20 * MINUTE }
+	]);
+	/** A revoke the server refuses. */
+	async function refuse(): Promise<void> {
+		await new Promise((resolve) => setTimeout(resolve, 200));
+		throw new Error('refused');
 	}
 	function reset() {
 		sessions = [
@@ -41,5 +50,6 @@
 		<button type="button" class="rounded-control border border-card-border px-3 py-1 text-[13px] text-fg-main" onclick={reset}>Reset sessions</button>
 		<p class="m-0 text-[13px] text-fg-light" data-testid="sessions-log">{log}</p>
 	</div>
+	<SessionList sessions={failing} onRevoke={refuse} labels={{ title: 'Signed-in devices (failing)' }} />
 	<SessionList sessions={[]} labels={{ title: "Signed-in devices (none)" }} />
 </div>
