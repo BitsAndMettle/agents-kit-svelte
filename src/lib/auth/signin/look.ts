@@ -8,3 +8,35 @@ export const LINK_CLASS =
 export function isThenable(value: unknown): value is PromiseLike<unknown> {
 	return typeof (value as PromiseLike<unknown> | null | undefined)?.then === 'function';
 }
+
+/** Words of the provider and passkey buttons a card draws. Cards extend this, so each keeps one `labels` prop. */
+export interface AlternativeLabels {
+	/** Accessible name of a provider button, from the provider's label. */
+	provider: (label: string) => string;
+	/** Badge on the provider used last. */
+	lastUsed: string;
+	/** The passkey button. */
+	passkey: string;
+}
+
+/** Words of the password field's reveal button and Caps Lock warning. */
+export interface PasswordLabels {
+	showPassword: string;
+	hidePassword: string;
+	/** Warning shown while Caps Lock is on. */
+	capsLock: string;
+}
+
+/** Words of the password checklist and strength meter (sign-up). */
+export interface PasswordGuideLabels {
+	/** Screen-reader text for a met requirement. */
+	ruleMet: string;
+	/** Screen-reader text for an unmet requirement. */
+	ruleUnmet: string;
+	/** The quiet progress line, e.g. "2 of 3 requirements met". */
+	rulesSummary: (met: number, total: number) => string;
+	/** Name of the strength meter, read before the level. */
+	strengthTitle: string;
+	/** Words for the five strength levels, from 0 to 4. */
+	strengthLabels: [string, string, string, string, string];
+}

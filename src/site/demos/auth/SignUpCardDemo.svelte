@@ -1,12 +1,29 @@
 <script lang="ts">
 	import { Button } from '$lib/primitives/actions';
 	import type { PasswordRule, PasswordStrength } from '$lib/auth/fields';
-	import { SignUpCard, type SignUpValues } from '$lib/auth/signin';
+	import { SignUpCard, type SignUpCardLabels, type SignUpValues } from '$lib/auth/signin';
 
 	let nameField = $state<'required' | 'optional' | 'hidden'>('optional');
 	let confirmPassword = $state(true);
 	let password = $state('');
 	let result = $state('Nothing submitted yet.');
+	let translated = $state(false);
+
+	/** The words of the card's buttons and password parts, in another language, to show that every one can be replaced. */
+	const spanish: Partial<SignUpCardLabels> = {
+		optional: 'Opcional',
+		provider: (label) => `Continuar con ${label}`,
+		lastUsed: 'Último uso',
+		passkey: 'Crear cuenta con una llave de acceso',
+		showPassword: 'Mostrar contraseña',
+		hidePassword: 'Ocultar contraseña',
+		capsLock: 'Bloq Mayús está activado',
+		ruleMet: 'cumple',
+		ruleUnmet: 'no cumple',
+		rulesSummary: (met, total) => `${met} de ${total} requisitos cumplidos`,
+		strengthTitle: 'Seguridad de la contraseña',
+		strengthLabels: ['Muy débil', 'Débil', 'Aceptable', 'Buena', 'Fuerte']
+	};
 
 	const rules: PasswordRule[] = [
 		{ label: 'At least 10 characters', test: (v) => v.length >= 10 },
@@ -32,15 +49,21 @@
 			<Button size="sm" variant={nameField === option ? 'primary' : 'secondary'} aria-pressed={nameField === option} onclick={() => (nameField = option)}>Name {option}</Button>
 		{/each}
 		<Button size="sm" variant={confirmPassword ? 'primary' : 'secondary'} aria-pressed={confirmPassword} onclick={() => (confirmPassword = !confirmPassword)}>Confirm password</Button>
+		<Button size="sm" variant={translated ? 'primary' : 'secondary'} aria-pressed={translated} onclick={() => (translated = !translated)}>Other language</Button>
 	</div>
 	<SignUpCard
 		headingLevel={3}
 		description="Try taken@example.com to see a field error."
 		{nameField}
+		labels={translated ? spanish : undefined}
 		{confirmPassword}
 		{rules}
 		{strength}
 		minlength={10}
+		onPasskey={async () => {
+			await wait(500);
+			result = 'Passkey requested';
+		}}
 		onPasswordChange={(value) => (password = value)}
 		{providers}
 		signInHref="https://example.com/sign-in"

@@ -11,9 +11,9 @@
 		/** Button that submits the code. */
 		verify: string;
 		resend: string;
-		/** Button text while the resend wait runs. */
+		/** The line under the button while the resend wait runs. Not live: it is read on focus, not every second. */
 		resendIn: (seconds: number) => string;
-		/** Polite confirmation after a resend. */
+		/** Polite confirmation after a resend (only shown with `onResend`). */
 		sent: string;
 		/** Shown when the resend failed. */
 		resendFailed: string;
@@ -33,7 +33,7 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { tick, type Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { MailCheck } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
@@ -119,7 +119,7 @@
 		code: 'Code from the email',
 		verify: 'Verify code',
 		resend: 'Resend email',
-		resendIn: (seconds) => `Resend in ${seconds}s`,
+		resendIn: (seconds) => `You can resend in ${seconds} s`,
 		sent: 'Sent again',
 		resendFailed: 'The email could not be sent. Try again.',
 		back: 'Use a different email',
@@ -140,20 +140,18 @@
 	let resending = $state(false);
 	let outcome = $state<'sent' | 'failed' | null>(null);
 
-	let resendRef = $state<HTMLElement | null>(null);
-	// Button sets its own aria-disabled (for loading) after spreading ours, so a wait is marked here. The button
-	// stays enabled so keyboard focus is not dropped; resend() ignores presses while the wait runs.
-	$effect(() => {
-		const wait = cooldown.active;
-		const busy = resending;
-		if (!resendRef) return;
-		if (wait) resendRef.setAttribute('aria-disabled', 'true');
-		else if (!busy) resendRef.removeAttribute('aria-disabled');
-	});
+	const uid = $props.id();
+
+	/** True between a press and the callback call, so a second press in that moment is ignored. */
+	let starting = false;
 
 	async function resend(): Promise<void> {
-		if (resending || cooldown.active) return;
+		if (resending || starting || cooldown.active) return;
+		// Clear first and let the DOM settle: a second success then changes the status text again, so it is announced again.
 		outcome = null;
+		starting = true;
+		await tick();
+		starting = false;
 		try {
 			const result = onResend?.();
 			if (isThenable(result)) {
@@ -182,16 +180,19 @@
 			<Alert tone="danger" live description={submit.error} data-auth-error tabindex={-1} />
 		{/if}
 		<Field label={text.code} error={submit.fieldError('code')} required>
-			<OtpInput length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
+			<OtpInput codeLabel={text.code} length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
 		</Field>
 		<Button type="submit" variant="primary" size="lg" loading={submit.pending} class="w-full">{text.verify}</Button>
 	{/if}
 	<div class="grid justify-items-center gap-2">
-		<Button variant="secondary" loading={resending} bind:ref={resendRef} class={cooldown.active ? 'cursor-not-allowed opacity-50' : ''} onclick={resend}>
-			{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}
-		</Button>
-		<span role="status" class="text-xs font-medium text-fg-main">{outcome === 'sent' ? text.sent : ''}</span>
-		{#if outcome === 'failed'}<span role="alert" class={cn('text-xs font-medium', READABLE_TONE_TEXT.danger)}>{text.resendFailed}</span>{/if}
+		{#if onResend}
+			<Button variant="secondary" loading={resending} softDisabled={cooldown.active} aria-describedby={cooldown.active ? `${uid}-wait` : undefined} onclick={resend}>{text.resend}</Button>
+			{#if cooldown.active}
+				<span id="{uid}-wait" class="text-xs text-fg-light">{text.resendIn(cooldown.remaining)}</span>
+			{/if}
+			<span role="status" class="text-xs font-medium text-fg-main">{outcome === 'sent' ? text.sent : ''}</span>
+			{#if outcome === 'failed'}<span role="alert" class={cn('text-xs font-medium', READABLE_TONE_TEXT.danger)}>{text.resendFailed}</span>{/if}
+		{/if}
 		{#if onBack}
 			<button type="button" onclick={() => onBack?.()} class={cn(LINK_CLASS, 'text-[13px]')}>{text.back}</button>
 		{/if}

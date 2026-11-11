@@ -59,7 +59,7 @@ export const AUTH_SIGNIN: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/signin/MagicLinkSent.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'The "Check your email" screen shown after a sign-in link or code was emailed. It shows the address, a Resend button that waits until your server says it may be used again (and confirms politely when it was sent), and a "Use a different email" button. Set codeLength when the email also holds a code: a code form appears and reports { code } to onSubmit. Your app sends the email and checks the code.',
+			'The "Check your email" screen shown after a sign-in link or code was emailed. It shows the address, a Resend button (with onResend) that waits until your server says it may be used again, tells why in a line under it, and confirms politely when it was sent, and a "Use a different email" button. Set codeLength when the email also holds a code: a code form appears and reports { code } to onSubmit. Your app sends the email and checks the code.',
 		usageSnippet: `<script lang="ts">
   import { MagicLinkSent } from 'agents-kit-svelte/auth';
 

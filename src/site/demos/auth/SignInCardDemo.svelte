@@ -1,12 +1,23 @@
 <script lang="ts">
 	import { Building2 } from '@lucide/svelte';
 	import { Button } from '$lib/primitives/actions';
-	import { SignInCard, type SignInValues } from '$lib/auth/signin';
+	import { SignInCard, type SignInCardLabels, type SignInValues } from '$lib/auth/signin';
 
 	let method = $state<'password' | 'magic-link'>('password');
 	let result = $state('Nothing submitted yet.');
 	let lastProvider = $state('github');
 	let calls = $state(0);
+	let translated = $state(false);
+
+	/** The words of the card's buttons and fields, in another language, to show that every one can be replaced. */
+	const spanish: Partial<SignInCardLabels> = {
+		provider: (label) => `Continuar con ${label}`,
+		lastUsed: 'Último uso',
+		passkey: 'Entrar con una llave de acceso',
+		showPassword: 'Mostrar contraseña',
+		hidePassword: 'Ocultar contraseña',
+		capsLock: 'Bloq Mayús está activado'
+	};
 
 	const providers = [
 		{ id: 'github', label: 'GitHub' },
@@ -30,11 +41,13 @@
 	<div class="flex flex-wrap items-center justify-center gap-2" role="group" aria-label="Sign-in method">
 		<Button size="sm" variant={method === 'password' ? 'primary' : 'secondary'} aria-pressed={method === 'password'} onclick={() => (method = 'password')}>Password</Button>
 		<Button size="sm" variant={method === 'magic-link' ? 'primary' : 'secondary'} aria-pressed={method === 'magic-link'} onclick={() => (method = 'magic-link')}>Email link</Button>
+		<Button size="sm" variant={translated ? 'primary' : 'secondary'} aria-pressed={translated} onclick={() => (translated = !translated)}>Other language</Button>
 	</div>
 	<SignInCard
 		headingLevel={3}
 		description="Try locked@example.com, or the password wrong or boom."
 		{method}
+		labels={translated ? spanish : undefined}
 		{providers}
 		lastUsedProvider={lastProvider}
 		onProvider={(id) => {
