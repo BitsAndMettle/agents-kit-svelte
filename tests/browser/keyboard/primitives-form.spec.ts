@@ -7,7 +7,7 @@ const submit = (section: Locator) => section.getByRole('button', { name: 'Submit
 const reset = (section: Locator) => section.getByRole('button', { name: 'Reset' }).click();
 
 test.describe('Field', () => {
-	test('names the control, describes it with the hint, and announces and wires the error', async ({ page }) => {
+	test('names the control, describes it with the description, and announces and wires the error', async ({ page }) => {
 		const section = await openSection(page, 'field');
 		const email = section.getByRole('textbox', { name: 'Work email' });
 
@@ -54,6 +54,16 @@ test.describe('Field', () => {
 		await submit(section);
 		await expect(group.getByRole('checkbox').first()).not.toHaveAttribute('aria-invalid');
 		await expect(sent(section)).toHaveText('Sent: email=ada@example.com, display=, topics=reviews');
+	});
+
+	test('a checkbox in a plain field keeps one name, its own label, and takes the field description', async ({ page }) => {
+		const section = await openSection(page, 'field');
+		const terms = section.getByRole('checkbox', { name: 'I agree to the terms', exact: true });
+		await expect(terms).toHaveAccessibleName('I agree to the terms');
+		await expect(terms).toHaveAccessibleDescription('A single checkbox keeps its own label as its name.');
+		// The field label still toggles it (its <label for> points at the same input).
+		await section.getByText('Terms', { exact: true }).click();
+		await expect(terms).toBeChecked();
 	});
 });
 
@@ -175,17 +185,27 @@ test('RadioGroup: Tab enters, arrows move and check skipping disabled, required 
 	const radio = (name: string) => model.getByRole('radio', { name });
 
 	await expect(model).toHaveAttribute('aria-required', 'true');
-	await submit(section);
-	await expect(sent(section)).toHaveText('');
-
 	await section.locator('legend').first().click();
 	await press(page, 'Tab');
 	await expect(radio('Fast')).toBeFocused();
 	await expect(radio('Fast')).not.toBeChecked();
 
+	// A blocked submit lands focus on the visible radio, not the hidden proxy, and says why.
+	await section.getByRole('button', { name: 'Submit' }).focus();
+	await submit(section);
+	await expect(sent(section)).toHaveText('');
+	await expect(radio('Fast')).toBeFocused();
+	await expect(model).toHaveAttribute('aria-invalid', 'true');
+	const messageId = await model.getAttribute('aria-errormessage');
+	const message = section.locator(`[id="${messageId}"]`);
+	await expect(message).toHaveAttribute('aria-live', 'polite');
+	await expect(message).not.toHaveText('');
+
 	await press(page, 'ArrowDown');
 	await expect(radio('Balanced')).toBeFocused();
 	await expect(radio('Balanced')).toBeChecked();
+	await expect(model).not.toHaveAttribute('aria-invalid');
+	await expect(message).toHaveText('');
 	await press(page, 'ArrowDown');
 	await expect(radio('Careful')).toBeChecked();
 	await expect(radio('Deep')).toHaveAttribute('aria-disabled', 'true');

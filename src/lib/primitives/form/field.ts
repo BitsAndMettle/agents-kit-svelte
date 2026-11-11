@@ -9,7 +9,9 @@ export interface FieldState {
 	readonly controlId: string;
 	/** Id of the `<label>` (or the `<legend>` in a group field). */
 	readonly labelId: string;
-	/** Id of the hint, when there is one. */
+	/** Id of the description, when there is one. */
+	readonly descriptionId: string | undefined;
+	/** The same id as `descriptionId`, kept so code that reads the context keeps working. */
 	readonly hintId: string | undefined;
 	/** Id of the error message, while it is shown. */
 	readonly errorId: string | undefined;
@@ -72,7 +74,7 @@ export function joinIds(...ids: (string | null | undefined)[]): string | undefin
  * Merges a control's own state with its field's wiring.
  *
  * - No field: the control's own values only.
- * - A plain field: the field's id (so its label names the control), the hint and error as
+ * - A plain field: the field's id (so its label names the control), the description and error as
  *   descriptions, and the field's invalid, required and disabled states.
  * - A group field (`<fieldset>`): the fieldset carries the description and disables native
  *   controls itself, so members take only the invalid state and the error reference; a
@@ -98,7 +100,7 @@ export function fieldControlAttrs(
 	const attrs: FieldControlAttrs = {};
 	const id = plain ? field.controlId : (own.id ?? undefined);
 	if (id) attrs.id = id;
-	const describedBy = plain ? joinIds(own.describedBy, field.hintId, errorId) : joinIds(own.describedBy);
+	const describedBy = plain ? joinIds(own.describedBy, field.descriptionId, errorId) : joinIds(own.describedBy);
 	if (describedBy) attrs['aria-describedby'] = describedBy;
 	if (invalid) attrs['aria-invalid'] = 'true';
 	if (errorId) attrs['aria-errormessage'] = errorId;

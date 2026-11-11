@@ -18,3 +18,5 @@ export { default as Slider } from './Slider.svelte';
 export type { Props as SliderProps } from './Slider.svelte';
 export { getFieldContext, fieldControlAttrs } from './field';
 export type { FieldState, FieldControlAttrs, FieldControlKind } from './field';
+export type { FormControlSize } from './classes';
+export type { CharacterCount, CharacterCountFormatter } from './text-count';

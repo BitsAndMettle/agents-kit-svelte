@@ -5,9 +5,11 @@
 	import { fieldControlAttrs, getFieldContext } from './field';
 	import { sliderRatio } from './slider-ratio';
 
-	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'type' | 'value' | 'min' | 'max' | 'step' | 'required'> {
+	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'type' | 'value' | 'defaultValue' | 'min' | 'max' | 'step' | 'required'> {
 		/** Bindable. */
 		value?: number;
+		/** Starting value when `value` is not given, and what a form reset restores (defaults to the starting value). */
+		defaultValue?: number;
 		min?: number;
 		max?: number;
 		step?: number;
@@ -25,7 +27,8 @@
 	}
 
 	let {
-		value = $bindable(50),
+		defaultValue,
+		value = $bindable(defaultValue ?? 50),
 		min = 0,
 		max = 100,
 		step = 1,
@@ -42,7 +45,7 @@
 	}: Props = $props();
 
 	const field = getFieldContext();
-	// A form reset restores the value the slider started at (or your own `defaultValue`).
+	// A form reset restores `defaultValue`, or the value the slider started at.
 	const initialValue = untrack(() => value);
 	// A range always has a value, so `required` does not apply to it.
 	const control = $derived.by(() => {
@@ -58,7 +61,7 @@
 		type="range"
 		bind:this={ref}
 		bind:value
-		defaultValue={rest.defaultValue ?? initialValue}
+		defaultValue={defaultValue ?? initialValue}
 		{min}
 		{max}
 		{step}

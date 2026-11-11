@@ -2,13 +2,14 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
+	import { DANGER_TEXT } from './classes';
 	import { fieldControlAttrs, setFieldContext, type FieldControlAttrs, type FieldState } from './field';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children'> {
 		/** Visible label. In a plain field it is a `<label for>` the control; in a group field, the `<legend>`. */
 		label?: string | Snippet;
 		/** Help text under the label, read as the control's description. */
-		hint?: string | Snippet;
+		description?: string | Snippet;
 		/** Error message. Shown in place, announced politely, and marks the control invalid. */
 		error?: string | Snippet;
 		/** Marks the control invalid without a message. */
@@ -32,7 +33,7 @@
 
 	let {
 		label,
-		hint,
+		description,
 		error,
 		invalid = false,
 		required = false,
@@ -54,8 +55,11 @@
 			return controlId ?? `${uid}-control`;
 		},
 		labelId: `${uid}-label`,
+		get descriptionId() {
+			return description ? `${uid}-description` : undefined;
+		},
 		get hintId() {
-			return hint ? `${uid}-hint` : undefined;
+			return this.descriptionId;
 		},
 		get errorId() {
 			return hasError ? `${uid}-error` : undefined;
@@ -76,7 +80,7 @@
 	setFieldContext(field);
 
 	const control = $derived(fieldControlAttrs(field));
-	const groupDescribedBy = $derived(group ? [field.hintId, field.errorId].filter(Boolean).join(' ') || undefined : undefined);
+	const groupDescribedBy = $derived(group ? [field.descriptionId, field.errorId].filter(Boolean).join(' ') || undefined : undefined);
 </script>
 
 {#snippet text(value: string | Snippet)}
@@ -92,12 +96,12 @@
 {/snippet}
 
 {#snippet body()}
-	{#if hint}
-		<p id={field.hintId} class="text-xs leading-5 text-fg-light">{@render text(hint)}</p>
+	{#if description}
+		<p id={field.descriptionId} class="text-xs leading-5 text-fg-light">{@render text(description)}</p>
 	{/if}
 	{@render children(control)}
 	<!-- Always rendered, so the message is announced when it appears; referenced only while it has one. -->
-	<div id="{uid}-error" aria-live="polite" class="text-xs leading-5 font-medium text-[color-mix(in_oklch,var(--ak-color-danger)_78%,var(--ak-color-fg))] empty:-mt-1.5">{#if error}<p>{@render text(error)}</p>{/if}</div>
+	<div id="{uid}-error" aria-live="polite" class={['text-xs leading-5 font-medium empty:-mt-1.5', DANGER_TEXT]}>{#if error}<p>{@render text(error)}</p>{/if}</div>
 {/snippet}
 
 {#if group}

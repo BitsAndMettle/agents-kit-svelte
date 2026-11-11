@@ -1,5 +1,6 @@
 <script lang="ts" module>
-	export type InputSize = 'sm' | 'md' | 'lg';
+	import type { FormControlSize } from './classes';
+	export type InputSize = FormControlSize;
 </script>
 
 <script lang="ts">
@@ -10,9 +11,11 @@
 	import { INPUT_CLASS } from '../../ui/styles';
 	import { fieldControlAttrs, getFieldContext } from './field';
 
-	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'size' | 'value' | 'type'> {
+	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'size' | 'value' | 'defaultValue' | 'type'> {
 		/** The text. Bindable. */
 		value?: string | number | null;
+		/** Starting value when `value` is not given, and what a form reset restores (defaults to the starting value). */
+		defaultValue?: string | number | null;
 		/** Native input type (text, email, search, number, password, url, tel…). Not checkbox, radio or range: use Checkbox, RadioGroup or Slider. */
 		type?: Exclude<HTMLInputAttributes['type'], 'checkbox' | 'radio' | 'range' | 'file' | 'hidden' | 'submit' | 'reset' | 'button' | 'image'>;
 		size?: InputSize;
@@ -35,7 +38,8 @@
 	}
 
 	let {
-		value = $bindable(''),
+		defaultValue,
+		value = $bindable(defaultValue ?? ''),
 		type = 'text',
 		size = 'md',
 		invalid = false,
@@ -54,7 +58,7 @@
 	}: Props = $props();
 
 	const field = getFieldContext();
-	// A form reset restores the value the input started with (or your own `defaultValue`).
+	// A form reset restores `defaultValue`, or the value the input started with.
 	const initialValue = untrack(() => value);
 	const control = $derived(fieldControlAttrs(field, { id, describedBy, invalid, required: Boolean(required), disabled: Boolean(disabled) }));
 	const filled = $derived(value !== null && value !== undefined && String(value) !== '');
@@ -89,7 +93,7 @@
 		{...control}
 		bind:this={ref}
 		bind:value
-		defaultValue={rest.defaultValue ?? initialValue}
+		defaultValue={defaultValue ?? initialValue}
 		{type}
 		oninput={(event) => {
 			onValueChange?.(event.currentTarget.value);

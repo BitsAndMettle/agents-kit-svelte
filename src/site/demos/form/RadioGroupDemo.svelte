@@ -19,11 +19,11 @@
 </script>
 
 <DemoForm label="Agent setup" class="mx-auto w-full max-w-xl">
-	<Field label="Model" group required hint="Arrow keys move and select; the disabled option is skipped.">
+	<Field label="Model" group required description="Arrow keys move and select; the disabled option is skipped.">
 		<RadioGroup name="model" options={models} bind:value={model} />
 	</Field>
 	<Field label="Effort" group>
-		<RadioGroup name="effort" orientation="horizontal" options={effort} bind:value={level} />
+		<RadioGroup name="effort" orientation="horizontal" options={effort} defaultValue="medium" onValueChange={(next) => (level = next)} />
 	</Field>
 	<p class="text-xs text-fg-light">Model: {model ?? 'none'} · Effort: {level ?? 'none'}</p>
 </DemoForm>
