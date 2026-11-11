@@ -11,3 +11,4 @@ export * from '../primitives/display';
 export * from '../primitives/navigation';
 export * from '../primitives/overlays';
 export * from '../primitives/menus';
+export { toPlacement, type OverlayPlacement } from '../primitives/placement';

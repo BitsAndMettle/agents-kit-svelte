@@ -10,4 +10,4 @@ export { default as Popover } from './Popover.svelte';
 export type { Props as PopoverProps } from './Popover.svelte';
 export { default as Tooltip } from './Tooltip.svelte';
 export type { Props as TooltipProps } from './Tooltip.svelte';
-export type { OverlayPlacement, SheetSide } from './overlay';
+export type { SheetSide } from './overlay';

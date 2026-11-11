@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cardArrowClass, tipArrowClass, toPlacement } from '../src/lib/primitives/overlays/overlay.ts';
+import { cardArrowClass, tipArrowClass } from '../src/lib/primitives/overlays/overlay.ts';
+import { toPlacement } from '../src/lib/primitives/placement.ts';
 
 const DEFAULTS = { side: 'bottom', align: 'center', offset: 6 } as const;
 

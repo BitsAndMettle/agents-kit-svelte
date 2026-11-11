@@ -12,7 +12,7 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { Part } from '../../headless/runtime/parts';
-	import type { OverlayPlacement } from './overlay';
+	import type { OverlayPlacement } from '../placement';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'content' | 'role'> {
 		/** The text, or a snippet for short rich content (no interactive elements). */
@@ -36,7 +36,8 @@
 <script lang="ts">
 	import { Tooltip } from '../../headless/patterns/tooltip.svelte';
 	import { cn } from '../../ui/cn';
-	import { ARROW_GAP, FLOAT_MOTION, tipArrowClass, TOOLTIP_SURFACE, toPlacement } from './overlay';
+	import { ARROW_GAP, FLOAT_MOTION, tipArrowClass, TOOLTIP_SURFACE } from './overlay';
+	import { toPlacement } from '../placement';
 
 	let {
 		content,

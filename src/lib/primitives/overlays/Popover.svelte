@@ -10,7 +10,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import type { FocusTarget } from '../../headless/runtime/layers.svelte';
 	import type { ChangeReason, Part } from '../../headless/runtime/parts';
-	import type { OverlayPlacement } from './overlay';
+	import type { OverlayPlacement } from '../placement';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
@@ -38,7 +38,8 @@
 <script lang="ts">
 	import { Popover } from '../../headless/patterns/popover.svelte';
 	import { cn } from '../../ui/cn';
-	import { ARROW_GAP, cardArrowClass, FLOAT_MOTION, POPOVER_SURFACE, toPlacement } from './overlay';
+	import { ARROW_GAP, cardArrowClass, FLOAT_MOTION, POPOVER_SURFACE } from './overlay';
+	import { toPlacement } from '../placement';
 
 	let {
 		open = $bindable(false),
