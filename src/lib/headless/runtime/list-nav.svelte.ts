@@ -27,6 +27,22 @@ import { isBuffering, isTypeaheadKey, typeahead, TYPEAHEAD_IDLE, type TypeaheadS
 import { activatesNatively } from './focus';
 import { cleanups, listen, part, read, subId, type MaybeGetter, type Part } from './parts';
 
+function isEditable(target: EventTarget | null): boolean {
+	if (!(target instanceof HTMLElement)) return false;
+	if (target.isContentEditable || target instanceof HTMLTextAreaElement) return true;
+	return (
+		target instanceof HTMLInputElement &&
+		!['button', 'checkbox', 'color', 'file', 'image', 'radio', 'range', 'reset', 'submit'].includes(target.type)
+	);
+}
+
+function scrollable(el: HTMLElement): boolean {
+	const style = getComputedStyle(el);
+	const y = /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight;
+	const x = /(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth;
+	return x || y;
+}
+
 export interface ListNavOptions {
 	/** From the component's `$props.id()`. */
 	id: string;
@@ -87,6 +103,10 @@ export class ListNav {
 	readonly #latest = new Map<string, ItemOptions>();
 	readonly #values = new WeakMap<Element, string>();
 	#typeahead: TypeaheadState = TYPEAHEAD_IDLE;
+	/** First value ever rendered: the tab stop on the server, before anything is measured. */
+	#firstSeen: string | null = null;
+	/** Focus is (or was, until it fell to <body>) on one of this nav's items. */
+	#focusWithin = false;
 
 	constructor(options: ListNavOptions) {
 		this.#id = options.id;
@@ -146,7 +166,8 @@ export class ListNav {
 			cached = { key: createAttachmentKey(), attach: this.#itemAttachment(value) };
 			this.#itemAttach.set(value, cached);
 		}
-		const stop = this.#highlighted ?? this.#options.tabStop?.() ?? this.#firstItem;
+		this.#firstSeen ??= value;
+		const stop = this.#highlighted ?? this.#options.tabStop?.() ?? this.#firstItem ?? this.#firstSeen;
 		return part(cached.key, cached.attach, {
 			id: subId(this.#id, 'item', value),
 			'data-ak-nav': this.#id,
@@ -181,12 +202,14 @@ export class ListNav {
 				{ count: items.length, current, disabled: blocked, loop: read(this.#options.loop ?? true), columns },
 				intent
 			);
-			if (index >= 0) this.highlight(values[index], { focus: true });
+			if (index >= 0) this.highlight(values[index], { focus: true, scroll: true });
 			return true;
 		}
 
+		// In a text owner (combobox input) Space and printable keys are text, never commands.
+		const editable = isEditable(event.target);
 		const now = event.timeStamp;
-		if (event.key === 'Enter' || (event.key === ' ' && !isBuffering(this.#typeahead, now))) {
+		if (event.key === 'Enter' || (event.key === ' ' && !editable && !isBuffering(this.#typeahead, now))) {
 			if (current < 0) return false;
 			const value = values[current];
 			if (this.#latest.get(value)?.disabled) {
@@ -201,7 +224,12 @@ export class ListNav {
 			return true;
 		}
 
-		if (read(this.#options.typeahead ?? this.#roving) && !modified && isTypeaheadKey(event.key, false, false, false)) {
+		if (
+			!editable &&
+			read(this.#options.typeahead ?? this.#roving) &&
+			!modified &&
+			isTypeaheadKey(event.key, false, false, false)
+		) {
 			const labels = items.map((el, i) =>
 				(this.#latest.get(values[i])?.textValue ?? el.textContent ?? '').trim().toLowerCase()
 			);
@@ -210,7 +238,7 @@ export class ListNav {
 			if (event.key === ' ' && result.state.buffer !== '') event.preventDefault();
 			if (result.index < 0) return false;
 			event.preventDefault();
-			this.highlight(values[result.index], { focus: true });
+			this.highlight(values[result.index], { focus: true, scroll: true });
 			return true;
 		}
 		return false;
@@ -218,10 +246,13 @@ export class ListNav {
 
 	/**
 	 * Move the highlight. `'first'`/`'last'` resolve against navigable items in DOM order.
-	 * Roving: optionally focuses the item. Active-descendant: scrolls it into view with
-	 * block 'nearest'. Idempotent.
+	 * `focus` (roving mode) focuses the item without scrolling the page; `scroll` brings it
+	 * into view inside the nav's OWN scroll container (the root, or a scrollable element
+	 * between the item and the root), never scrolling the root's ancestors or the page.
+	 * Key navigation passes both; programmatic highlights and revalidation pass neither.
+	 * Idempotent.
 	 */
-	highlight(to: 'first' | 'last' | string | null, options: { focus?: boolean } = {}): void {
+	highlight(to: 'first' | 'last' | string | null, options: { focus?: boolean; scroll?: boolean } = {}): void {
 		let value = to;
 		if (to === 'first' || to === 'last') {
 			const navigable = this.#items()
@@ -235,11 +266,28 @@ export class ListNav {
 		}
 		const el = value === null ? null : (this.#items().find((item) => this.#values.get(item) === value) ?? null);
 		if (!el) return;
-		if (this.#roving) {
-			if (options.focus) el.focus();
-		} else {
-			el.scrollIntoView({ block: 'nearest' });
+		if (this.#roving && options.focus) el.focus({ preventScroll: true });
+		if (options.scroll) this.#scrollIntoRoot(el);
+	}
+
+	#scrollIntoRoot(el: HTMLElement): void {
+		let box: HTMLElement | null = null;
+		for (let node = el.parentElement; node; node = node.parentElement) {
+			if (scrollable(node)) {
+				box = node;
+				break;
+			}
+			if (node === this.#rootEl) break;
 		}
+		if (!box) return;
+		const outer = box.getBoundingClientRect();
+		const r = el.getBoundingClientRect();
+		const top = outer.top + box.clientTop;
+		const left = outer.left + box.clientLeft;
+		if (r.top < top) box.scrollTop -= top - r.top;
+		else if (r.bottom > top + box.clientHeight) box.scrollTop += r.bottom - (top + box.clientHeight);
+		if (r.left < left) box.scrollLeft -= left - r.left;
+		else if (r.right > left + box.clientWidth) box.scrollLeft += r.right - (left + box.clientWidth);
 	}
 
 	/** Items in DOM order (a fresh query; cheap, only run on input and mutations). */
@@ -265,6 +313,13 @@ export class ListNav {
 		} else if (current === null && auto && navigable.length > 0) {
 			this.highlight(navigable[0]);
 		}
+		// The focused item was removed and focus fell to <body>: move it to the new tab stop.
+		const active = document.activeElement;
+		if (this.#roving && this.#focusWithin && (!active || active === document.body)) {
+			const stop = this.#highlighted ?? this.#options.tabStop?.() ?? this.#firstItem;
+			const el = stop === null ? null : this.#items().find((item) => this.#values.get(item) === stop);
+			el?.focus({ preventScroll: true });
+		}
 	};
 
 	#attachRoot: Attachment<HTMLElement> = (el) =>
@@ -276,16 +331,23 @@ export class ListNav {
 			queueMicrotask(this.#revalidate);
 			const offs = this.#roving
 				? [
+						// Only keys aimed at one of THIS nav's items: an input inside a toolbar, or a
+						// nested nav's item, keeps its own keys.
 						listen(el, 'keydown', (event) => {
-							const owner = event.target instanceof Element ? event.target.closest('[data-ak-nav-root]') : null;
-							if (owner === el) this.handleKey(event);
+							if (event.target instanceof Element && this.#values.has(event.target)) this.handleKey(event);
 						}),
 						listen(el, 'focusin', (event) => {
 							const value = event.target instanceof Element ? this.#values.get(event.target) : undefined;
+							this.#focusWithin = value !== undefined;
 							if (value !== undefined && value !== this.#highlighted) {
 								this.#highlighted = value;
 								this.#options.onHighlight?.(value);
 							}
+						}),
+						listen(el, 'focusout', (event) => {
+							// A null relatedTarget is focus falling to <body> (item removed) or the window
+							// blurring: keep the flag so revalidation can put focus back.
+							if (event.relatedTarget instanceof Node && !el.contains(event.relatedTarget)) this.#focusWithin = false;
 						})
 					]
 				: [];

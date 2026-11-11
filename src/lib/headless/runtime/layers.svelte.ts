@@ -82,12 +82,15 @@ export class Layer {
 	readonly init: LayerInit;
 	/** Set by the attachments; null on the server and before mount. */
 	contentEl: HTMLElement | null = null;
-	triggerEl: HTMLElement | null = null;
-	anchorEl: HTMLElement | null = null;
+	/** Reactive (raw) so positioning re-anchors when a trigger is re-keyed. */
+	triggerEl: HTMLElement | null = $state.raw(null);
+	anchorEl: HTMLElement | null = $state.raw(null);
 	/** Virtual anchor (context menu point). Wins over anchorEl/triggerEl when set. */
 	anchorPoint: { x: number; y: number } | null = $state(null);
 	/** Written ONLY by LayerStack (through setPhase). */
 	phase: LayerPhase = $state('closed');
+	/** Shown at all (open or closing): open -> closing must not restart positioning. */
+	readonly #visible = $derived(this.phase !== 'closed');
 	/** Measured side after positioning, for `data-side`. */
 	side: Side | null = $state(null);
 	/** What had focus when the layer opened, plus its id for "re-rendered trigger" lookup. */
@@ -112,23 +115,34 @@ export class Layer {
 					const want = init.desired();
 					untrack(() => (want ? stack.open(this) : stack.close(this, 'api')));
 				});
+				// Positioning runs while shown and restarts when the anchor or placement changes.
+				// When the anchor goes away (trigger removed) the last placement is kept rather
+				// than re-positioning against nothing.
+				let stopPositioning: (() => void) | null = null;
+				const stop = () => {
+					stopPositioning?.();
+					stopPositioning = null;
+				};
 				if (init.placement !== undefined) {
 					const placement = init.placement;
 					$effect(() => {
-						if (this.phase === 'closed') return;
+						if (!this.#visible) return untrack(stop);
 						const value = read(placement);
-						const point = this.anchorPoint;
-						return untrack(() =>
-							startPositioning(el, {
-								anchor: () => point ?? this.anchorEl ?? this.triggerEl,
+						const anchor = this.anchorPoint ?? this.anchorEl ?? this.triggerEl;
+						untrack(() => {
+							if (!anchor) return;
+							stop();
+							stopPositioning = startPositioning(el, {
+								anchor,
 								placement: value,
 								onSide: (side) => (this.side = side),
 								anchorName: `--ak-anchor-${this.id.replace(/[^A-Za-z0-9_-]/g, '_')}`
-							})
-						);
+							});
+						});
 					});
 				}
 				return () => {
+					stop();
 					stack.detach(this);
 					unwire();
 					if (this.contentEl === el) this.contentEl = null;
@@ -166,6 +180,11 @@ export class Layer {
 interface ApplyOptions {
 	/** Restore focus for the lowest closed layer. Default true. */
 	restoreFocus?: boolean;
+	/**
+	 * Whether focus on <body> counts as lost (and is restored). Default true; false after an
+	 * outside press, where the person deliberately put focus elsewhere.
+	 */
+	bodyIsLost?: boolean;
 	/** Layers already hidden by the browser or being removed: no exit wait. */
 	immediate?: ReadonlySet<LayerId>;
 }
@@ -199,13 +218,34 @@ export class LayerStack {
 	#chain: Chain = [];
 	#layers = new Map<LayerId, Layer>();
 	#pendingTouch = false;
+	/** An Escape keydown is being dispatched (cleared on the next task). */
+	#escapeKeyPending = false;
+	/** One policy snapshot per event, so a veto function runs once per decision. */
+	#snap: { event: Event; chain: Chain; snapshot: Chain } | null = null;
 	#scrollLock: { overflow: string; gutter: string } | null = null;
+	/** Elements this stack just focused while returning focus; cleared on the next task. */
+	readonly restored = new WeakSet<Element>();
 
 	install(doc: Document): void {
+		doc.addEventListener('keydown', this.#onKeydownCapture, true);
 		doc.addEventListener('keydown', this.#onKeydown);
 		doc.addEventListener('pointerdown', this.#onPointerdown, true);
+		doc.addEventListener('pointercancel', this.#onPointercancel, true);
 		doc.addEventListener('click', this.#onClick, true);
 	}
+
+	/**
+	 * CAPTURE phase, for one job only: when the top layer REFUSES Escape, consume the key
+	 * before anything can stop its propagation, so the browser's close watcher never closes
+	 * a vetoing <dialog>. Allowed Escapes are still decided in the bubble phase below.
+	 */
+	#onKeydownCapture = (event: KeyboardEvent) => {
+		if (event.key !== 'Escape' || event.isComposing || this.#chain.length === 0) return;
+		this.#escapeKeyPending = true;
+		setTimeout(() => (this.#escapeKeyPending = false), 0);
+		const snapshot = this.#snapshot(event);
+		if (!snapshot[snapshot.length - 1].dismiss.escape) event.preventDefault();
+	};
 
 	/**
 	 * BUBBLE phase, so an element's own Escape handling runs first and can claim the key
@@ -222,6 +262,10 @@ export class LayerStack {
 		// Touch decides on click, so a scroll gesture that starts outside does not dismiss.
 		this.#pendingTouch = event.pointerType === 'touch';
 		if (!this.#pendingTouch) this.#outside(event);
+	};
+
+	#onPointercancel = () => {
+		this.#pendingTouch = false;
 	};
 
 	#onClick = (event: MouseEvent) => {
@@ -244,12 +288,12 @@ export class LayerStack {
 		if (!reopening && !this.#show(layer, el)) {
 			this.#chain = closeLayer(this.#chain, layer.id).chain;
 			this.#layers.delete(layer.id);
-			notify(layer, false, 'native');
+			this.#notify(layer, false, 'native');
 			return;
 		}
 		layer.setPhase('open');
 		this.#syncScrollLock();
-		if (!reopening) this.#focusInitial(layer, el);
+		if (!reopening || !el.contains(document.activeElement)) this.#focusInitial(layer, el);
 	}
 
 	/** Close `layer` and every layer above it. Idempotent. */
@@ -280,9 +324,12 @@ export class LayerStack {
 	}
 
 	/**
-	 * Wire per-content events: dialog `cancel` → preventDefault + the escape path for the
-	 * TOP layer (covers Android back), `focusout` → dismissOnFocusOut, `close`/`toggle` →
-	 * reconcile what the browser did by itself.
+	 * Wire per-content events: `focusout` → dismissOnFocusOut, `close`/`toggle` → reconcile
+	 * what the browser did by itself, and dialog `cancel` → preventDefault, then:
+	 * - during an Escape keydown whose propagation app code stopped: the TOP layer's escape
+	 *   path, as for any Escape;
+	 * - otherwise (`dialog.requestClose()`, Android back): close THIS dialog, and with it
+	 *   the layers above it, under its own escape policy.
 	 */
 	wire(layer: Layer, el: HTMLElement): () => void {
 		const reconcile = () => this.#reconcileNative(layer);
@@ -290,7 +337,10 @@ export class LayerStack {
 			return cleanups(
 				listen(el, 'cancel', (event) => {
 					event.preventDefault();
-					this.#escape(event);
+					if (this.#escapeKeyPending) return this.#escape(event);
+					if (layer.phase !== 'open') return;
+					if (!allows(read(layer.init.dismiss).escape, event, true)) return;
+					this.#apply(closeLayer(this.#chain, layer.id), (id) => (id === layer.id ? 'escape' : 'parent'));
 				}),
 				listen(el, 'close', reconcile),
 				listen(el, 'toggle', reconcile)
@@ -314,7 +364,7 @@ export class LayerStack {
 	#outside(event: MouseEvent): void {
 		const target = event.target instanceof Node ? event.target : null;
 		const hit = this.#hitIndex(target, event.clientX, event.clientY);
-		this.#apply(dismissOnPointer(this.#snapshot(event), hit), () => 'outside');
+		this.#apply(dismissOnPointer(this.#snapshot(event), hit), () => 'outside', { bodyIsLost: false });
 	}
 
 	#focusOut(layer: Layer, event: FocusEvent): void {
@@ -328,7 +378,10 @@ export class LayerStack {
 				break;
 			}
 		}
-		this.#apply(dismissOnFocusOut(this.#snapshot(event), layer.id, index), () => 'focus-out');
+		// Focus already went where the person sent it (Tab out): never pull it back.
+		this.#apply(dismissOnFocusOut(this.#snapshot(event), layer.id, index), () => 'focus-out', {
+			restoreFocus: false
+		});
 	}
 
 	#reconcileNative(layer: Layer): void {
@@ -341,7 +394,7 @@ export class LayerStack {
 			this.#push(layer);
 			layer.setPhase('open');
 			this.#syncScrollLock();
-			notify(layer, true, 'native');
+			this.#notify(layer, true, 'native');
 		} else if (!shown && layer.phase === 'open') {
 			this.#apply(closeLayer(this.#chain, layer.id), (id) => (id === layer.id ? 'native' : 'parent'), {
 				immediate: new Set([layer.id])
@@ -356,25 +409,29 @@ export class LayerStack {
 	 * decision time, so a veto function runs only for layers the walk actually reaches.
 	 */
 	#snapshot(event: Event): Chain {
-		return this.#chain.map((entry): ChainEntry => {
+		if (this.#snap?.event === event && this.#snap.chain === this.#chain) return this.#snap.snapshot;
+		const snapshot = this.#chain.map((entry): ChainEntry => {
 			const layer = this.#layers.get(entry.id);
 			let policy: Dismiss | undefined;
 			const get = () => (policy ??= layer ? read(layer.init.dismiss) : {});
+			const verdicts: Partial<Record<'escape' | 'outside' | 'focusOut', boolean>> = {};
 			return {
 				...entry,
 				dismiss: {
 					get escape() {
-						return allows(get().escape, event, true);
+						return (verdicts.escape ??= allows(get().escape, event, true));
 					},
 					get outside() {
-						return allows(get().outside, event, true);
+						return (verdicts.outside ??= allows(get().outside, event, true));
 					},
 					get focusOut() {
-						return allows(get().focusOut, event, false);
+						return (verdicts.focusOut ??= allows(get().focusOut, event, false));
 					}
 				}
 			};
 		});
+		this.#snap = { event, chain: this.#chain, snapshot };
+		return snapshot;
 	}
 
 	#hitIndex(target: Node | null, x: number, y: number): number {
@@ -392,18 +449,23 @@ export class LayerStack {
 		return -1;
 	}
 
+	/** Content, trigger and anchor all belong to a layer (a combobox input is an anchor). */
 	#holds(id: LayerId, node: Node | null): boolean {
 		const layer = this.#layers.get(id);
 		if (!layer || !node) return false;
-		return !!(layer.contentEl?.contains(node) || layer.triggerEl?.contains(node));
+		return !!(
+			layer.contentEl?.contains(node) ||
+			layer.triggerEl?.contains(node) ||
+			layer.anchorEl?.contains(node)
+		);
 	}
 
 	// ------------------------------------------------------------------ effects
 
 	#push(layer: Layer): void {
-		const parent = resolveParent(this.#chain, layer.triggerEl !== null, (i) =>
-			this.#holds(this.#chain[i].id, layer.triggerEl)
-		);
+		// The trigger decides the parent; an anchor-only layer (combobox) uses its anchor.
+		const origin = layer.triggerEl ?? layer.anchorEl;
+		const parent = resolveParent(this.#chain, origin !== null, (i) => this.#holds(this.#chain[i].id, origin));
 		this.#layers.set(layer.id, layer);
 		const entry: ChainEntry = {
 			id: layer.id,
@@ -457,13 +519,41 @@ export class LayerStack {
 		if (closed.length === 0) return;
 		const lowest = closed[closed.length - 1];
 		const elements = closed.map((layer) => layer.contentEl);
+		const bodyIsLost = options.bodyIsLost ?? true;
 		for (const layer of closed) {
 			const after =
-				layer === lowest && options.restoreFocus !== false ? () => this.#restoreFocus(layer, elements) : undefined;
+				layer === lowest && options.restoreFocus !== false
+					? () => this.#restoreFocus(layer, elements, bodyIsLost)
+					: undefined;
 			this.#beginClose(layer, options.immediate?.has(layer.id) ?? false, after);
 		}
 		this.#syncScrollLock();
-		for (const layer of closed) notify(layer, false, reasonFor(layer.id));
+		for (const layer of closed) this.#notify(layer, false, reasonFor(layer.id));
+	}
+
+	/**
+	 * Tell the pattern, then let the controlled value win: a microtask re-reads desired()
+	 * and re-applies it, so a consumer whose onOpenChange refuses a change (stays open on
+	 * Escape, or rejects a native open) is reconciled back instead of desyncing. Structural
+	 * 'parent' closes are not re-applied (two refusing siblings would ping-pong).
+	 */
+	#notify(layer: Layer, open: boolean, reason: ChangeReason): void {
+		try {
+			layer.init.notify(open, reason);
+		} catch (error) {
+			// A throwing callback must not leave the stack half-applied.
+			queueMicrotask(() => {
+				throw error;
+			});
+		}
+		if (reason === 'parent') return;
+		queueMicrotask(() =>
+			untrack(() => {
+				const want = layer.init.desired();
+				if (want && layer.phase !== 'open') this.open(layer);
+				else if (!want && layer.phase === 'open') this.close(layer, 'api');
+			})
+		);
 	}
 
 	#beginClose(layer: Layer, immediate: boolean, after?: () => void): void {
@@ -499,9 +589,10 @@ export class LayerStack {
 	 * 4. the new top layer's first tabbable, else its content
 	 * 5. nothing (leave the browser default); never document.body.focus()
 	 */
-	#restoreFocus(layer: Layer, closed: readonly (HTMLElement | null)[]): void {
+	#restoreFocus(layer: Layer, closed: readonly (HTMLElement | null)[], bodyIsLost: boolean): void {
 		const active = document.activeElement;
-		const lost = !active || active === document.body || closed.some((el) => el?.contains(active));
+		const onBody = !active || active === document.body;
+		const lost = (bodyIsLost && onBody) || closed.some((el) => el?.contains(active));
 		if (!lost) return;
 		const top = this.#layers.get(this.#chain[this.#chain.length - 1]?.id ?? '');
 		const topContent = top?.contentEl ?? null;
@@ -512,7 +603,12 @@ export class LayerStack {
 			topContent ? (tabbables(topContent)[0] ?? topContent) : null
 		];
 		for (const candidate of candidates) {
-			if (canFocus(candidate) && focusQuietly(candidate)) return;
+			if (!canFocus(candidate)) continue;
+			// Mark before focusing: focus/focusin handlers run inside focus().
+			this.restored.add(candidate);
+			setTimeout(() => this.restored.delete(candidate), 0);
+			if (focusQuietly(candidate)) return;
+			this.restored.delete(candidate);
 		}
 	}
 
@@ -552,18 +648,19 @@ function captureFocus(): { el: HTMLElement | null; id: string | null } {
 	return { el: active, id: active.id || null };
 }
 
-function notify(layer: Layer, open: boolean, reason: ChangeReason): void {
-	try {
-		layer.init.notify(open, reason);
-	} catch (error) {
-		// A throwing callback must not leave the stack half-applied.
-		queueMicrotask(() => {
-			throw error;
-		});
-	}
-}
 
 const STACK_KEY = Symbol.for('agents-kit-svelte/layers@1');
+
+/**
+ * @internal For the Tooltip pattern (not in the public entry): true while `el` is
+ * receiving focus because the stack returned it after a close (from inside focus/focusin
+ * handlers until the next task). A tooltip must not open for focus the stack restored,
+ * or Escape-closing a menu re-opens the tooltip on its shared trigger.
+ */
+export function isRestoringFocus(el: Element | null): boolean {
+	const stack = (globalThis as typeof globalThis & { [STACK_KEY]?: LayerStack })[STACK_KEY];
+	return !!el && !!stack?.restored.has(el);
+}
 
 /** Client-only accessor; only attachments call it. @internal */
 export function layerStack(): LayerStack {
