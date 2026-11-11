@@ -13,9 +13,12 @@ test('roving toolbar: one tab stop, arrows skip disabled items, Home/End, Enter 
 	await page.keyboard.press('ArrowRight');
 	await expect(button('Underline')).toBeFocused();
 	await page.keyboard.press('End');
-	await expect(button('Strike')).toBeFocused();
+	await expect(button('More')).toBeFocused();
 	await page.keyboard.press('ArrowRight');
 	await expect(button('Bold')).toBeFocused();
+	await page.keyboard.press('ArrowLeft');
+	await expect(button('More')).toBeFocused();
+	await page.keyboard.press('ArrowLeft');
 	await page.keyboard.press('ArrowLeft');
 	await expect(button('Strike')).toBeFocused();
 	await expect(button('Strike')).toHaveAttribute('tabindex', '0');

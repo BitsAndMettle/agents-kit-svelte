@@ -3,8 +3,8 @@ import { expect, type Locator, type Page } from '@playwright/test';
 export type Strategy = 'native' | 'fallback';
 
 /** Loads the headless fixture and waits for hydration (keys before it reach inert markup). */
-export async function openFixture(page: Page, anchor?: Strategy): Promise<void> {
-	await page.setViewportSize({ width: 1280, height: 800 });
+export async function openFixture(page: Page, anchor?: Strategy, height = 800): Promise<void> {
+	await page.setViewportSize({ width: 1280, height });
 	await page.goto(anchor ? `/headless/?anchor=${anchor}` : '/headless/');
 	await expect(page.getByRole('button', { name: 'Toggle global color theme' })).toBeEnabled({ timeout: 45000 });
 }
@@ -15,7 +15,7 @@ export function content(page: Page, name: string): Locator {
 }
 
 export function trigger(page: Page, name: string): Locator {
-	return page.locator(`[id$="-${name}-trigger"]`);
+	return page.getByTestId(`${name}-trigger`);
 }
 
 /** Whether a popover is in the top layer / a dialog is open. */

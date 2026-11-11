@@ -4,7 +4,7 @@
  * thing (colour picker, date picker, hover-less card) is a Popover with their own markup.
  *
  * Parts:
- *   trigger   toggles; id, aria-haspopup (configurable), aria-expanded, aria-controls
+ *   trigger   toggles (no id: see parts.ts "Ids"); aria-haspopup (configurable), aria-expanded, aria-controls
  *   anchor    optional: position against this element instead of the trigger
  *   content   the floating element: popover="manual", id, role, tabindex=-1, data-state, data-side
  *   title / description / close  same as Dialog
@@ -117,7 +117,6 @@ export class Popover {
 
 	get trigger(): Part<HTMLButtonElement> {
 		return part(this.#keys.trigger, this.#attachTrigger, {
-			id: subId(this.#id, 'trigger'),
 			type: 'button',
 			'aria-haspopup': this.#options.haspopup ?? 'dialog',
 			'aria-expanded': this.open,
@@ -127,7 +126,7 @@ export class Popover {
 	}
 
 	get anchor(): Part {
-		return part(this.#keys.anchor, this.#layer.attachAnchor, { id: subId(this.#id, 'anchor') });
+		return part(this.#keys.anchor, this.#layer.attachAnchor, {});
 	}
 
 	get content(): Part {
