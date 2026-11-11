@@ -20,6 +20,10 @@ import GitHubIssueCard from '../github/GitHubIssueCard.svelte';
 import GitHubPullRequestCard from '../github/GitHubPullRequestCard.svelte';
 import AgentGenerativeSurface from './AgentGenerativeSurface.svelte';
 import AgentHandoffGantt from '../charts/AgentHandoffGantt.svelte';
+import AgentWorkTrace from '../agents/AgentWorkTrace.svelte';
+import GitHubChecksWaterfall from '../github/GitHubChecksWaterfall.svelte';
+import GitHubPrActionBar from '../github/GitHubPrActionBar.svelte';
+import GitHubPullRequestGraph from '../github/GitHubPullRequestGraph.svelte';
 import GenerativeChart from '../charts/GenerativeChart.svelte';
 import ModelPhaseStream from '../charts/ModelPhaseStream.svelte';
 import FeatureCard from '../charts/FeatureCard.svelte';
@@ -153,6 +157,42 @@ export const defaultUIRegistry: UIRegistry = {
 			...props,
 			onSelectEvent: (event: { id: string }) => emit('select-event', event.id),
 			onSelectPhase: (phase: { id: string }) => emit('select-phase', phase.id)
+		})
+	},
+	'github-pr-action-bar': {
+		component: GitHubPrActionBar,
+		required: ['diff'],
+		props: (props, emit) => ({
+			...props,
+			onCreate: () => emit('create-pr'),
+			onOpenPr: (prNumber: number) => emit('open-pr', String(prNumber)),
+			onSelectFile: (path: string) => emit('open-file', path)
+		})
+	},
+	'github-pr-graph': {
+		component: GitHubPullRequestGraph,
+		required: ['title', 'number', 'lanes', 'commits'],
+		props: (props, emit) => ({
+			...props,
+			onSelectCommit: (commit: { sha: string }) => emit('open-commit', commit.sha)
+		})
+	},
+	'github-checks-waterfall': {
+		component: GitHubChecksWaterfall,
+		required: ['prNumber', 'commit', 'checks'],
+		props: (props, emit) => ({
+			...props,
+			onFix: (failed: { id: string }[]) => emit('fix-check', failed.map((c) => c.id).join(',')),
+			onMerge: () => emit('merge-pr'),
+			onSelectCheck: (check: { id: string }) => emit('open-check', check.id)
+		})
+	},
+	'agent-work-trace': {
+		component: AgentWorkTrace,
+		required: ['steps'],
+		props: (props, emit) => ({
+			...props,
+			onSelectFile: (path: string) => emit('open-file', path)
 		})
 	},
 	'feature-card': {

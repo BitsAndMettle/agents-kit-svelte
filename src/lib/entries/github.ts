@@ -1,4 +1,4 @@
-/** GitHub cards, boards and the dev-lifecycle set: issues, pull requests, commits, checks, reviews, merge queue, deployments, releases and incidents. */
+/** GitHub cards, boards and the dev-lifecycle set: issues, pull requests, commits, checks, reviews, merge queue, deployments, releases and incidents, plus the in-chat pull request flow (create, commit graph, checks waterfall). */
 
 export { default as GitHubBentoLayout } from '../github/GitHubBentoLayout.svelte';
 export { default as GitHubChecksPanel } from '../github/GitHubChecksPanel.svelte';
@@ -15,5 +15,8 @@ export { default as GitHubMergeQueue } from '../github/GitHubMergeQueue.svelte';
 export { default as GitHubDeploymentPipeline } from '../github/GitHubDeploymentPipeline.svelte';
 export { default as GitHubReleaseCard } from '../github/GitHubReleaseCard.svelte';
 export { default as GitHubIncidentCard } from '../github/GitHubIncidentCard.svelte';
+export { default as GitHubPrActionBar } from '../github/GitHubPrActionBar.svelte';
+export { default as GitHubPullRequestGraph } from '../github/GitHubPullRequestGraph.svelte';
+export { default as GitHubChecksWaterfall } from '../github/GitHubChecksWaterfall.svelte';
 
 export type * from '../types';
