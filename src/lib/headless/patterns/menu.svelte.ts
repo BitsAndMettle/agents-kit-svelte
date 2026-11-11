@@ -196,7 +196,7 @@ export class Menu {
 				this.#openFocus = 'content';
 				if (how === 'content' || how === 'none') return how;
 				return () => {
-					this.#nav.highlight(how, { focus: true });
+					this.#nav.highlight(how, { focus: true, scroll: true });
 					const active = document.activeElement;
 					return active instanceof HTMLElement && this.#layer.contentEl?.contains(active) ? active : null;
 				};
@@ -264,11 +264,10 @@ export class Menu {
 	get trigger(): Part {
 		if (this.#parent) return this.#subTrigger(this.#parent);
 		if (this.#options.trigger === 'contextmenu') {
-			return part(this.#keys.trigger, this.#attachTrigger, {
-				id: subId(this.#id, 'trigger'),
-				'data-state': this.#layer.state
-			});
+			return part(this.#keys.trigger, this.#attachTrigger, { 'data-state': this.#layer.state });
 		}
+		// The menu button is the Menu's own element and never a nav item, so it may carry the
+		// id the content's aria-labelledby points at (parts.ts "Ids").
 		// `type` is valid on the <button> this part is meant for; Part<HTMLElement> lacks it.
 		return part(this.#keys.trigger, this.#attachTrigger, {
 			id: subId(this.#id, 'trigger'),
@@ -481,13 +480,13 @@ export class Menu {
 		this.#layer.anchorPoint = point;
 		if (!this.open) return this.#openWith(focus);
 		// Already open: the positioning effect follows the new point; re-take focus.
-		if (focus === 'first') this.#nav.highlight('first', { focus: true });
+		if (focus === 'first') this.#nav.highlight('first', { focus: true, scroll: true });
 		else this.#layer.contentEl?.focus({ preventScroll: true });
 	}
 
 	#openWith(focus: OpenFocus, reason: ChangeReason = 'trigger'): void {
 		if (this.open) {
-			if (focus === 'first' || focus === 'last') this.#nav.highlight(focus, { focus: true });
+			if (focus === 'first' || focus === 'last') this.#nav.highlight(focus, { focus: true, scroll: true });
 			return;
 		}
 		this.#openFocus = focus;

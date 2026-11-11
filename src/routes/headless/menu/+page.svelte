@@ -56,7 +56,7 @@
 
 	<section class="space-y-2">
 		<h2 class={SURFACE.title}>Menu button</h2>
-		<button {...actions.trigger} class={buttonClass('secondary', 'md')}>Actions</button>
+		<button {...actions.trigger} data-testid="actions-trigger" class={buttonClass('secondary', 'md')}>Actions</button>
 		<div {...actions.content} class={SURFACE_CLASS}>
 			<div {...actions.item({ value: 'new', onSelect: choose('new') })} class={ITEM}>New file</div>
 			<div {...actions.item({ value: 'copy', onSelect: choose('copy') })} class={ITEM}>Copy</div>
@@ -113,11 +113,11 @@
 
 	<section class="space-y-2">
 		<h2 class={SURFACE.title}>Menu inside a dialog</h2>
-		<button {...dialog.trigger} class={buttonClass('secondary', 'md')}>Open dialog</button>
+		<button {...dialog.trigger} data-testid="dialog-trigger" class={buttonClass('secondary', 'md')}>Open dialog</button>
 		<dialog {...dialog.content} class="fade w-[min(28rem,calc(100vw-2rem))] rounded-card border border-card-border bg-card-bg p-5 text-fg-main">
 			<h2 {...dialog.title} class={SURFACE.heading}>Dialog with a menu</h2>
 			<div class="mt-3 flex gap-2">
-				<button {...dmenu.trigger} class={buttonClass('secondary', 'sm')}>Dialog menu</button>
+				<button {...dmenu.trigger} data-testid="dmenu-trigger" class={buttonClass('secondary', 'sm')}>Dialog menu</button>
 				<button {...dialog.close} class={buttonClass('ghost', 'sm')}>Close dialog</button>
 			</div>
 			<div {...dmenu.content} class={SURFACE_CLASS}>
