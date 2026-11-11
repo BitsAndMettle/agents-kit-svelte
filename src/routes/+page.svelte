@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS } from '$lib/fixtures/workflows';
+	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_BLOCKED_ITEMS, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS } from '$lib/fixtures/workflows';
 	import { SAMPLE_CONTEXT_CHUNKS, SAMPLE_DIFF_ROWS, SAMPLE_FILTER_ROWS, SAMPLE_FINE_TUNE_FIELDS, SAMPLE_FLOWCHART_NODES, SAMPLE_INSIGHTS, SAMPLE_RECOMMENDATION_ALTERNATIVES, SAMPLE_RECOMMENDATION_REASONING, SAMPLE_RECORDS, SAMPLE_SEARCH_ITEMS, SAMPLE_SELECTION_ACTIONS, SAMPLE_TOOL_DIFFS, SAMPLE_TOOL_STEPS } from '$lib/fixtures/data';
 	import { SAMPLE_CHAIN_OF_THOUGHT, SAMPLE_ENV_VARIABLES, SAMPLE_PACKAGE_DEPENDENCIES, SAMPLE_PACKAGE_SCRIPTS, SAMPLE_PLAN_MILESTONES, SAMPLE_PREVIEW_LOGS, SAMPLE_PROMPT_SUGGESTIONS, SAMPLE_SCHEMA_PARAMETERS, SAMPLE_SCHEMA_REQUEST_BODY, SAMPLE_SCHEMA_RESPONSE_BODY, SAMPLE_SIDEBAR_RESOURCES, SAMPLE_STACK_SNIPPET, SAMPLE_STACK_TRACE, SAMPLE_VOICE_DEVICES, SAMPLE_VOICE_PERSONAS, SAMPLE_PRESENCE_NOW, SAMPLE_PRESENCE_SINCE, SAMPLE_WORK_STEPS } from '$lib/fixtures/chat';
 	import {
@@ -131,6 +131,8 @@
 		FeatureCard,
 		MetricTiles,
 		PresenceBanner,
+		FeatureProposalCard,
+		BlockedWorkList,
 		FeatureLineage,
 		FeatureTimeline,
 		RunReplayScrubber,
@@ -147,7 +149,7 @@
 		WebPreview
 	} from '$lib';
 	import { SAMPLE_SKILLS, SAMPLE_SKILL_MANIFEST, SAMPLE_SKILL_PROPOSAL, SAMPLE_SKILL_STEPS } from '$lib/entries/fixtures';
-	import { SAMPLE_BURN_POINTS, SAMPLE_CHART_SPECS, SAMPLE_FLEET_METRICS, SAMPLE_FEATURE, SAMPLE_FEATURE_START, SAMPLE_HANDOFFS, SAMPLE_RUN_DURATION, SAMPLE_RUN_MARKS, SAMPLE_TIMELINE_ITEMS, SAMPLE_TIMELINE_MILESTONES, SAMPLE_TIMELINE_TODAY, SAMPLE_TOKEN_BUDGET, SAMPLE_LINEAGE_EDGES, SAMPLE_LINEAGE_NODES, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS } from '$lib/fixtures/charts';
+	import { SAMPLE_BURN_POINTS, SAMPLE_CHART_SPECS, SAMPLE_FLEET_METRICS, SAMPLE_FEATURE, SAMPLE_FEATURE_START, SAMPLE_HANDOFFS, SAMPLE_RUN_DURATION, SAMPLE_RUN_MARKS, SAMPLE_TIMELINE_ITEMS, SAMPLE_TIMELINE_MILESTONES, SAMPLE_TIMELINE_TODAY, SAMPLE_TOKEN_BUDGET, SAMPLE_LINEAGE_EDGES, SAMPLE_LINEAGE_NODES, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS, SAMPLE_PROPOSAL } from '$lib/fixtures/charts';
 	import { CATALOG_ITEMS, type CatalogCategory } from '$site/catalog-registry';
 	import { holdHeight } from '$site/hold-height';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -195,6 +197,20 @@
 
 	let { data = {} }: Props = $props();
 
+	let blockedItems = $state(SAMPLE_BLOCKED_ITEMS);
+	let blockedBusy = $state<string[]>([]);
+	let proposalStatus = $state<'proposed' | 'approving' | 'approved' | 'declined'>('proposed');
+	function runBlockedAction(item: { id: string }): void {
+		blockedBusy = [...blockedBusy, item.id];
+		setTimeout(() => {
+			blockedBusy = blockedBusy.filter((id) => id !== item.id);
+			blockedItems = blockedItems.filter((i) => i.id !== item.id);
+		}, 1200);
+	}
+	function approveProposal(): void {
+		proposalStatus = 'approving';
+		setTimeout(() => (proposalStatus = 'approved'), 1000);
+	}
 	let selectedCategory = $state<'All' | CatalogCategory>('All');
 	let searchQuery = $state('');
 	let cardTabs = $state<Record<string, CardTabMode>>({});
@@ -1636,6 +1652,14 @@
 							{:else if item.slug === 'feature-card'}
 								<div class="mx-auto max-w-md">
 									<FeatureCard feature={SAMPLE_FEATURE} />
+								</div>
+							{:else if item.slug === 'feature-proposal'}
+								<div class="mx-auto max-w-md">
+									<FeatureProposalCard title={SAMPLE_PROPOSAL.title} summary={SAMPLE_PROPOSAL.summary} criteria={SAMPLE_PROPOSAL.criteria} cards={SAMPLE_PROPOSAL.cards} estimate={SAMPLE_PROPOSAL.estimate} status={proposalStatus} onApprove={approveProposal} onDecline={() => (proposalStatus = 'declined')} />
+								</div>
+							{:else if item.slug === 'blocked-work-list'}
+								<div class="mx-auto max-w-xl">
+									<BlockedWorkList items={blockedItems} busyIds={blockedBusy} onAction={runBlockedAction} />
 								</div>
 							{:else if item.slug === 'feature-lineage'}
 								<FeatureLineage title="F-12 lineage" nodes={SAMPLE_LINEAGE_NODES} edges={SAMPLE_LINEAGE_EDGES} />

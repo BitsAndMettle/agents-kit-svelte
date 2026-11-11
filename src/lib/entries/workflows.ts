@@ -1,6 +1,7 @@
 /** Multi-agent orchestration: orchestrator, routing hub, task queue, parallel and sequential workflows, evaluator, ops monitor and tool palette. */
 
 export { default as AgentArtifact } from '../agents-ui/AgentArtifact.svelte';
+export { default as BlockedWorkList } from '../agents-ui/BlockedWorkList.svelte';
 export { default as AgentEvaluator } from '../agents-ui/AgentEvaluator.svelte';
 export { default as AgentFormGenerator } from '../agents-ui/AgentFormGenerator.svelte';
 export { default as AgentOpsMonitor } from '../agents-ui/AgentOpsMonitor.svelte';
@@ -13,6 +14,7 @@ export { default as AgentThinkingIndicator } from '../agents-ui/AgentThinkingInd
 export { default as AgentToolPalette } from '../agents-ui/AgentToolPalette.svelte';
 
 export type * from '../types';
+export * from '../agents-ui/blocked-work';
 
 // Types declared in the components themselves.
 export type { ArtifactType, ArtifactVersion, ArtifactMetadata } from '../agents-ui/AgentArtifact.svelte';
