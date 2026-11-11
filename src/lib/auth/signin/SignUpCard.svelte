@@ -1,9 +1,10 @@
 <script lang="ts" module>
 	import type { AuthProvider, AuthSubmitHandler } from '../shared';
 	import type { PasswordRule, PasswordStrength } from '../fields';
+	import type { AlternativeLabels, PasswordGuideLabels, PasswordLabels } from './look';
 
-	/** Every word the card shows. */
-	export interface SignUpCardLabels {
+	/** Every word the card shows, including the words of its provider, passkey and password parts. */
+	export interface SignUpCardLabels extends AlternativeLabels, PasswordLabels, PasswordGuideLabels {
 		title: string;
 		name: string;
 		email: string;
@@ -17,6 +18,8 @@
 		/** Text before the sign-in link in the default footer. */
 		haveAccount: string;
 		signIn: string;
+		/** The mark after an optional field's label (without the parentheses). */
+		optional: string;
 		/** Shown when the submit handler throws or rejects. */
 		genericError: string;
 	}
@@ -146,7 +149,19 @@
 		submit: 'Create account',
 		haveAccount: 'Already have an account?',
 		signIn: 'Sign in',
+		optional: 'Optional',
 		genericError: 'Something went wrong. Try again.',
+		provider: (label) => `Continue with ${label}`,
+		lastUsed: 'Last used',
+		passkey: 'Sign up with a passkey',
+		showPassword: 'Show password',
+		hidePassword: 'Hide password',
+		capsLock: 'Caps Lock is on',
+		ruleMet: 'met',
+		ruleUnmet: 'not met',
+		rulesSummary: (met, total) => `${met} of ${total} requirements met`,
+		strengthTitle: 'Password strength',
+		strengthLabels: ['Very weak', 'Weak', 'Fair', 'Good', 'Strong'],
 		...labels
 	});
 
@@ -189,15 +204,15 @@
 		<div class="grid min-w-0 grid-cols-1 gap-2">
 			{#each providers ?? [] as provider (provider.id)}
 				{#if providerIcon}
-					<ProviderButton {provider} {onProvider} lastUsed={provider.id === lastUsedProvider}>
+					<ProviderButton {provider} {onProvider} formatLabel={(p) => text.provider(p.label)} lastUsedLabel={text.lastUsed} lastUsed={provider.id === lastUsedProvider}>
 						{#snippet icon()}{@render providerIcon(provider)}{/snippet}
 					</ProviderButton>
 				{:else}
-					<ProviderButton {provider} {onProvider} lastUsed={provider.id === lastUsedProvider} />
+					<ProviderButton {provider} {onProvider} formatLabel={(p) => text.provider(p.label)} lastUsedLabel={text.lastUsed} lastUsed={provider.id === lastUsedProvider} />
 				{/if}
 			{/each}
 			{#if onPasskey}
-				<PasskeyButton {onPasskey} />
+				<PasskeyButton {onPasskey} label={text.passkey} />
 			{/if}
 		</div>
 		<Separator label={text.or} />
@@ -210,7 +225,7 @@
 			<Alert tone="danger" live description={submit.error} data-auth-error tabindex={-1} />
 		{/if}
 		{#if nameField !== 'hidden'}
-			<Field label={text.name} error={submit.fieldError('name')} required={nameField === 'required'} optional={nameField === 'optional'}>
+			<Field label={text.name} error={submit.fieldError('name')} required={nameField === 'required'} optional={nameField === 'optional'} optionalLabel={text.optional}>
 				<Input name="name" autocomplete="name" />
 			</Field>
 		{/if}
@@ -218,11 +233,25 @@
 			<Input name="email" type="email" autocomplete="email" defaultValue={email} />
 		</Field>
 		<Field label={text.password} error={submit.fieldError('password')} required>
-			<PasswordInput autocomplete="new-password" {minlength} {rules} {strength} bind:value={password} onValueChange={(value) => onPasswordChange?.(value)} />
+			<PasswordInput
+				autocomplete="new-password"
+				{minlength}
+				{rules}
+				{strength}
+				showLabel={text.showPassword}
+				hideLabel={text.hidePassword}
+				capsLockLabel={text.capsLock}
+				metLabel={text.ruleMet}
+				unmetLabel={text.ruleUnmet}
+				rulesSummary={text.rulesSummary}
+				strengthTitle={text.strengthTitle}
+				strengthLabels={text.strengthLabels}
+				bind:value={password} onValueChange={(value) => onPasswordChange?.(value)}
+			/>
 		</Field>
 		{#if confirmPassword}
 			<Field label={text.confirmPassword} error={confirmError} required>
-				<PasswordInput name="confirmPassword" autocomplete="new-password" bind:value={confirm} bind:ref={confirmRef} oninvalid={() => (mismatchRefused = true)} />
+				<PasswordInput name="confirmPassword" autocomplete="new-password" showLabel={text.showPassword} hideLabel={text.hidePassword} capsLockLabel={text.capsLock} bind:value={confirm} bind:ref={confirmRef} oninvalid={() => (mismatchRefused = true)} />
 			</Field>
 		{/if}
 		{#if terms}

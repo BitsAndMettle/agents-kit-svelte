@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	import type { AuthSubmitHandler } from '../shared';
 
-	/** Every word the card shows. */
+	/** Every word the card shows, including the passkey button's. */
 	export interface TwoFactorCardLabels {
 		title: string;
 		/** The line under the title while the authenticator code is asked for. */
@@ -22,6 +22,8 @@
 		or: string;
 		/** Button that calls `onBack`. */
 		back: string;
+		/** The passkey button. */
+		passkey: string;
 		/** Shown when the submit handler throws or rejects. */
 		genericError: string;
 	}
@@ -128,6 +130,7 @@
 		trustDevice: 'Trust this device',
 		or: 'or',
 		back: 'Sign in another way',
+		passkey: 'Sign in with a passkey',
 		genericError: 'Something went wrong. Try again.',
 		...labels
 	});
@@ -148,17 +151,32 @@
 		genericError: () => text.genericError
 	});
 
+	/**
+	 * The `errors` prop that was current when the person switched code kinds. A server error about one kind of code
+	 * says nothing about the other, and clearing it by editing must not be undone by switching. It stays hidden
+	 * until the prop changes or the next submit. Raw: the identity is what is compared.
+	 */
+	let switchedAt = $state.raw<{ errors: typeof errors } | null>(null);
+	const codeError = $derived(switchedAt && switchedAt.errors === errors ? undefined : submit.fieldError('code'));
+
+	/** A new submit shows the next errors in full, so the hidden prop error may come back. */
+	function onsubmit(event: SubmitEvent): void {
+		switchedAt = null;
+		submit.onsubmit(event);
+	}
+
 	/** Swaps the code control and moves focus into the new one, so the person can keep typing. */
 	async function switchMode(): Promise<void> {
 		mode = mode === 'totp' ? 'backup' : 'totp';
 		submit.clear();
+		switchedAt = { errors };
 		await tick();
 		(mode === 'backup' ? backupRef : otpRef)?.focus();
 	}
 </script>
 
 <AuthCard class={cn('w-full', className)} title={title ?? text.title} description={description ?? (mode === 'totp' ? text.description : text.backupDescription)} {headingLevel} {logo} {footer}>
-	<form {...rest} bind:this={ref} {action} method="post" onsubmit={submit.onsubmit} oninput={submit.oninput} class="grid gap-4">
+	<form {...rest} bind:this={ref} {action} method="post" {onsubmit} oninput={submit.oninput} class="grid gap-4">
 		{#each Object.entries(hidden ?? {}) as [name, value] (name)}
 			<input type="hidden" {name} {value} />
 		{/each}
@@ -167,11 +185,11 @@
 			<Alert tone="danger" live description={submit.error} data-auth-error tabindex={-1} />
 		{/if}
 		{#if mode === 'totp'}
-			<Field label={text.code} error={submit.fieldError('code')} required>
-				<OtpInput bind:ref={otpRef} length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
+			<Field label={text.code} error={codeError} required>
+				<OtpInput bind:ref={otpRef} codeLabel={text.code} length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
 			</Field>
 		{:else}
-			<Field label={text.backupCode} description={text.backupHint} error={submit.fieldError('code')} required>
+			<Field label={text.backupCode} description={text.backupHint} error={codeError} required>
 				<Input bind:ref={backupRef} name="code" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
 			</Field>
 		{/if}
@@ -185,7 +203,7 @@
 	</form>
 	{#if onPasskey}
 		<Separator label={text.or} />
-		<PasskeyButton {onPasskey} />
+		<PasskeyButton {onPasskey} label={text.passkey} />
 	{/if}
 	{#if onBack}
 		<button type="button" onclick={() => onBack?.()} class={cn(LINK_CLASS, 'justify-self-center text-[13px]')}>{text.back}</button>
