@@ -51,7 +51,7 @@
 	const GAP = 15;
 	const X0 = 11;
 	const PALETTE = ['var(--ak-chart-1)', 'var(--ak-chart-4)', 'var(--ak-chart-3)', 'var(--ak-chart-2)', 'var(--ak-chart-5)'];
-	const BASE_COLOR = 'color-mix(in oklch, var(--color-fg-light) 55%, transparent)';
+	const BASE_COLOR = 'color-mix(in oklch, var(--ak-color-fg-muted) 55%, transparent)';
 
 	let base = $derived(lanes.find((l) => l.base));
 	/** Base lane on the far left, then branches in the order given. */
@@ -85,10 +85,12 @@
 		const baseX = base ? laneX.get(base.id)! : X0;
 		const rows = (id: string) => commits.flatMap((c, i) => (c.lane === id ? [i + 1] : []));
 		const baseRows = base ? rows(base.id) : [];
+		/** Bottom edge of the last commit row; lines with no older base commit end here. */
+		const bottom = (commits.length + 1) * ROW;
 		if (base) {
-			const top = baseRows.length ? baseRows[0] : commits.length + 1;
-			out.push({ key: 'base-up', d: `M${baseX},${y(0)} V${y(top)}`, color: BASE_COLOR, dashed: true });
-			out.push({ key: 'base', d: `M${baseX},${y(top)} V${y(commits.length) + ROW}`, color: BASE_COLOR });
+			const top = baseRows.length ? y(baseRows[0]) : bottom;
+			out.push({ key: 'base-up', d: `M${baseX},${y(0)} V${top}`, color: BASE_COLOR, dashed: true });
+			out.push({ key: 'base', d: `M${baseX},${top} V${bottom}`, color: BASE_COLOR });
 		}
 		for (const lane of ordered) {
 			if (lane.base) continue;
@@ -99,9 +101,9 @@
 			const first = r[0];
 			const last = r[r.length - 1];
 			out.push({ key: `${lane.id}-line`, d: `M${x},${y(first)} V${y(last)}`, color });
-			const fork = baseRows.find((row) => row > last) ?? commits.length + 1;
+			const fork = baseRows.find((row) => row > last);
 			const y1 = y(last);
-			const y2 = y(fork);
+			const y2 = fork === undefined ? bottom : y(fork);
 			out.push({ key: `${lane.id}-fork`, d: `M${x},${y1} C${x},${y1 + (y2 - y1) * 0.7} ${baseX},${y2 - ROW * 0.5} ${baseX},${y2}`, color });
 			if (lane.id === headId) {
 				out.push({
@@ -181,7 +183,7 @@
 					{#if state === 'merged' || mergeState === 'merged'}
 						<circle r="6" fill="var(--ak-chart-3)" />
 					{:else}
-						<circle r="5.5" fill="var(--color-card-bg)" stroke="var(--color-fg-light)" stroke-width="1.4" stroke-dasharray="2.2 2.2">
+						<circle r="5.5" fill="var(--ak-color-surface)" stroke="var(--ak-color-fg-muted)" stroke-width="1.4" stroke-dasharray="2.2 2.2">
 							{#if mergeState === 'checking'}
 								<animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="2.4s" repeatCount="indefinite" />
 							{/if}
@@ -194,7 +196,7 @@
 						cy={y(i + 1)}
 						r={lanes.find((l) => l.id === c.lane)?.base ? 4 : 4.5}
 						fill={laneColor.get(c.lane) ?? BASE_COLOR}
-						stroke="var(--color-card-bg)"
+						stroke="var(--ak-color-surface)"
 						stroke-width="2"
 					/>
 				{/each}
@@ -252,8 +254,8 @@
 							{#if chip}
 								<span
 									class="shrink-0 rounded-[6px] px-1.5 py-0.5 font-mono text-[11.5px]"
-									style="color:{isBase ? 'var(--color-fg-light)' : laneColor.get(c.lane)};background:color-mix(in oklch, {isBase
-										? 'var(--color-fg-light)'
+									style="color:{isBase ? 'var(--ak-color-fg-muted)' : laneColor.get(c.lane)};background:color-mix(in oklch, {isBase
+										? 'var(--ak-color-fg-muted)'
 										: laneColor.get(c.lane)} 11%, transparent)"
 								>
 									{chip}

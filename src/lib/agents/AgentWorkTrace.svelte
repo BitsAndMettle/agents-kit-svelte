@@ -51,13 +51,13 @@
 		svelte: { tag: 'SV', color: 'var(--ak-chart-2)' },
 		css: { tag: 'CSS', color: 'var(--ak-chart-3)' },
 		json: { tag: '{}', color: 'var(--ak-chart-5)' },
-		md: { tag: 'MD', color: 'var(--color-fg-light)' },
+		md: { tag: 'MD', color: 'var(--ak-color-fg-muted)' },
 		py: { tag: 'PY', color: 'var(--ak-chart-1)' }
 	};
 	function fileTag(path: string) {
 		const name = path.split('/').pop() ?? path;
 		const ext = name.includes('.') ? name.split('.').pop()!.toLowerCase() : '';
-		return { name, ...(EXT[ext] ?? { tag: ext.toUpperCase().slice(0, 3) || '•', color: 'var(--color-fg-light)' }) };
+		return { name, ...(EXT[ext] ?? { tag: ext.toUpperCase().slice(0, 3) || '•', color: 'var(--ak-color-fg-muted)' }) };
 	}
 </script>
 
@@ -91,7 +91,7 @@
 					<span class="relative flex h-7 items-center justify-center" aria-hidden="true">
 						{#if step.nested}
 							<svg class="absolute -top-2 left-[0.6rem] h-11 w-3 overflow-visible" viewBox="0 0 12 44" fill="none">
-								<path d="M0 0 C0 10 10 10 10 22 C10 34 0 34 0 44" stroke="var(--color-canvas-border)" stroke-width="1" />
+								<path d="M0 0 C0 10 10 10 10 22 C10 34 0 34 0 44" stroke="var(--ak-color-border-subtle)" stroke-width="1" />
 							</svg>
 							<span class="relative left-[0.6rem]">
 								{@render marker(step)}
@@ -105,6 +105,7 @@
 							<span class={cn(step.kind === 'result' ? 'text-fg-main' : step.status === 'failed' ? 'text-status-danger' : step.nested ? 'text-fg-light' : 'text-fg-main/80', step.status === 'running' && 'ak-shimmer-text')}>
 								{step.label}
 							</span>
+							{#if step.status}<span class="sr-only">, {step.status}</span>{/if}
 							{#if step.detail}<span class="ml-1.5 text-fg-light">{step.detail}</span>{/if}
 						</p>
 						{#if step.files?.length}

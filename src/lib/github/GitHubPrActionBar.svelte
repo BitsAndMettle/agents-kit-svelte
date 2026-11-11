@@ -39,6 +39,23 @@
 
 	let open = $state(false);
 	let root: HTMLDivElement | undefined = $state();
+	let trigger: HTMLButtonElement | undefined = $state();
+	const uid = $props.id();
+	const listId = `ak-pr-files-${uid}`;
+
+	$effect(() => {
+		if (!open) return;
+		const onKeydown = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') return;
+			open = false;
+			trigger?.focus();
+		};
+		window.addEventListener('keydown', onKeydown);
+		return () => window.removeEventListener('keydown', onKeydown);
+	});
+	function onFocusout(event: FocusEvent): void {
+		if (root && !root.contains(event.relatedTarget as Node | null)) open = false;
+	}
 
 	/** GitHub-style five-block bar: green for additions, red for deletions, grey for the rest. */
 	let blocks = $derived.by(() => {
@@ -65,7 +82,7 @@
 	const fmt = (n: number) => n.toLocaleString('en-US');
 </script>
 
-<div {...rest} bind:this={root} class={cn('relative flex flex-wrap items-center gap-1.5', className)}>
+<div {...rest} bind:this={root} class={cn('relative flex flex-wrap items-center gap-1.5', className)} onfocusout={onFocusout}>
 	{#if status === 'created' && prNumber !== undefined}
 		<button
 			type="button"
@@ -96,8 +113,9 @@
 	<button
 		type="button"
 		class={pillClass('secondary', 'md', 'gap-2 font-mono tabular-nums ak-shadow-btn')}
-		aria-haspopup={files.length ? 'menu' : undefined}
+		bind:this={trigger}
 		aria-expanded={files.length ? open : undefined}
+		aria-controls={files.length ? listId : undefined}
 		aria-label="{fmt(diff.additions)} lines added, {fmt(diff.deletions)} removed{files.length ? `, ${files.length} files` : ''}"
 		onclick={() => files.length && (open = !open)}
 	>
@@ -128,7 +146,7 @@
 
 	{#if open && files.length}
 		<div
-			role="menu"
+			id={listId}
 			class="absolute bottom-full left-0 z-20 mb-2 w-[min(26rem,calc(100vw-2rem))] overflow-hidden rounded-[12px] border border-chat-border bg-card-bg p-1 ak-shadow-soft-sm"
 			transition:rise={{ y: 4, duration: 140 }}
 		>
@@ -136,7 +154,6 @@
 			{#each files as file (file.path)}
 				<button
 					type="button"
-					role="menuitem"
 					class="flex w-full items-center gap-3 rounded-[8px] px-2.5 py-1.5 text-left text-[13px] hover:bg-chat-surface"
 					onclick={() => {
 						onSelectFile?.(file.path);

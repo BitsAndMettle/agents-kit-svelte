@@ -96,11 +96,11 @@
 		skipped: 'bg-canvas-border'
 	};
 	const RING: Record<CheckRun['status'], string> = {
-		queued: 'var(--color-canvas-border)',
-		running: 'var(--color-status-info)',
-		passed: 'var(--color-status-success)',
-		failed: 'var(--color-status-danger)',
-		skipped: 'var(--color-canvas-border)'
+		queued: 'var(--ak-color-border-subtle)',
+		running: 'var(--ak-color-info)',
+		passed: 'var(--ak-color-success)',
+		failed: 'var(--ak-color-danger)',
+		skipped: 'var(--ak-color-border-subtle)'
 	};
 
 	/** Ring of one arc per check, coloured by status. */
@@ -217,7 +217,7 @@
 </section>
 
 {#snippet row(check: CheckRun, s: number, dur: number)}
-							<span class="inline-flex size-4 items-center justify-center [&_svg]:size-3.5" aria-label={check.status}>
+							<span class="inline-flex size-4 items-center justify-center [&_svg]:size-3.5" aria-hidden="true">
 								{#if check.status === 'passed'}
 									<Check class="text-status-success" />
 								{:else if check.status === 'failed'}
@@ -228,7 +228,7 @@
 									<Clock class="text-fg-light" />
 								{/if}
 							</span>
-							<span class="truncate text-fg-main">{check.name}</span>
+							<span class="truncate text-fg-main">{check.name}<span class="sr-only">, {check.status}</span></span>
 							<span class="relative h-2" aria-hidden="true">
 								{#if check.status !== 'queued' && check.start !== undefined}
 									<span
