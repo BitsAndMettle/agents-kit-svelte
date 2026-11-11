@@ -14,6 +14,8 @@
 		 * With `mac` the common modifiers (Cmd, Alt, Shift, Ctrl, Enter) are drawn as Mac symbols with spoken names.
 		 */
 		platform?: 'auto' | 'mac' | 'other';
+		/** Spoken names that replace the built-in English ones, keyed by the key as written, e.g. { Cmd: 'Befehl' }. */
+		keyLabels?: Record<string, string>;
 		/** A single key cap, when `keys` is not used. */
 		children?: Snippet;
 		class?: string;
@@ -23,6 +25,7 @@
 		keys,
 		joiner = '+',
 		platform = 'other',
+		keyLabels,
 		children,
 		class: className = '',
 		...rest
@@ -35,7 +38,10 @@
 		detectedMac = /mac|iphone|ipad/i.test(nav.userAgentData?.platform ?? nav.platform ?? '');
 	});
 	let mac = $derived(platform === 'mac' || (platform === 'auto' && detectedMac));
-	let caps = $derived((keys ?? []).map((key) => resolveKey(key, mac)));
+	let caps = $derived((keys ?? []).map((key) => {
+			const cap = resolveKey(key, mac);
+			return { ...cap, label: keyLabels?.[key] ?? cap.label };
+		}));
 
 	const CAP =
 		'inline-flex min-w-5 items-center justify-center rounded-chip border border-card-border border-b-2 bg-card-bg px-1.5 py-px font-mono text-[11px] font-medium leading-4 text-fg-main';

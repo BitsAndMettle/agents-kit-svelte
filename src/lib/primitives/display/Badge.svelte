@@ -6,7 +6,7 @@
 	import { OUTLINE_TONE_CLASS, READABLE_TONE_TEXT, SOLID_TONE_CLASS } from './helpers';
 
 	export type BadgeVariant = 'soft' | 'solid' | 'outline';
-	export type BadgeSize = 'sm' | 'md';
+	export type BadgeSize = 'sm' | 'md' | 'lg';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLSpanElement>, 'class' | 'children'> {
 		/** Semantic tone. */
@@ -25,7 +25,7 @@
 	let {
 		tone = 'neutral',
 		variant = 'soft',
-		size = 'sm',
+		size = 'md',
 		dot = false,
 		icon,
 		children,
@@ -41,7 +41,7 @@
 </script>
 
 <span {...rest}
-	class={cn(badgeClass(tone), look, size === 'md' && 'px-2.5 py-0.5 text-xs [&_svg]:size-3.5', className)}
+	class={cn(badgeClass(tone), look, size === 'lg' && 'px-2.5 py-0.5 text-xs [&_svg]:size-3.5', size === 'sm' && 'px-1.5 text-[10px] [&_svg]:size-2.5', className)}
 >
 	{#if dot}
 		<span aria-hidden="true" class={cn('size-1.5 shrink-0 rounded-full', variant === 'solid' ? 'bg-current' : TONE_FILL_CLASS[tone])}></span>

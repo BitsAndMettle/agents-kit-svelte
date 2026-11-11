@@ -15,13 +15,13 @@
 		name?: string;
 		/** Accessible name when it differs from `name`. */
 		alt?: string;
-		/** Hides the avatar from assistive technology. Use it when the name is written out next to it. */
+		/** Hides the avatar, and its status, from assistive technology. Use it when the name is written out next to it. */
 		decorative?: boolean;
 		size?: AvatarSize;
 		shape?: 'round' | 'square';
 		/** Fallback icon, shown instead of initials. */
 		icon?: Snippet;
-		/** Presence dot. It is spoken as text, see `statusLabel`. */
+		/** Presence dot. Spoken as text (see `statusLabel`) unless the avatar is decorative. */
 		status?: AvatarStatus;
 		/** Spoken text for the status. Defaults to the status word. */
 		statusLabel?: string;
@@ -101,6 +101,6 @@
 	{/if}
 	{#if status}
 		<span aria-hidden="true" class={cn('absolute right-0 bottom-0 rounded-full ring-2 ring-card-bg', DOTS[size], STATUS_FILL[status])}></span>
-		<span class="sr-only">{statusLabel ?? status}</span>
+		{#if !decorative}<span class="sr-only">{statusLabel ?? status}</span>{/if}
 	{/if}
 </span>

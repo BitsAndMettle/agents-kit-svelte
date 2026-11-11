@@ -3,7 +3,7 @@
 </script>
 
 <div class="flex max-w-sm flex-col gap-4">
-	<Skeleton label="Loading profile" class="rounded-card border border-card-border bg-card-bg p-4">
+	<Skeleton loadingLabel="Loading profile" class="rounded-card border border-card-border bg-card-bg p-4">
 		<div class="flex items-center gap-3">
 			<Skeleton shape="circle" width="2.5rem" />
 			<div class="flex flex-1 flex-col gap-2">
