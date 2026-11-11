@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { clampSlots, fleetSummary, missingFlags, relativeTime, slotSegments, workPreview } from '../src/lib/agents-ui/fleet.ts';
+import { formatElapsed } from '../src/lib/core/time.ts';
+import { clampSlots, fleetSummary, slotSegments, workPreview } from '../src/lib/agents-ui/fleet.ts';
 import { SAMPLE_FLEET_NOW, SAMPLE_MACHINES } from '../src/lib/fixtures/workflows.ts';
 
 test('fleetSummary counts slots and presence', () => {
@@ -21,24 +22,18 @@ test('slotSegments draws one segment per slot and caps long bars', () => {
 	assert.equal(slotSegments({ used: 1, total: 100 }).filter((x) => x === 'busy').length, 1);
 });
 
-test('relativeTime reads in coarse units', () => {
+test('formatElapsed floors, has no "ago" and agrees with the banner', () => {
 	const now = '2026-11-11T12:00:00Z';
-	assert.equal(relativeTime('2026-11-11T11:59:50Z', now), 'just now');
-	assert.equal(relativeTime('2026-11-11T11:55:00Z', now), '5 min ago');
-	assert.equal(relativeTime('2026-11-11T09:00:00Z', now), '3 h ago');
-	assert.equal(relativeTime('2026-11-08T12:00:00Z', now), '3 d ago');
-	assert.equal(relativeTime(undefined, now), '');
-	assert.equal(relativeTime('nope', now), '');
-	assert.equal(relativeTime(SAMPLE_MACHINES[1].lastSeen, SAMPLE_FLEET_NOW), '3 h ago');
+	assert.equal(formatElapsed('2026-11-11T11:59:50Z', now), 'under a minute');
+	assert.equal(formatElapsed('2026-11-11T11:57:40Z', now), '2 min');
+	assert.equal(formatElapsed('2026-11-11T09:00:00Z', now), '3 h');
+	assert.equal(formatElapsed('2026-11-08T12:00:00Z', now), '3 days');
+	assert.equal(formatElapsed('nope', now), '');
+	assert.equal(formatElapsed(SAMPLE_MACHINES[1].lastSeen!, SAMPLE_FLEET_NOW), '3 h');
 });
 
 test('workPreview collapses past three', () => {
 	const w = [1, 2, 3, 4, 5].map((n) => ({ id: String(n), label: `#${n}` }));
 	assert.deepEqual(workPreview(w), { shown: w.slice(0, 3), more: 2 });
 	assert.equal(workPreview(w.slice(0, 3)).more, 0);
-});
-
-test('missingFlags returns only warnings', () => {
-	assert.deepEqual(missingFlags(SAMPLE_MACHINES[1]).map((f) => f.id), ['confined']);
-	assert.deepEqual(missingFlags(SAMPLE_MACHINES[0]), []);
 });

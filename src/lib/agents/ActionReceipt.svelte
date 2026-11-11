@@ -3,7 +3,8 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { Ban, Check, Clock, Undo2 } from '@lucide/svelte';
 	import { badgeClass, pillClass } from '../ui/styles';
-	import { relativeTime } from '../agents-ui/fleet';
+	import { formatElapsed } from '../core/time';
+	import { useClock } from '../state/clock.svelte';
 	import type { ActionOutcome, ActionRun, ActionTarget } from '../types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children'> {
@@ -18,7 +19,7 @@
 		actor?: string;
 		/** When it happened (ISO 8601), shown relative to `now`. */
 		at?: string;
-		/** The time `at` is measured against: an ISO string, a timestamp or a Date. Defaults to the current time. */
+		/** The time `at` is measured against: an ISO string, a timestamp or a Date. Without it, the time appears after mount and updates every 30 seconds. */
 		now?: string | number | Date;
 		/** The run that proposed the action. */
 		run?: ActionRun;
@@ -28,12 +29,14 @@
 		onOpenTarget?: (target: ActionTarget) => void;
 		/** Called when the person presses the run. The run is only a button when this is set. */
 		onOpenRun?: (run: ActionRun) => void;
-		/** Called when the person presses Undo. The button only shows while the outcome is `done`. */
+		/** Whether the action can be undone. Undo shows only when this is true, the outcome is `done` and `onUndo` is set. */
+		undoable?: boolean;
+		/** Called when the person presses Undo. */
 		onUndo?: (target: ActionTarget) => void;
 		class?: string;
 	}
 
-	let { action, target, outcome, reason, actor, at, now, run, compact = false, onOpenTarget, onOpenRun, onUndo, class: className = '', ...rest }: Props = $props();
+	let { action, target, outcome, reason, actor, at, now, run, compact = false, onOpenTarget, onOpenRun, undoable = false, onUndo, class: className = '', ...rest }: Props = $props();
 
 	const OUTCOME = {
 		done: { text: 'Done', box: 'border-card-border bg-card-bg', icon: 'bg-status-success-subtle text-status-success', label: 'text-status-success' },
@@ -43,7 +46,8 @@
 	} satisfies Record<ActionOutcome, { text: string; box: string; icon: string; label: string }>;
 
 	let o = $derived(OUTCOME[outcome]);
-	let when = $derived(at ? relativeTime(at, now ?? Date.now()) : '');
+	const clock = useClock(() => now);
+	let when = $derived(at && clock.value !== undefined ? `${formatElapsed(at, clock.value)} ago` : '');
 	const RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary';
 	const LINK = cn('rounded-[4px] font-medium text-fg-main underline decoration-fg-light/40 underline-offset-2 hover:decoration-fg-main', RING);
 </script>
@@ -92,7 +96,7 @@
 		{/if}
 	</div>
 
-	{#if onUndo && outcome === 'done'}
+	{#if undoable && onUndo && outcome === 'done'}
 		<button type="button" class={cn(pillClass('secondary', 'xs'), RING)} onclick={() => onUndo(target)}>
 			<Undo2 aria-hidden="true" /> Undo<span class="sr-only"> {action} {target.label}</span>
 		</button>

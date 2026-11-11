@@ -4,7 +4,8 @@
 	import { badgeClass, pillClass } from '../ui/styles';
 	import { Check, Clock, Globe, Laptop, Loader, Monitor, ShieldCheck, Smartphone, Tablet, X } from '@lucide/svelte';
 	import type { DeviceApprovalDevice, DeviceApprovalStatus, DeviceKind } from '../types';
-	import { formatRequestedAgo, groupCode, speakCode, timeLeft } from './device-approval';
+	import { tick } from 'svelte';
+	import { canApproveNow, formatRequestedAgo, groupCode, speakCode, timeLeft } from './device-approval';
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'onApprove' | 'onDeny'> {
 		/** The device asking for the same rights as this one. */
@@ -40,7 +41,6 @@
 		...rest
 	}: Props = $props();
 
-	const mountedAt = Date.now();
 	const KIND_NOUN: Record<DeviceKind, string> = {
 		phone: 'phone',
 		tablet: 'tablet',
@@ -51,9 +51,34 @@
 
 	let decided = $state<'approved' | 'denied' | null>(null);
 	let confirmed = $state(false);
+	/** Live clock, set only after mount so the server render has no time-dependent text. */
+	let liveNow = $state<number | undefined>(undefined);
+	let outcomeEl = $state<HTMLElement | null>(null);
+	let wasOpen = false;
 
-	let clock = $derived(now ?? mountedAt);
-	let left = $derived(timeLeft(expiresAt, clock));
+	// A new request (code or time) must never inherit an old tick or decision.
+	$effect(() => {
+		void code;
+		void requestedAt;
+		confirmed = false;
+		decided = null;
+	});
+
+	// Release the lock once the agent answers with anything but 'pending'.
+	$effect(() => {
+		if (status !== undefined && status !== 'pending') decided = null;
+	});
+
+	$effect(() => {
+		if (now !== undefined || !expiresAt) return;
+		liveNow = Date.now();
+		const id = setInterval(() => (liveNow = Date.now()), 1000);
+		return () => clearInterval(id);
+	});
+
+	let clock = $derived(now ?? liveNow);
+	let left = $derived(clock === undefined ? null : timeLeft(expiresAt, clock));
+	let locked = $derived(decided !== null);
 	let effective = $derived<DeviceApprovalStatus>(status ?? decided ?? 'pending');
 	let open = $derived(effective === 'pending' || effective === 'approving');
 	let busy = $derived(effective === 'approving');
@@ -61,9 +86,9 @@
 	let groups = $derived(groupCode(code));
 	let spoken = $derived(speakCode(code));
 	let noun = $derived(device.kind ? KIND_NOUN[device.kind] : 'device');
-	let ago = $derived(formatRequestedAgo(requestedAt, clock));
+	let ago = $derived(clock === undefined ? '' : formatRequestedAgo(requestedAt, clock));
 	let meta = $derived([device.platform, device.location].filter(Boolean).join(' · '));
-	let canApprove = $derived(confirmed && !busy && !expired && open);
+	let canApprove = $derived(confirmed && !busy && !expired && open && !locked);
 
 	let outcome = $derived(
 		effective === 'approved'
@@ -73,14 +98,24 @@
 				: { tone: 'neutral' as const, text: `Request from ${device.name} expired. Ask it to try again.` }
 	);
 
+	$effect(() => {
+		if (open) {
+			wasOpen = true;
+		} else if (wasOpen) {
+			wasOpen = false;
+			void tick().then(() => outcomeEl?.focus());
+		}
+	});
+
 	function approve(): void {
 		if (!canApprove) return;
+		if (!canApproveNow({ confirmed, locked, open, expiresAt, now: now ?? Date.now() })) return;
 		decided = 'approved';
 		onApprove?.();
 	}
 
 	function deny(): void {
-		if (!open || busy) return;
+		if (!open || busy || locked) return;
 		decided = 'denied';
 		onDeny?.();
 	}
@@ -102,9 +137,11 @@
 
 {#if !open}
 	<div {...rest}
+		bind:this={outcomeEl}
+		tabindex="-1"
 		role="status"
 		class={cn(
-			'flex w-full items-center gap-2.5 rounded-soft border border-chat-border bg-card-bg px-3.5 py-3 text-[13px] ak-shadow-soft-sm',
+			'flex w-full items-center gap-2.5 rounded-soft border border-chat-border bg-card-bg px-3.5 py-3 text-[13px] ak-shadow-soft-sm focus:outline-none focus-visible:outline-2',
 			className
 		)}
 	>
@@ -188,8 +225,8 @@
 			<input
 				type="checkbox"
 				bind:checked={confirmed}
-				disabled={expired || busy}
-				class="mt-0.5 size-4 shrink-0 accent-[var(--ak-accent-primary,currentColor)]"
+				disabled={expired || busy || locked}
+				class="mt-0.5 size-4 shrink-0 accent-accent-primary"
 			/>
 			<span>
 				The code on my {noun} is
@@ -198,7 +235,7 @@
 		</label>
 
 		<div class="mt-3 flex flex-wrap items-center justify-end gap-2">
-			<button type="button" disabled={busy} onclick={deny} class={pillClass('danger', 'md')}>
+			<button type="button" disabled={busy || locked} onclick={deny} class={pillClass('danger', 'md')}>
 				<X aria-hidden="true" />
 				Deny
 			</button>

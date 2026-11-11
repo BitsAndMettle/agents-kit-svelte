@@ -10,6 +10,8 @@ export interface SourcesSummary {
 	unverified: number;
 	mismatch: number;
 	total: number;
+	/** True when an answer built on these sources may be sent: at least one source, none mismatched. */
+	sendable: boolean;
 	/** One sentence for the header and screen readers. */
 	label: string;
 }
@@ -36,7 +38,7 @@ export function summarizeSources(sources: readonly { check: CitedSourceCheck }[]
 	let label: string;
 	if (total === 0) {
 		state = 'none';
-		label = 'No sources';
+		label = 'No sources to check this answer against';
 	} else if (mismatch > 0) {
 		state = 'mismatch';
 		label = `${noun(mismatch)} did not match the quoted text`;
@@ -47,5 +49,5 @@ export function summarizeSources(sources: readonly { check: CitedSourceCheck }[]
 		state = 'all-verified';
 		label = total === 1 ? 'Source checked' : `All ${total} sources checked`;
 	}
-	return { state, verified, unverified, mismatch, total, label };
+	return { state, verified, unverified, mismatch, total, label, sendable: total > 0 && mismatch === 0 };
 }

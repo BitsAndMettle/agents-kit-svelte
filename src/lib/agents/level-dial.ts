@@ -35,8 +35,8 @@ export interface LevelChanges {
  */
 export function levelChanges(from: AutonomyLevel, to: AutonomyLevel): LevelChanges {
 	const diff = (a: string[] = [], b: string[] = []) => ({
-		added: b.filter((item) => !a.includes(item)),
-		removed: a.filter((item) => !b.includes(item))
+		added: [...new Set(b.filter((item) => !a.includes(item)))],
+		removed: [...new Set(a.filter((item) => !b.includes(item)))]
 	});
 	const allows = diff(from.allows, to.allows);
 	const asks = diff(from.asks, to.asks);

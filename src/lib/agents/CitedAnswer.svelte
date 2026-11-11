@@ -54,9 +54,10 @@
 
 	let summary = $derived(summarizeSources(sources));
 	let blocked = $derived(summary.state === 'mismatch');
+	const uid = $props.id();
 	let isDraft = $derived(status === 'draft');
-	let canSend = $derived(isDraft && !blocked && !!onSend);
-	let headingId = $derived(`cited-answer-${sources[0]?.id ?? 'card'}`);
+	let canSend = $derived(isDraft && summary.sendable && !!onSend);
+	let headingId = $derived(`cited-answer-${uid}`);
 </script>
 
 <section {...rest}
@@ -162,8 +163,8 @@
 			</ul>
 		</div>
 	{:else}
-		<p class="mt-4 rounded-2xl bg-status-warning-subtle px-3 py-2 text-xs text-status-warning">
-			No sources were given for this answer.
+		<p role="alert" class="mt-4 rounded-2xl bg-status-warning-subtle px-3 py-2 text-xs font-medium text-status-warning">
+			No sources. This answer cannot be sent from here until it cites at least one.
 		</p>
 	{/if}
 
@@ -172,7 +173,7 @@
 			{#if onEdit}
 				<button type="button" onclick={() => onEdit()} class={pillClass('secondary', 'md')}>Edit</button>
 			{/if}
-			{#if onSend && !blocked}
+			{#if onSend && summary.sendable}
 				<button type="button" disabled={!canSend} onclick={() => onSend()} class={pillClass('primary', 'md')}>
 					<Send aria-hidden="true" />
 					Send answer

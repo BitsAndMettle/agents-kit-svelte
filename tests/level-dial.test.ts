@@ -44,3 +44,11 @@ test('stepIndex clamps at both ends', () => {
 	assert.equal(stepIndex(1, 1, 4), 2);
 	assert.equal(stepIndex(0, 1, 0), 0);
 });
+
+test('levelChanges lists a repeated line once', () => {
+	const a = { id: 'a', label: 'A', summary: '', allows: ['x'] };
+	const b = { id: 'b', label: 'B', summary: '', allows: ['x', 'y', 'y'], asks: ['z', 'z'] };
+	assert.deepEqual(levelChanges(a, b).allowsAdded, ['y']);
+	assert.deepEqual(levelChanges(b, a).allowsRemoved, ['y']);
+	assert.deepEqual(levelChanges(b, a).asksRemoved, ['z']);
+});

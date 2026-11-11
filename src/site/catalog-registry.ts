@@ -665,6 +665,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   actor="You"
   at="2026-11-11T11:59:00Z"
   run={{ id: 'run-88', label: 'Run 88' }}
+  undoable
   onUndo={(target) => console.log('unpark', target.id)}
 />
 
@@ -1938,7 +1939,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
       name: 'devbox',
       presence: 'online',
       slots: { used: 4, total: 6 },
-      holdsOperator: true,
+      badge: 'Operator',
       flags: [{ id: 'confined', label: 'Confined', ok: true }],
       work: [{ id: '3412', label: '#3412 Fix sign-in redirect', status: 'running' }]
     },

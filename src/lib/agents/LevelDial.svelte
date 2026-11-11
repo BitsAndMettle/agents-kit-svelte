@@ -47,6 +47,21 @@
 		previewId = null;
 	});
 
+	// One confirmation reports once; a new value or pending state re-arms it.
+	let sent = $state(false);
+	$effect(() => {
+		void value;
+		void pending;
+		sent = false;
+	});
+
+	// Release the lock if the caller refused the change and nothing else moved.
+	$effect(() => {
+		if (!sent) return;
+		const timer = setTimeout(() => (sent = false), 4000);
+		return () => clearTimeout(timer);
+	});
+
 	let locked = $derived(disabled || pending !== undefined);
 	let currentIndex = $derived(levels.findIndex((level) => level.id === value));
 	let shownId = $derived(previewId ?? value);
@@ -88,12 +103,14 @@
 
 	/** Reports the previewed level as the person's choice. */
 	function apply(): void {
-		if (!direction || !shown || locked) return;
+		if (!direction || !shown || locked || sent) return;
+		sent = true;
 		onChange?.(shown.id, { direction });
 	}
 
 	/** Drops the preview and returns to the current level. */
 	function cancel(): void {
+		if (locked) return;
 		previewId = null;
 		buttons[Math.max(currentIndex, 0)]?.focus();
 	}
@@ -131,10 +148,10 @@
 				aria-checked={isShown}
 				aria-describedby="{uid}-detail"
 				tabindex={isShown ? 0 : -1}
-				disabled={locked}
+				aria-disabled={locked}
 				onclick={() => preview(i)}
 				onkeydown={onKeydown}
-				class="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 pt-1 pb-2 text-center transition-colors disabled:cursor-not-allowed disabled:opacity-60 enabled:hover:bg-chat-surface"
+				class="group flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-1 pt-1 pb-2 text-center transition-colors aria-disabled:cursor-not-allowed aria-disabled:opacity-60 not-aria-disabled:hover:bg-chat-surface"
 			>
 				<span class="relative flex h-6 w-full items-center justify-center">
 					<span
@@ -203,7 +220,7 @@
 					<div>
 						<p class="text-[11px] font-semibold tracking-wide text-status-success uppercase">Does on its own</p>
 						<ul class="mt-1.5 space-y-1">
-							{#each shown.allows as item (item)}
+							{#each shown.allows as item, n (n)}
 								<li class="flex items-start gap-1.5 text-[13px] leading-5 text-fg-main">
 									<Check aria-hidden="true" class="mt-0.5 size-3.5 shrink-0 text-status-success" />
 									<span class="min-w-0 break-words">{item}</span>
@@ -216,7 +233,7 @@
 					<div>
 						<p class="text-[11px] font-semibold tracking-wide text-fg-light uppercase">Still asks you</p>
 						<ul class="mt-1.5 space-y-1">
-							{#each shown.asks as item (item)}
+							{#each shown.asks as item, n (n)}
 								<li class="flex items-start gap-1.5 text-[13px] leading-5 text-fg-main">
 									<span aria-hidden="true" class="mt-0.5 w-3.5 shrink-0 text-center text-fg-light">?</span>
 									<span class="min-w-0 break-words">{item}</span>
@@ -241,7 +258,7 @@
 			{#if changes.allowsAdded.length}
 				<p class="mt-1.5 text-xs text-fg-light">It will newly do without asking:</p>
 				<ul class="mt-1 list-disc space-y-0.5 pl-5 text-[13px] text-fg-main">
-					{#each changes.allowsAdded as item (item)}
+					{#each changes.allowsAdded as item, n (n)}
 						<li class="break-words">{item}</li>
 					{/each}
 				</ul>
@@ -249,26 +266,26 @@
 			{#if changes.asksRemoved.length}
 				<p class="mt-1.5 text-xs text-fg-light">It will stop asking about:</p>
 				<ul class="mt-1 list-disc space-y-0.5 pl-5 text-[13px] text-fg-main">
-					{#each changes.asksRemoved as item (item)}
+					{#each changes.asksRemoved as item, n (n)}
 						<li class="break-words">{item}</li>
 					{/each}
 				</ul>
 			{/if}
 			<div class="mt-3 flex flex-wrap items-center justify-end gap-1.5">
-				<button type="button" disabled={locked} onclick={cancel} class={pillClass('ghost', 'md')}>
+				<button type="button" aria-disabled={locked} onclick={cancel} class={pillClass('ghost', 'md', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}>
 					Cancel
 				</button>
-				<button type="button" disabled={locked} onclick={apply} class={pillClass('primary', 'md')}>
+				<button type="button" aria-disabled={locked} onclick={apply} class={pillClass('primary', 'md', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}>
 					Allow {shown.label}
 				</button>
 			</div>
 		</div>
 	{:else if direction === 'down' && shown}
 		<div class="mt-3 flex flex-wrap items-center justify-end gap-1.5">
-			<button type="button" disabled={locked} onclick={cancel} class={pillClass('ghost', 'md')}>
+			<button type="button" aria-disabled={locked} onclick={cancel} class={pillClass('ghost', 'md', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}>
 				Cancel
 			</button>
-			<button type="button" disabled={locked} onclick={apply} class={pillClass('primary', 'md')}>
+			<button type="button" aria-disabled={locked} onclick={apply} class={pillClass('primary', 'md', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}>
 				Switch to {shown.label}
 			</button>
 		</div>

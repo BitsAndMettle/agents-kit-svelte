@@ -3,7 +3,9 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { CircleCheck, Clock, Wifi, WifiOff, X } from '@lucide/svelte';
 	import { buttonClass } from '../ui/styles';
-	import { clockTime, relativeTime, type TimeInput } from './presence';
+	import { formatElapsed } from '../core/time';
+	import { useClock } from '../state/clock.svelte';
+	import { clockTime, type TimeInput } from './presence';
 	import type { PresenceAction, PresenceState } from '../types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
@@ -12,7 +14,7 @@
 		subject: string;
 		/** When the state began (ISO time). Shown as clock time and, with `now`, how long ago. */
 		since?: string;
-		/** The current time. Pass it in so the banner renders the same on the server and in tests. */
+		/** The current time. Pass it in so the banner renders the same on the server and in tests. Without it the "ago" text appears after mount and updates every 30 seconds. */
 		now?: TimeInput;
 		/** IANA time zone for the clock time. Without it the time is UTC and says so. */
 		timeZone?: string;
@@ -28,16 +30,17 @@
 	let { state, subject, since = '', now, timeZone, detail = '', action, onDismiss, compact, class: className = '', ...rest }: Props = $props();
 
 	const STATES = {
-		online: { label: 'Online', tone: 'border-status-success/30 bg-status-success-subtle text-status-success', icon: CircleCheck },
-		stale: { label: 'Not responding', tone: 'border-status-warning/30 bg-status-warning-subtle text-status-warning', icon: Clock },
-		offline: { label: 'Offline', tone: 'border-status-danger/30 bg-status-danger-subtle text-status-danger', icon: WifiOff },
-		reconnecting: { label: 'Reconnecting…', tone: 'border-status-info/30 bg-status-info-subtle text-status-info', icon: Wifi }
+		online: { label: 'Online', tone: 'border-status-success/30 bg-status-success-subtle text-status-success', text: 'text-status-success', icon: CircleCheck },
+		stale: { label: 'Not responding', tone: 'border-status-warning/30 bg-status-warning-subtle text-status-warning', text: 'text-status-warning', icon: Clock },
+		offline: { label: 'Offline', tone: 'border-status-danger/30 bg-status-danger-subtle text-status-danger', text: 'text-status-danger', icon: WifiOff },
+		reconnecting: { label: 'Reconnecting…', tone: 'border-status-info/30 bg-status-info-subtle text-status-info', text: 'text-status-info', icon: Wifi }
 	} as const;
 
 	let meta = $derived(STATES[state]);
 	let slim = $derived(compact ?? state === 'online');
 	let clock = $derived(since ? clockTime(since, timeZone ?? 'UTC') : '');
-	let ago = $derived(since && now !== undefined ? relativeTime(since, now) : '');
+	const clockNow = useClock(() => now);
+	let ago = $derived(since && clockNow.value !== undefined ? formatElapsed(since, clockNow.value) : '');
 	let utcNote = $derived(!timeZone || timeZone === 'UTC' ? ' UTC' : '');
 	let Icon = $derived(meta.icon);
 </script>
@@ -54,7 +57,7 @@
 	</span>
 	<p class="min-w-0 flex-1 text-fg-main">
 		<span class="font-semibold">{subject}</span>
-		<span class="text-fg-light">&nbsp;·&nbsp;</span><span class={cn('font-medium', meta.tone.split(' ').at(-1))}>{meta.label}</span>
+		<span class="text-fg-light">&nbsp;·&nbsp;</span><span class={cn('font-medium', meta.text)}>{meta.label}</span>
 		{#if clock}<span class="text-fg-light">&nbsp;since {clock}{utcNote}{#if ago} · {ago} ago{/if}</span>{/if}
 		{#if detail}<span class="block text-[12px] text-fg-light">{detail}</span>{/if}
 	</p>

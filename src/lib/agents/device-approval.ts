@@ -95,3 +95,27 @@ export function timeLeft(expiresAt: string | undefined, now: string | number | D
 	if (ms <= 0) return { ms: 0, expired: true, label: 'Expired' };
 	return { ms, expired: false, label: `${formatDuration(ms)} left` };
 }
+
+export interface ApprovalGate {
+	/** The person ticked "the code matches". */
+	confirmed: boolean;
+	/** A decision was already pressed and the agent has not answered yet. */
+	locked: boolean;
+	/** The request is still pending (not approving, decided or expired). */
+	open: boolean;
+	expiresAt: string | undefined;
+	/** Current time at the moment of the press. */
+	now: string | number | Date;
+}
+
+/**
+ * Whether Approve may fire right now. Re-checks expiry against the time given, so a
+ * stale render cannot approve an expired request.
+ *
+ * @param gate - Current state of the card.
+ * @returns True only when confirmed, unlocked, open and not past expiry.
+ */
+export function canApproveNow(gate: ApprovalGate): boolean {
+	if (!gate.confirmed || gate.locked || !gate.open) return false;
+	return !timeLeft(gate.expiresAt, gate.now)?.expired;
+}

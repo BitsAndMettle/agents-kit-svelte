@@ -16,3 +16,9 @@ test('a mismatch wins over unverified', () => {
 	assert.equal(s.mismatch, 1);
 	assert.equal(s.total, 3);
 });
+
+test('sendable needs at least one source and no mismatch', () => {
+	assert.equal(summarizeSources([]).sendable, false);
+	assert.equal(summarizeSources([{ check: 'unverified' }]).sendable, true);
+	assert.equal(summarizeSources([{ check: 'verified' }, { check: 'mismatch' }]).sendable, false);
+});

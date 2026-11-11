@@ -1696,7 +1696,7 @@
 							{:else if item.slug === 'action-receipt'}
 								<div class="mx-auto flex max-w-xl flex-col gap-2">
 									{#each SAMPLE_RECEIPTS as r (r.id)}
-										<ActionReceipt action={r.action} target={r.target} outcome={r.outcome} reason={r.reason} actor={r.actor} at={r.at} now={SAMPLE_RECEIPTS_NOW} run={r.run} onOpenTarget={() => {}} onOpenRun={() => {}} onUndo={r.id === 'r3' ? () => {} : undefined} />
+										<ActionReceipt action={r.action} target={r.target} outcome={r.outcome} reason={r.reason} actor={r.actor} at={r.at} now={SAMPLE_RECEIPTS_NOW} run={r.run} onOpenTarget={() => {}} onOpenRun={() => {}} undoable={r.undoable} onUndo={() => {}} />
 									{/each}
 								</div>
 							{:else if item.slug === 'github-checks-waterfall'}

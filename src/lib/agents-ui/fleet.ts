@@ -42,29 +42,9 @@ export function slotSegments(slots: { used: number; total: number }): ('busy' | 
 	return Array.from({ length: MAX_SEGMENTS }, (_, i) => (i < busy ? 'busy' : 'free'));
 }
 
-/** "just now", "5 min ago", "3 h ago", "2 d ago". Empty when a time is missing or invalid. */
-export function relativeTime(iso: string | undefined, now: string | number | Date): string {
-	if (!iso) return '';
-	const then = Date.parse(iso);
-	const t = now instanceof Date ? now.getTime() : typeof now === 'number' ? now : Date.parse(now);
-	if (Number.isNaN(then) || Number.isNaN(t)) return '';
-	const sec = Math.round((t - then) / 1000);
-	if (sec < 45) return 'just now';
-	const min = Math.round(sec / 60);
-	if (min < 60) return `${min} min ago`;
-	const h = Math.round(min / 60);
-	if (h < 24) return `${h} h ago`;
-	return `${Math.round(h / 24)} d ago`;
-}
-
 /** The first `limit` items and how many are hidden. */
 export function workPreview(work: MachineWork[], limit = WORK_PREVIEW): { shown: MachineWork[]; more: number } {
 	return { shown: work.slice(0, limit), more: Math.max(0, work.length - limit) };
-}
-
-/** Flags that are not ok, in order. */
-export function missingFlags(m: Machine) {
-	return (m.flags ?? []).filter((f) => !f.ok);
 }
 
 export const PRESENCE_LABEL: Record<MachinePresence, string> = {

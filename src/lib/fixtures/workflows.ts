@@ -656,7 +656,7 @@ export const SAMPLE_MACHINES: Machine[] = [
 		presence: 'online',
 		lastSeen: '2026-11-11T11:59:40Z',
 		slots: { used: 4, total: 6 },
-		holdsOperator: true,
+		badge: 'Operator',
 		flags: [
 			{ id: 'confined', label: 'Confined', ok: true },
 			{ id: 'autostart', label: 'Autostart', ok: true }

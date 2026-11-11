@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
 	formatDuration,
+	canApproveNow,
 	formatRequestedAgo,
 	groupCode,
 	speakCode,
@@ -41,4 +42,21 @@ test('formatRequestedAgo', () => {
 	assert.equal(formatRequestedAgo('2026-11-11T09:59:55Z', now), 'just now');
 	assert.equal(formatRequestedAgo('2026-11-11T09:58:00Z', now), '2 min ago');
 	assert.equal(formatRequestedAgo('bad', now), '');
+});
+
+test('canApproveNow needs a tick, an open request, no lock and time left', () => {
+	const base = {
+		confirmed: true,
+		locked: false,
+		open: true,
+		expiresAt: '2026-11-11T10:04:00Z',
+		now: '2026-11-11T10:00:00Z'
+	};
+	assert.equal(canApproveNow(base), true);
+	assert.equal(canApproveNow({ ...base, confirmed: false }), false);
+	assert.equal(canApproveNow({ ...base, locked: true }), false);
+	assert.equal(canApproveNow({ ...base, open: false }), false);
+	assert.equal(canApproveNow({ ...base, now: '2026-11-11T10:04:00Z' }), false);
+	assert.equal(canApproveNow({ ...base, now: '2026-11-11T11:00:00Z' }), false);
+	assert.equal(canApproveNow({ ...base, expiresAt: undefined }), true);
 });

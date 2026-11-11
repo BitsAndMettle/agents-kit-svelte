@@ -37,13 +37,22 @@ export function dependencyLabels(card: ProposalCard, cards: ProposalCard[]): str
 }
 
 /**
- * Removes a card and drops it from every other card's `dependsOn`. Does not mutate.
+ * Removes a card. Cards that waited for it inherit its own dependencies (deduplicated, never themselves), so the chain still holds. Does not mutate.
  *
  * @param cards - Cards.
  * @param id - Card to remove.
  */
 export function removeProposalCard(cards: ProposalCard[], id: string): ProposalCard[] {
-	return cards.filter((c) => c.id !== id).map((c) => ({ ...c, dependsOn: (c.dependsOn ?? []).filter((d) => d !== id) }));
+	const removed = cards.find((c) => c.id === id);
+	const inherited = removed?.dependsOn ?? [];
+	return cards
+		.filter((c) => c.id !== id)
+		.map((c) => {
+			const deps = c.dependsOn ?? [];
+			if (!deps.includes(id)) return { ...c, dependsOn: [...deps] };
+			const next = deps.flatMap((d) => (d === id ? inherited : [d])).filter((d) => d !== c.id && d !== id);
+			return { ...c, dependsOn: [...new Set(next)] };
+		});
 }
 
 /**

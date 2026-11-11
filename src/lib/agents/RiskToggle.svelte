@@ -56,6 +56,21 @@
 	let checkboxEl = $state<HTMLInputElement>();
 
 	let locked = $derived(disabled || pending);
+
+	// One confirmation reports once; a new checked value or pending state re-arms it.
+	let sent = $state(false);
+	$effect(() => {
+		void checked;
+		void pending;
+		sent = false;
+	});
+
+	// Release the lock if the caller refused the change and nothing else moved.
+	$effect(() => {
+		if (!sent) return;
+		const timer = setTimeout(() => (sent = false), 4000);
+		return () => clearTimeout(timer);
+	});
 	let riskyDirection = $derived(riskOn === 'on');
 	let riskyNow = $derived(checked === riskyDirection);
 
@@ -84,12 +99,16 @@
 		}
 		const next = !checked;
 		if (next === riskyDirection) void openPanel();
-		else onChange?.(next, { acknowledged: false });
+		else if (!sent) {
+			sent = true;
+			onChange?.(next, { acknowledged: false });
+		}
 	}
 
 	/** Reports the risky change once the box is ticked. */
 	function confirm(): void {
-		if (!acknowledged || locked) return;
+		if (!acknowledged || locked || sent) return;
+		sent = true;
 		open = false;
 		acknowledged = false;
 		onChange?.(riskyDirection, { acknowledged: true });
@@ -153,9 +172,9 @@
 				aria-busy={pending}
 				aria-expanded={open}
 				aria-controls={open ? `${uid}-panel` : undefined}
-				disabled={locked}
+				aria-disabled={locked}
 				onclick={toggle}
-				class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-50 {checked
+				class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 {checked
 					? riskyNow
 						? 'border-status-warning bg-status-warning'
 						: 'border-chat-accent bg-chat-accent'
@@ -192,7 +211,7 @@
 				<span class="min-w-0 break-words">{risk.title}</span>
 			</p>
 			<ul class="mt-2 list-disc space-y-1 pl-9 text-[13px] leading-5 text-fg-main">
-				{#each risk.points as point (point)}
+				{#each risk.points as point, n (n)}
 					<li class="break-words">{point}</li>
 				{/each}
 			</ul>
@@ -206,12 +225,13 @@
 				<span class="min-w-0 break-words">{risk.acknowledge}</span>
 			</label>
 			<div class="mt-3 flex flex-wrap items-center justify-end gap-1.5">
-				<button type="button" onclick={closePanel} class={pillClass('ghost', 'md')}>Cancel</button>
+				<button type="button" onclick={() => !locked && closePanel()} class={pillClass('ghost', 'md', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}>Cancel</button>
 				<button
 					type="button"
-					disabled={!acknowledged || locked}
+					disabled={!acknowledged}
+					aria-disabled={locked}
 					onclick={confirm}
-					class={pillClass('primary', 'md')}
+					class={pillClass('primary', 'md', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}
 				>
 					{riskyDirection ? 'Turn on' : 'Turn off'}
 				</button>

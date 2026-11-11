@@ -25,6 +25,18 @@ test('removing a card drops it from others and renumbers', () => {
 	assert.deepEqual(cards[1].dependsOn, ['a'], 'input is not mutated');
 });
 
+test('removing the middle of a chain passes its dependencies on', () => {
+	const chain: ProposalCard[] = [
+		{ id: 'c', title: 'C' },
+		{ id: 'b', title: 'B', dependsOn: ['c'] },
+		{ id: 'a', title: 'A', dependsOn: ['b'] }
+	];
+	const next = removeProposalCard(chain, 'b');
+	assert.deepEqual(next.find((x) => x.id === 'a')?.dependsOn, ['c']);
+	const twice = removeProposalCard([{ id: 'c', title: 'C' }, { id: 'b', title: 'B', dependsOn: ['c', 'a'] }, { id: 'a', title: 'A', dependsOn: ['b', 'c'] }], 'b');
+	assert.deepEqual(twice.find((x) => x.id === 'a')?.dependsOn, ['c']);
+});
+
 test('rename trims and ignores blank names', () => {
 	assert.equal(renameProposalCard(cards, 'a', '  New  ')[0].title, 'New');
 	assert.equal(renameProposalCard(cards, 'a', '   ')[0].title, 'A');

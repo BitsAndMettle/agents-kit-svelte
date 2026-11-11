@@ -249,7 +249,7 @@ export const defaultUIRegistry: UIRegistry = {
 		props: (props, emit) => ({
 			...props,
 			onSelectMachine: (machine: { id: string }) => emit('open-machine', machine.id),
-			onSelectWork: (work: { id: string }, machine: { id: string }) => emit('open-work', `${machine.id}:${work.id}`)
+			onSelectWork: (work: { id: string }, machine: { id: string }) => emit('open-work', JSON.stringify({ machineId: machine.id, workId: work.id }))
 		})
 	},
 	'action-receipt': {
@@ -259,7 +259,8 @@ export const defaultUIRegistry: UIRegistry = {
 			...props,
 			onOpenTarget: (target: { id?: string; label: string }) => emit('open-target', target.id ?? target.label),
 			onOpenRun: (run: { id: string }) => emit('open-run', run.id),
-			onUndo: (target: { id?: string; label: string }) => emit('undo', target.id ?? target.label)
+			// Undo only for actions the agent says it can reverse; a merge, for one, cannot be.
+			onUndo: props.undoable === true ? (target: { id?: string; label: string }) => emit('undo', target.id ?? target.label) : undefined
 		})
 	},
 	'device-approval': {
@@ -295,8 +296,9 @@ export const defaultUIRegistry: UIRegistry = {
 		required: ['title', 'cards'],
 		props: (props, emit) => ({
 			...props,
-			onApprove: (proposal: { cards: { id: string }[] }) => emit('approve-proposal', proposal.cards.map((c) => c.id).join(',')),
-			onRevise: (note: string) => emit('revise-proposal', note),
+			// The whole edited proposal goes back, so renamed and removed cards reach the agent.
+			onApprove: (proposal: unknown) => emit('approve-proposal', JSON.stringify(proposal)),
+			onRevise: (note: string, proposal: unknown) => emit('revise-proposal', JSON.stringify({ note, proposal })),
 			onDecline: () => emit('decline-proposal')
 		})
 	},
@@ -305,7 +307,7 @@ export const defaultUIRegistry: UIRegistry = {
 		required: ['items'],
 		props: (props, emit) => ({
 			...props,
-			onAction: (item: { id: string }, action: { id: string }) => emit('blocked-work-action', `${item.id}:${action.id}`)
+			onAction: (item: { id: string }, action: { id: string }) => emit('blocked-work-action', JSON.stringify({ itemId: item.id, actionId: action.id }))
 		})
 	},
 	'feature-lineage': {

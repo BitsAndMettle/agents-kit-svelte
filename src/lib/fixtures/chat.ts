@@ -358,6 +358,7 @@ export const SAMPLE_RECEIPTS: ActionReceiptData[] = [
 		outcome: 'done',
 		actor: 'You',
 		at: '2026-11-11T11:59:00Z',
+		undoable: true,
 		run: { id: 'run-88', label: 'Run 88' }
 	},
 	{

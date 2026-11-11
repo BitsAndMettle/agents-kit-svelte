@@ -692,8 +692,8 @@ export interface Machine {
 	work?: MachineWork[];
 	/** Safeguards such as confinement or autostart. A flag with `ok: false` is a warning. */
 	flags?: MachineFlag[];
-	/** Marks the machine the operator agent lives on. */
-	holdsOperator?: boolean;
+	/** A short label next to the name, e.g. "Operator" for the machine an agent lives on. */
+	badge?: string;
 	/** A short problem statement, shown in the warning colour. */
 	alert?: string;
 }
@@ -725,4 +725,6 @@ export interface ActionReceiptData {
 	actor?: string;
 	at?: string;
 	run?: ActionRun;
+	/** Whether Undo is offered while the outcome is `done`. */
+	undoable?: boolean;
 }

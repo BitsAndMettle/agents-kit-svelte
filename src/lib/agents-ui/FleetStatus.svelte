@@ -2,16 +2,18 @@
 	import { cn } from '../ui/cn';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { prefersReducedMotion } from 'svelte/motion';
-	import { Bot, Clock, Eye, LoaderCircle, TriangleAlert } from '@lucide/svelte';
+	import { Clock, Eye, LoaderCircle, TriangleAlert } from '@lucide/svelte';
 	import { badgeClass } from '../ui/styles';
+	import { formatElapsed } from '../core/time';
+	import { useClock } from '../state/clock.svelte';
 	import type { Machine, MachinePresence, MachineWork, MachineWorkStatus } from '../types';
-	import { clampSlots, fleetSummary, WORK_PREVIEW, PRESENCE_LABEL, relativeTime, slotSegments, workPreview } from './fleet';
+	import { clampSlots, fleetSummary, WORK_PREVIEW, PRESENCE_LABEL, slotSegments, workPreview } from './fleet';
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title'> {
 		machines: Machine[];
 		/** Heading shown above the summary. */
 		title?: string;
-		/** The time "last seen" is measured against: an ISO string, a timestamp or a Date. Defaults to the current time. */
+		/** The time "last seen" is measured against: an ISO string, a timestamp or a Date. Without it, last-seen text appears after mount and updates every 30 seconds. */
 		now?: string | number | Date;
 		/** Called when the person presses a machine's name row, e.g. to open its page. Rows are only buttons when set. */
 		onSelectMachine?: (machine: Machine) => void;
@@ -23,7 +25,7 @@
 	let { machines, title, now, onSelectMachine, onSelectWork, class: className = '', ...rest }: Props = $props();
 
 	let summary = $derived(fleetSummary(machines));
-	let clock = $derived(now ?? Date.now());
+	const clock = useClock(() => now);
 	let expanded = $state<string[]>([]);
 
 	const DOT: Record<MachinePresence, string> = {
@@ -65,7 +67,7 @@
 				{@const work = m.work ?? []}
 				{@const all = expanded.includes(m.id)}
 				{@const preview = workPreview(work, all ? work.length : undefined)}
-				{@const seen = relativeTime(m.lastSeen, clock)}
+				{@const seen = m.lastSeen && clock.value !== undefined ? formatElapsed(m.lastSeen, clock.value) : ''}
 				<li
 					class={cn(
 						'flex flex-col gap-2.5 px-3 py-3 sm:grid sm:grid-cols-[minmax(9rem,13rem)_minmax(8rem,11rem)_1fr] sm:items-start sm:gap-x-4 sm:px-4',
@@ -76,8 +78,8 @@
 						{#snippet identity()}
 							<span class={cn('size-2 shrink-0 rounded-full', DOT[m.presence])} aria-hidden="true"></span>
 							<span class="min-w-0 truncate font-medium text-fg-main">{m.name}</span>
-							{#if m.holdsOperator}
-								<span class={badgeClass('accent')}><Bot aria-hidden="true" />Operator</span>
+							{#if m.badge}
+								<span class={badgeClass('accent')}>{m.badge}</span>
 							{/if}
 						{/snippet}
 						{#if onSelectMachine}
@@ -92,7 +94,7 @@
 							<p class="flex items-center gap-2 py-1">{@render identity()}</p>
 						{/if}
 						<p class={cn('mt-0.5 text-xs', PRESENCE_TEXT[m.presence])}>
-							{PRESENCE_LABEL[m.presence]}{#if seen && m.presence !== 'online'}<span class="text-fg-light">&nbsp;· seen {seen}</span>{/if}
+							{PRESENCE_LABEL[m.presence]}{#if seen && m.presence !== 'online'}<span class="text-fg-light">&nbsp;· seen {seen} ago</span>{/if}
 						</p>
 					</div>
 
