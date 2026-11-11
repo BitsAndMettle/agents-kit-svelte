@@ -282,6 +282,52 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 	{
+		slug: 'level-dial',
+		name: 'LevelDial',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/LevelDial.svelte',
+		upstreamSource: 'Agents Kit Svelte · beUI Agents',
+		description:
+			'Choose how much an agent may do on its own from ordered levels. Selecting previews the level and what it does or still asks; moving up needs a confirm that names what changes, moving down applies in one press.',
+		usageSnippet: `<script lang="ts">
+  import { LevelDial, type AutonomyLevel } from 'agents-kit-svelte';
+
+  const levels: AutonomyLevel[] = [
+    { id: 'careful', label: 'Careful', summary: 'Asks before anything leaves its branch.', allows: ['Commit to its own branch'], asks: ['Open a pull request', 'Merge'] },
+    { id: 'balanced', label: 'Balanced', summary: 'Opens pull requests itself.', allows: ['Commit to its own branch', 'Open a pull request'], asks: ['Merge'] }
+  ];
+  let value = $state('careful');
+</script>
+
+<LevelDial title="Autonomy" {levels} {value} onChange={(id) => (value = id)} />`
+	},
+	{
+		slug: 'risk-toggle',
+		name: 'RiskToggle',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/RiskToggle.svelte',
+		upstreamSource: 'Agents Kit Svelte · beUI Agents',
+		description:
+			'A switch for a setting that carries risk. Turning it the risky way opens the risk points and a checkbox; the confirm button stays disabled until the person ticks it. The safe direction applies at once.',
+		usageSnippet: `<script lang="ts">
+  import { RiskToggle } from 'agents-kit-svelte';
+
+  let checked = $state(false);
+</script>
+
+<RiskToggle
+  label="Merge protected changes without asking"
+  {checked}
+  scope="devbox"
+  risk={{
+    title: 'Protected files guard releases and secrets',
+    points: ['A bad merge can break every build.', 'Changes go live without a person reading them.'],
+    acknowledge: 'I understand agents can merge protected changes without asking me.'
+  }}
+  onChange={(next) => (checked = next)}
+/>`
+	},
+	{
 		slug: 'prompt-input',
 		name: 'PromptInput',
 		category: 'beUI Agents',

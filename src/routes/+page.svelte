@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_BLOCKED_ITEMS, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS, SAMPLE_FLEET_NOW, SAMPLE_MACHINES } from '$lib/fixtures/workflows';
+	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS } from '$lib/fixtures/workflows';
+	import { SAMPLE_AUTONOMY_LEVELS, SAMPLE_RISK_TOGGLE } from '$lib/fixtures/chat';
 	import { SAMPLE_CONTEXT_CHUNKS, SAMPLE_DIFF_ROWS, SAMPLE_FILTER_ROWS, SAMPLE_FINE_TUNE_FIELDS, SAMPLE_FLOWCHART_NODES, SAMPLE_INSIGHTS, SAMPLE_RECOMMENDATION_ALTERNATIVES, SAMPLE_RECOMMENDATION_REASONING, SAMPLE_RECORDS, SAMPLE_SEARCH_ITEMS, SAMPLE_SELECTION_ACTIONS, SAMPLE_TOOL_DIFFS, SAMPLE_TOOL_STEPS } from '$lib/fixtures/data';
 	import { SAMPLE_CHAIN_OF_THOUGHT, SAMPLE_ENV_VARIABLES, SAMPLE_PACKAGE_DEPENDENCIES, SAMPLE_PACKAGE_SCRIPTS, SAMPLE_PLAN_MILESTONES, SAMPLE_PREVIEW_LOGS, SAMPLE_PROMPT_SUGGESTIONS, SAMPLE_SCHEMA_PARAMETERS, SAMPLE_SCHEMA_REQUEST_BODY, SAMPLE_SCHEMA_RESPONSE_BODY, SAMPLE_SIDEBAR_RESOURCES, SAMPLE_STACK_SNIPPET, SAMPLE_STACK_TRACE, SAMPLE_VOICE_DEVICES, SAMPLE_VOICE_PERSONAS, SAMPLE_PRESENCE_NOW, SAMPLE_PRESENCE_SINCE, SAMPLE_WORK_STEPS, SAMPLE_RECEIPTS, SAMPLE_RECEIPTS_NOW } from '$lib/fixtures/chat';
 	import {
@@ -69,6 +71,8 @@
 		AgentToolPalette,
 		ApprovalCard,
 		BorderBeam,
+		LevelDial,
+		RiskToggle,
 		ChainOfThought,
 		Citations,
 		CodeBlock,
@@ -424,6 +428,19 @@
 		{ label: 'cwd', value: '/Users/gregory.winkler/agents-kit-svelte', code: true },
 		{ label: 'timeoutMs', value: '10000', code: true }
 	];
+
+	let levelDialValue = $state('careful');
+	let levelDialPending = $state<string | undefined>(undefined);
+	let riskToggleOn = $state(false);
+
+	/** Pretends to apply a level: shows the spinner for a moment, then accepts it. */
+	function applyLevel(levelId: string): void {
+		levelDialPending = levelId;
+		setTimeout(() => {
+			levelDialValue = levelId;
+			levelDialPending = undefined;
+		}, 600);
+	}
 
 	const sampleQuestions: ApprovalQuestion[] = [
 		{
@@ -1360,6 +1377,24 @@
 									title="Confirm verification scope before creating PR"
 									questions={sampleQuestions}
 								/>
+							{:else if item.slug === 'level-dial'}
+								<div class="mx-auto max-w-md">
+									<LevelDial
+										title="Autonomy"
+										levels={SAMPLE_AUTONOMY_LEVELS}
+										value={levelDialValue}
+										pending={levelDialPending}
+										onChange={applyLevel}
+									/>
+								</div>
+							{:else if item.slug === 'risk-toggle'}
+								<div class="mx-auto max-w-md">
+									<RiskToggle
+										{...SAMPLE_RISK_TOGGLE}
+										checked={riskToggleOn}
+										onChange={(next) => (riskToggleOn = next)}
+									/>
+								</div>
 							{:else if item.slug === 'prompt-input'}
 								<PromptInput agents={sampleAgents} selectedAgentId="claude-code" />
 							{:else if item.slug === 'message'}
