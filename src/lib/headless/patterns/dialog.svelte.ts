@@ -4,7 +4,7 @@
  * the CommandPalette shell.
  *
  * Parts:
- *   trigger      button that opens it: id, aria-haspopup="dialog", aria-expanded, aria-controls
+ *   trigger      button that opens it (no id: see parts.ts "Ids"): aria-haspopup="dialog", aria-expanded, aria-controls
  *   content      the <dialog> itself (typed: only spreadable on <dialog>)
  *   title        heading: id wired to aria-labelledby
  *   description  optional: wired to aria-describedby only while it is mounted
@@ -113,7 +113,6 @@ export class Dialog {
 
 	get trigger(): Part<HTMLButtonElement> {
 		return part(this.#keys.trigger, this.#attachTrigger, {
-			id: subId(this.#id, 'trigger'),
 			type: 'button',
 			'aria-haspopup': 'dialog',
 			'aria-expanded': this.open,

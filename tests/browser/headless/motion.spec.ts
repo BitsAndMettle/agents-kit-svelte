@@ -12,7 +12,7 @@ interface Timeline {
 async function recordClose(page: Page): Promise<Timeline> {
 	await page.evaluate(() => {
 		const dialog = document.querySelector<HTMLDialogElement>('[id$="-settings-content"]')!;
-		const button = document.querySelector<HTMLElement>('[id$="-settings-trigger"]')!;
+		const button = document.querySelector<HTMLElement>('[data-testid="settings-trigger"]')!;
 		const t: Partial<Timeline> = {};
 		(window as unknown as { timeline: Partial<Timeline> }).timeline = t;
 		document.addEventListener('keydown', (e) => e.key === 'Escape' && (t.escape ??= performance.now()), true);
@@ -72,4 +72,6 @@ test('re-opening during the exit animation cancels the close', async ({ page }) 
 	await page.waitForTimeout(500);
 	await expectShown(popover, true);
 	await expect(trigger(page, 'page')).toHaveAttribute('aria-expanded', 'true');
+	// The re-open moved focus back into the surface (the click had put it on the trigger).
+	await expect(popover).toBeFocused();
 });
