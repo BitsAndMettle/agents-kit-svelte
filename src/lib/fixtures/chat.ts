@@ -322,3 +322,9 @@ export const SAMPLE_WORK_STEPS: WorkStep[] = [
 	{ id: 'w5', label: 'Pushed 4a1c9e to #128', kind: 'push', status: 'done' },
 	{ id: 'w6', label: 'Fixed the checkout test', detail: 'Pushed 4a1c9e', kind: 'result', status: 'done' }
 ];
+
+/** The moment the sample presence banners are drawn at. */
+export const SAMPLE_PRESENCE_NOW = '2026-11-11T02:22:00Z';
+
+/** When the sample operator went offline: 12 minutes before `SAMPLE_PRESENCE_NOW`. */
+export const SAMPLE_PRESENCE_SINCE = '2026-11-11T02:10:00Z';

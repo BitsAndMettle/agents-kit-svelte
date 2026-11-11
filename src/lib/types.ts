@@ -611,3 +611,12 @@ export interface WorkStep {
 	/** Draws the step on a short branch off the main line, e.g. a test run inside an edit. */
 	nested?: boolean;
 }
+
+/** Whether something the person depends on is reachable, for `PresenceBanner`. */
+export type PresenceState = 'online' | 'stale' | 'offline' | 'reconnecting';
+
+/** The one action a `PresenceBanner` offers, e.g. "Move" or "Retry". */
+export interface PresenceAction {
+	label: string;
+	onAction: () => void;
+}

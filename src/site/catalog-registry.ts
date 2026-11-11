@@ -2323,6 +2323,54 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 <ModelPhaseStream title="Model throughput" {phases} {series} {events} />`
 	},
 	{
+		slug: 'metric-tiles',
+		name: 'MetricTiles',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/MetricTiles.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'A row of headline numbers, such as runs and merges per hour, time from ready to merged and busy slots. Each tile can show the change against the prior period (coloured by whether that direction is good), a small trend line, or a capacity bar. Make the tiles buttons to open the detail behind one.',
+		usageSnippet: `<script lang="ts">
+  import { MetricTiles, type Metric } from 'agents-kit-svelte';
+
+  const metrics: Metric[] = [
+    { id: 'merges', label: 'Merges per hour', value: 3.2, unit: '/h', previous: 2.1, better: 'up', series: [1.8, 2.2, 2.6, 3, 3.2] },
+    { id: 'ttm', label: 'Ready to merged', value: 2280, format: 'duration', previous: 3060, better: 'down', hint: 'Median' },
+    { id: 'slots', label: 'Busy slots', value: 4, max: 6 }
+  ];
+</script>
+
+<MetricTiles
+  title="Fleet"
+  period="last 24 hours"
+  {metrics}
+  onSelect={(metric) => console.log('open', metric.id)}
+/>`
+	},
+	{
+		slug: 'presence-banner',
+		name: 'PresenceBanner',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/PresenceBanner.svelte',
+		upstreamSource: 'Agents Kit Svelte · beUI Agents',
+		description:
+			'A slim banner that says whether something you depend on is reachable: online, not responding, offline or reconnecting, with since when, one action such as Move or Retry, and a live region so a change of state is announced. Fits full width at the top of a phone chat.',
+		usageSnippet: `<script lang="ts">
+  import { PresenceBanner } from 'agents-kit-svelte';
+
+  let now = $state(new Date().toISOString());
+</script>
+
+<PresenceBanner
+  state="offline"
+  subject="Operator on devbox"
+  since="2026-11-11T02:10:00Z"
+  {now}
+  action={{ label: 'Move', onAction: () => console.log('move the operator') }}
+  onDismiss={() => console.log('dismissed')}
+/>`
+	},
+	{
 		slug: 'feature-card',
 		name: 'FeatureCard',
 		category: 'Charts & Timelines',

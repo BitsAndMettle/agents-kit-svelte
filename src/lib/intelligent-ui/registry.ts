@@ -27,6 +27,8 @@ import GitHubPullRequestGraph from '../github/GitHubPullRequestGraph.svelte';
 import GenerativeChart from '../charts/GenerativeChart.svelte';
 import ModelPhaseStream from '../charts/ModelPhaseStream.svelte';
 import FeatureCard from '../charts/FeatureCard.svelte';
+import MetricTiles from '../charts/MetricTiles.svelte';
+import PresenceBanner from '../agents/PresenceBanner.svelte';
 import FeatureLineage from '../charts/FeatureLineage.svelte';
 import FeatureTimeline from '../charts/FeatureTimeline.svelte';
 import RunReplayScrubber from '../charts/RunReplayScrubber.svelte';
@@ -194,6 +196,26 @@ export const defaultUIRegistry: UIRegistry = {
 			...props,
 			onSelectFile: (path: string) => emit('open-file', path)
 		})
+	},
+	'metric-tiles': {
+		component: MetricTiles,
+		required: ['metrics'],
+		props: (props, emit) => ({
+			...props,
+			onSelect: (metric: { id: string }) => emit('select-metric', metric.id)
+		})
+	},
+	'presence-banner': {
+		component: PresenceBanner,
+		required: ['state', 'subject'],
+		props: (props, emit) => {
+			const action = props.action as { label?: string } | undefined;
+			return {
+				...props,
+				action: action?.label ? { label: action.label, onAction: () => emit('presence-action', action.label) } : undefined,
+				onDismiss: () => emit('dismiss')
+			};
+		}
 	},
 	'feature-card': {
 		component: FeatureCard,

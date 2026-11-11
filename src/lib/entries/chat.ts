@@ -13,6 +13,7 @@ export { default as ImageGeneration } from '../agents/ImageGeneration.svelte';
 export { default as Message } from '../agents/Message.svelte';
 export { default as MessageBubble } from '../agents/MessageBubble.svelte';
 export { default as MessageScroller } from '../agents/MessageScroller.svelte';
+export { default as PresenceBanner } from '../agents/PresenceBanner.svelte';
 export { default as PromptInput } from '../agents/PromptInput.svelte';
 export { default as ReasoningText } from '../agents/ReasoningText.svelte';
 export { default as StreamingResponse } from '../agents/StreamingResponse.svelte';
@@ -42,6 +43,7 @@ export { ChatWorkbench };
 export const TrailsideClaudeChat: typeof ChatWorkbench = ChatWorkbench;
 
 export * from '../state/chat-helpers';
+export * from '../agents/presence';
 export * from '../core/agent';
 export type * from '../types';
 

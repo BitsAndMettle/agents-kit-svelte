@@ -7,6 +7,7 @@ import type { GitHubIncidentData, GitHubIssueData, GitHubPullRequestData, GitHub
 import type {
 	ChartSpec,
 	FeatureSummary,
+	Metric,
 	LineageEdge,
 	LineageNode,
 	HandoffLane,
@@ -540,4 +541,12 @@ export const SAMPLE_RUN_MARKS: RunMark[] = [
 	{ id: 'e3', t: 232, label: 'Review escalated to claude-opus (risk T3)', kind: 'decision' },
 	{ id: 'h5', t: 250, label: 'Review approved', kind: 'handoff' },
 	{ id: 'done', t: 282, label: 'Verified: all 4 criteria met', kind: 'done' }
+];
+
+/** The fleet over the last 24 hours, for `MetricTiles`: 4 of 6 slots busy, merges up, time to merge down. */
+export const SAMPLE_FLEET_METRICS: Metric[] = [
+	{ id: 'runs', label: 'Runs per hour', value: 7.4, unit: '/h', previous: 6.9, better: 'up', series: [5, 6, 6.5, 6, 7, 7.2, 7.4] },
+	{ id: 'merges', label: 'Merges per hour', value: 3.2, unit: '/h', previous: 2.1, better: 'up', series: [1.8, 2.2, 2, 2.6, 2.9, 3, 3.2] },
+	{ id: 'ttm', label: 'Ready to merged', value: 2280, format: 'duration', previous: 3060, better: 'down', series: [3400, 3100, 3000, 2700, 2500, 2400, 2280], hint: 'Median' },
+	{ id: 'slots', label: 'Busy slots', value: 4, max: 6, hint: '2 free' }
 ];
