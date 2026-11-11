@@ -16,6 +16,18 @@ export { Dialog, type DialogOptions } from '../headless/patterns/dialog.svelte';
 export { Popover, type PopoverOptions } from '../headless/patterns/popover.svelte';
 export type { FocusTarget } from '../headless/runtime/layers.svelte';
 
+// Menus
+export {
+	Menu,
+	type MenuOptions,
+	type MenuItemOptions,
+	type MenuCheckboxOptions,
+	type MenuRadioGroupOptions,
+	type MenuRadioGroup,
+	type MenuSubmenuOptions,
+	type MenuSelectEvent
+} from '../headless/patterns/menu.svelte';
+
 // Building blocks for custom composites
 export { ListNav, type ListNavOptions, type ItemOptions } from '../headless/runtime/list-nav.svelte';
 export type {
