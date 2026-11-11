@@ -95,7 +95,7 @@ test('every single .svelte component in src/lib/ has a dedicated 1-to-1 showcase
 	const pageSource = readFileSync(join(rootDir, 'src', 'routes', '+page.svelte'), 'utf8');
 	const demosDir = join(rootDir, 'src', 'site', 'demos');
 	const demoSources = readdirSync(demosDir)
-		.filter((f) => f.startsWith('primitives-') && f.endsWith('.ts'))
+		.filter((f) => (f.startsWith('primitives-') || f.startsWith('auth-')) && f.endsWith('.ts'))
 		.map((f) => readFileSync(join(demosDir, f), 'utf8'))
 		.join('\n');
 	for (const item of CATALOG_ITEMS) {
