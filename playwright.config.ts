@@ -4,6 +4,13 @@ const updatingBaseline = Boolean(process.env.A11Y_UPDATE_BASELINE);
 // Several checkouts can test side by side on one machine by giving each its own port.
 const port = Number(process.env.PW_PORT ?? 5188);
 const origin = `http://127.0.0.1:${port}`;
+// Tests run against a production build by default: the dev server compiles on demand and,
+// with every catalogue component on one page, stalls under parallel load. PW_DEV=1 uses the
+// dev server instead, for quick local iterations.
+const useDevServer = Boolean(process.env.PW_DEV);
+const serverCommand = useDevServer
+	? `corepack pnpm exec vite dev --host 127.0.0.1 --port ${port} --strictPort`
+	: `corepack pnpm exec vite build && corepack pnpm exec vite preview --host 127.0.0.1 --port ${port} --strictPort`;
 
 export default defineConfig({
 	testDir: './tests/browser',
@@ -21,9 +28,9 @@ export default defineConfig({
 		trace: 'on-first-retry'
 	},
 	webServer: {
-		command: `corepack pnpm exec vite dev --host 127.0.0.1 --port ${port} --strictPort`,
+		command: serverCommand,
 		url: origin,
 		reuseExistingServer: !process.env.CI,
-		timeout: 120000
+		timeout: useDevServer ? 120000 : 420000
 	}
 });
