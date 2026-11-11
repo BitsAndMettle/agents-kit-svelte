@@ -1,4 +1,4 @@
-import type { Component, Snippet } from 'svelte';
+import type { Component } from 'svelte';
 import type { TimeInput } from '../../core/time';
 
 /**
@@ -35,8 +35,12 @@ export interface AuthProvider {
 	id: string;
 	/** Provider name as shown, e.g. "GitHub". The button reads "Continue with GitHub" by default. */
 	label: string;
-	/** Your logo, as a snippet or a component (e.g. an icon component). Decorative. */
-	icon?: Snippet | Component;
+	/**
+	 * Your logo as a component (an icon component, or a small Svelte file with your SVG), so a
+	 * provider list can live in plain data. Decorative. For a one-off snippet, use the button's
+	 * own `icon` snippet instead.
+	 */
+	icon?: Component;
 	/** Makes the button a link (a server-side redirect start), so it works without JavaScript. */
 	href?: string;
 	disabled?: boolean;
