@@ -161,7 +161,7 @@
 
 	/** A new submit shows the next errors in full, so the hidden prop error may come back. */
 	function onsubmit(event: SubmitEvent): void {
-		switchedAt = null;
+		if (!submit.pending) switchedAt = null;
 		submit.onsubmit(event);
 	}
 
@@ -186,7 +186,7 @@
 		{/if}
 		{#if mode === 'totp'}
 			<Field label={text.code} error={codeError} required>
-				<OtpInput bind:ref={otpRef} codeLabel={text.code} length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
+				<OtpInput bind:ref={otpRef} length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
 			</Field>
 		{:else}
 			<Field label={text.backupCode} description={text.backupHint} error={codeError} required>

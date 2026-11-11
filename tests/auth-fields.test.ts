@@ -138,3 +138,8 @@ test('evaluateRules runs each test, and a throwing test counts as unmet', () => 
 	assert.deepEqual(evaluateRules(rules, ''), [false, false, false]);
 	assert.equal(defaultRulesSummary(2, 3), '2 of 3 requirements met');
 });
+
+test('applyEdit: a whole code inserted into a full code replaces it wherever the caret is', () => {
+	assert.deepEqual(applyEdit('123456', 6, 6, '654321', 6), { value: '654321', caret: 6 });
+	assert.deepEqual(applyEdit('123456', 2, 2, '654 321', 6), { value: '654321', caret: 6 });
+});

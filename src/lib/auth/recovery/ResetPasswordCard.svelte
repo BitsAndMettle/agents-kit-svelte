@@ -184,6 +184,11 @@
 	const headingId = $props.id();
 	const messageId = `${headingId}-message`;
 
+	function focusIfLost(target: HTMLElement): void {
+		const active = document.activeElement;
+		if (!active || active === document.body) target.focus();
+	}
+
 	// The browser owns the mismatch message: while the two differ, the confirm field is invalid and the submit is blocked.
 	$effect(() => {
 		confirmInput?.setCustomValidity(mismatch ? text.passwordMismatch : '');
@@ -201,13 +206,14 @@
 			if (!expired) skipExpiredFocus = false;
 			return;
 		}
-		if (!skipExpiredFocus) void tick().then(() => target.focus());
+		// Only when focus was lost with the form: a parent that marks the link expired later must not steal focus.
+		if (!skipExpiredFocus) void tick().then(() => focusIfLost(target));
 	});
 
 	// The success state replaces the form, so focus would be lost with it: move it to what to do next.
 	$effect(() => {
 		const target = doneTarget ?? doneHeading;
-		if (target) void tick().then(() => target.focus());
+		if (target) void tick().then(() => focusIfLost(target));
 	});
 
 	const passwordLabels = $derived({
@@ -269,7 +275,7 @@
 				<PasswordInput bind:value={password} onValueChange={(value) => onPasswordChange?.(value)} name="password" autocomplete="new-password" {minlength} {rules} {strength} {...passwordLabels} />
 			</Field>
 			<Field label={text.confirmPassword} error={confirmError} required>
-				<PasswordInput bind:value={confirm} bind:ref={confirmInput} oninvalid={() => (mismatchRefused = true)} name="confirmPassword" autocomplete="new-password" {minlength} showLabel={text.showLabel} hideLabel={text.hideLabel} capsLockLabel={text.capsLockLabel} />
+				<PasswordInput bind:value={confirm} bind:ref={confirmInput} oninvalid={() => (mismatchRefused = mismatch)} name="confirmPassword" autocomplete="new-password" {minlength} showLabel={text.showLabel} hideLabel={text.hideLabel} capsLockLabel={text.capsLockLabel} />
 			</Field>
 			<Button type="submit" variant="primary" size="lg" loading={submit.pending}>{text.submit}</Button>
 		</form>

@@ -207,6 +207,13 @@ test.describe('SignInCard', () => {
 		await section.getByRole('button', { name: 'Flag the fields again' }).click();
 		await expect(card.getByText(mail)).toBeVisible();
 		await expect(card.getByText(pass)).toBeVisible();
+		// Errors that arrive in the same update as a switch are shown, not taken for the old ones.
+		await card.locator('input[name=email]').focus();
+		await page.keyboard.type('c');
+		await expect(card.getByText(mail)).toHaveCount(0);
+		await section.getByRole('button', { name: 'Switch and flag together' }).click();
+		await expect(card.locator('input[name=password]')).toHaveCount(0);
+		await expect(card.getByText(mail)).toBeVisible();
 	});
 
 	test('every word of the building blocks can be replaced through labels', async ({ page }) => {

@@ -90,5 +90,13 @@
 	<div class="flex flex-wrap items-center justify-center gap-2">
 		<Button size="sm" variant="secondary" onclick={() => (flaggedMethod = flaggedMethod === 'password' ? 'magic-link' : 'password')}>Switch flagged method</Button>
 		<Button size="sm" variant="secondary" onclick={() => (flagged = flag())}>Flag the fields again</Button>
+		<Button
+			size="sm"
+			variant="secondary"
+			onclick={() => {
+				flaggedMethod = flaggedMethod === 'password' ? 'magic-link' : 'password';
+				flagged = flag();
+			}}>Switch and flag together</Button
+		>
 	</div>
 </div>

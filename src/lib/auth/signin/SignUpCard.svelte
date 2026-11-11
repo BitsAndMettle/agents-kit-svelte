@@ -251,7 +251,7 @@
 		</Field>
 		{#if confirmPassword}
 			<Field label={text.confirmPassword} error={confirmError} required>
-				<PasswordInput name="confirmPassword" autocomplete="new-password" showLabel={text.showPassword} hideLabel={text.hidePassword} capsLockLabel={text.capsLock} bind:value={confirm} bind:ref={confirmRef} oninvalid={() => (mismatchRefused = true)} />
+				<PasswordInput name="confirmPassword" autocomplete="new-password" showLabel={text.showPassword} hideLabel={text.hidePassword} capsLockLabel={text.capsLock} bind:value={confirm} bind:ref={confirmRef} oninvalid={() => (mismatchRefused = mismatch)} />
 			</Field>
 		{/if}
 		{#if terms}

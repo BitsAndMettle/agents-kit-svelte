@@ -133,6 +133,8 @@
 
 	/** Places `text` at the current selection through `applyEdit`, the one edit rule. */
 	function insert(input: HTMLInputElement, text: string, inputType: string): void {
+		// Nothing allowed in it (a dash, a space): leave the value and the selection exactly as they were.
+		if (normalizeCode(text, length, alphanumeric) === '') return;
 		const prev = input.value;
 		const from = input.selectionStart ?? prev.length;
 		const to = input.selectionEnd ?? from;

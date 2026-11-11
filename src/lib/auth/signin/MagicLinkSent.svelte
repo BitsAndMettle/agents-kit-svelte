@@ -180,7 +180,7 @@
 			<Alert tone="danger" live description={submit.error} data-auth-error tabindex={-1} />
 		{/if}
 		<Field label={text.code} error={submit.fieldError('code')} required>
-			<OtpInput codeLabel={text.code} length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
+			<OtpInput length={codeLength} groupSize={codeLength % 3 === 0 ? 3 : codeLength % 4 === 0 ? 4 : 0} {autoSubmit} />
 		</Field>
 		<Button type="submit" variant="primary" size="lg" loading={submit.pending} class="w-full">{text.verify}</Button>
 	{/if}

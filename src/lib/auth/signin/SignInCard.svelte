@@ -166,11 +166,18 @@
 	 * prop changes or the next submit. Raw: the identity is what is compared.
 	 */
 	let switchedAt = $state.raw<{ errors: typeof errors } | null>(null);
+	// The errors seen before this update: a switch that arrives together with new errors shows them.
+	let seenErrors = untrack(() => errors);
 	$effect.pre(() => {
-		if (method === shownMethod) return;
+		const current = errors;
+		if (method === shownMethod) {
+			seenErrors = current;
+			return;
+		}
 		shownMethod = method;
 		submit.clear();
-		switchedAt = { errors: untrack(() => errors) };
+		switchedAt = current === seenErrors ? { errors: current } : null;
+		seenErrors = current;
 	});
 	const propErrorsHidden = $derived(switchedAt !== null && switchedAt.errors === errors);
 	const emailError = $derived(propErrorsHidden ? undefined : submit.fieldError('email'));
@@ -178,7 +185,7 @@
 
 	/** A new submit shows the next errors in full, so a hidden prop error may come back. */
 	function onsubmit(event: SubmitEvent): void {
-		switchedAt = null;
+		if (!submit.pending) switchedAt = null;
 		submit.onsubmit(event);
 	}
 

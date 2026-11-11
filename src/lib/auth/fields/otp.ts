@@ -29,6 +29,7 @@ export interface CodeEdit {
  *
  * - The inserted text is cleaned first (`normalizeCode`): full-width folded, separators and
  *   disallowed characters dropped.
+ * - A whole code (as long as `length` once cleaned) inserted into a full code replaces it, wherever the caret is.
  * - Overwrite mode: with a collapsed caret before the last cell of a full code, the inserted text
  *   replaces the characters after the caret ("123456", caret 2, "9" gives "129456"), so a full code
  *   can be corrected without deleting first.
@@ -54,6 +55,8 @@ export function applyEdit(prev: string, start: number, end: number, inserted: st
 		const value = prev.slice(0, max);
 		return { value, caret: Math.min(to, value.length) };
 	}
+	// A whole code pasted over a full code replaces it wherever the caret is: retrying a wrong code by pasting works.
+	if (prev.length >= max && text.length >= max) return { value: text.slice(0, max), caret: max };
 	const overwrite = from === to && prev.length >= max && from < max;
 	const value = (prev.slice(0, from) + text + prev.slice(overwrite ? from + text.length : to)).slice(0, max);
 	return { value, caret: Math.min(from + text.length, value.length) };

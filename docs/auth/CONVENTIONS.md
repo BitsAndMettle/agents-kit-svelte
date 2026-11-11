@@ -44,7 +44,7 @@ Composite components have many strings, so they take one `labels` prop. It is a 
 
 ## Waits
 
-Resend and retry waits are set by the server. Pass when they end (`resendAvailableAt`). Compute it in the browser from the server's wait in seconds (`Date.now() + retryAfter * 1000`), not from a server timestamp, so a skewed client clock cannot shorten or stretch it. `Cooldown` from `src/lib/auth/shared/cooldown.svelte.ts` counts down; the button stays focusable with `aria-disabled` (never `disabled`, which would drop keyboard focus to the page) and its text comes from `labels.resendIn(seconds)`.
+Resend and retry waits are set by the server. Pass when they end (`resendAvailableAt`). Compute it in the browser from the server's wait in seconds (`Date.now() + retryAfter * 1000`), not from a server timestamp, so a skewed client clock cannot shorten or stretch it. `Cooldown` from `src/lib/auth/shared/cooldown.svelte.ts` counts down. The button takes `Button`'s `softDisabled` (focusable, `aria-disabled`; never `disabled`, which would drop keyboard focus to the page), keeps its name (`labels.resend`) so a screen reader is not told a new name every second, and points `aria-describedby` at a separate line showing `labels.resendIn(seconds)`.
 
 ## Callback names
 
