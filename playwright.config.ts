@@ -1,6 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
 const updatingBaseline = Boolean(process.env.A11Y_UPDATE_BASELINE);
+// Several checkouts can test side by side on one machine by giving each its own port.
+const port = Number(process.env.PW_PORT ?? 5188);
+const origin = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
 	testDir: './tests/browser',
@@ -14,12 +17,12 @@ export default defineConfig({
 	timeout: 60000,
 	reporter: [['list'], ['html', { open: 'never' }]],
 	use: {
-		baseURL: 'http://127.0.0.1:5188',
+		baseURL: origin,
 		trace: 'on-first-retry'
 	},
 	webServer: {
-		command: 'corepack pnpm dev',
-		url: 'http://127.0.0.1:5188',
+		command: `corepack pnpm exec vite dev --host 127.0.0.1 --port ${port} --strictPort`,
+		url: origin,
 		reuseExistingServer: !process.env.CI,
 		timeout: 120000
 	}
