@@ -52,3 +52,14 @@ export type {
 } from '../headless/runtime/parts';
 export type { Placement, Side, Align } from '../headless/logic/placement';
 export type { Orientation } from '../headless/logic/roving';
+export { Tooltip, type TooltipOptions } from '../headless/patterns/tooltip.svelte';
+export {
+	Tabs,
+	Accordion,
+	RadioGroup,
+	ToggleGroup,
+	type TabsOptions,
+	type AccordionOptions,
+	type RadioGroupOptions,
+	type ToggleGroupOptions
+} from '../headless/patterns/groups.svelte';

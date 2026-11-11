@@ -1,16 +1,30 @@
 /**
- * Pure selection math for option lists (Select, Combobox, Listbox). Self-contained (no
- * imports). Values are option values; `order` is the navigable options in CURRENT DOM
- * order, read by the shell at event time (filtered lists change it).
- *
- * Selection is always an array here; single-select patterns hold at most one value.
- * Multi-select arrays keep the order values were selected in.
+ * Pure selection rules shared by every pattern that selects values: Select, Combobox and
+ * Listbox (option lists) and Accordion and ToggleGroup (groups). Self-contained (no imports).
+ * The selection is always an array; single-value patterns hold at most one value and convert
+ * at their boundary. Multi-select arrays keep the order values were selected in. `order` is
+ * the navigable items in CURRENT DOM order, read by the shell at event time.
  */
 
-/** Click / Enter / Space on `value`. Single: it becomes the selection. Multiple: toggles it. */
-export function toggleValue(selected: readonly string[], value: string, multiple: boolean): string[] {
-	if (!multiple) return [value];
-	return selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value];
+export interface ToggleRule {
+	/** Several values may be selected at once. */
+	readonly multiple: boolean;
+	/** Single mode: may the selected value be deselected (leaving none)? Option lists: no. */
+	readonly collapsible: boolean;
+}
+
+/** Click / Enter / Space on `value`. Returns the same array when nothing changes. */
+export function toggleValue(selected: readonly string[], value: string, rule: ToggleRule): readonly string[] {
+	const on = selected.includes(value);
+	if (rule.multiple) return on ? selected.filter((v) => v !== value) : [...selected, value];
+	if (on) return rule.collapsible ? [] : selected;
+	return [value];
+}
+
+/** Make `value` selected, never deselecting: find-in-page reveal, programmatic open. */
+export function includeValue(selected: readonly string[], value: string, multiple: boolean): readonly string[] {
+	if (selected.includes(value)) return selected;
+	return multiple ? [...selected, value] : [value];
 }
 
 /**

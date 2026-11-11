@@ -5,14 +5,14 @@ import { addValues, rangeValues, sameValues, toggleAll, toggleValue } from '../s
 const order = ['a', 'b', 'c', 'd', 'e'];
 
 test('single selection replaces, even when the value is already selected', () => {
-	assert.deepEqual(toggleValue([], 'b', false), ['b']);
-	assert.deepEqual(toggleValue(['a'], 'b', false), ['b']);
-	assert.deepEqual(toggleValue(['b'], 'b', false), ['b']);
+	assert.deepEqual(toggleValue([], 'b', { multiple: false, collapsible: false }), ['b']);
+	assert.deepEqual(toggleValue(['a'], 'b', { multiple: false, collapsible: false }), ['b']);
+	assert.deepEqual(toggleValue(['b'], 'b', { multiple: false, collapsible: false }), ['b']);
 });
 
 test('multiple selection toggles and keeps selection order', () => {
-	assert.deepEqual(toggleValue(['c'], 'a', true), ['c', 'a']);
-	assert.deepEqual(toggleValue(['c', 'a'], 'c', true), ['a']);
+	assert.deepEqual(toggleValue(['c'], 'a', { multiple: true, collapsible: false }), ['c', 'a']);
+	assert.deepEqual(toggleValue(['c', 'a'], 'c', { multiple: true, collapsible: false }), ['a']);
 });
 
 test('a range runs in DOM order whichever end comes first', () => {

@@ -518,7 +518,7 @@ class ListboxCore {
 		if (multiple && owner === 'list' && event instanceof MouseEvent && event.shiftKey) {
 			this.#setSelected(addValues(this.#selected(), rangeValues(this.#order(), this.#rangeAnchor, value)));
 		} else {
-			this.#setSelected(toggleValue(this.#selected(), value, multiple));
+			this.#setSelected([...toggleValue(this.#selected(), value, { multiple, collapsible: false })]);
 		}
 		this.#rangeAnchor = value;
 	}
@@ -657,7 +657,7 @@ class ListboxCore {
 			if (this.nav.handleKey(event)) {
 				const now = this.nav.highlighted;
 				if (now !== null && now !== highlighted) {
-					this.#setSelected(toggleValue(this.#selected(), now, true));
+					this.#setSelected([...toggleValue(this.#selected(), now, { multiple: true, collapsible: false })]);
 					this.#rangeAnchor = now;
 				}
 			}
