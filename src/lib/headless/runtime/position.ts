@@ -71,35 +71,46 @@ export function supportsNativeAnchoring(): boolean {
 // ---------------------------------------------------------------- constructed stylesheet
 
 let sheet: CSSStyleSheet | null = null;
-const rules = new Map<string, CSSStyleRule>();
+/** Declarations per element id; the sheet is re-rendered from these on every change. */
+const blocks = new Map<string, Map<string, string>>();
 const anchorNames = new Map<string, Set<string>>();
 
-function ruleFor(id: string): CSSStyleRule {
+/**
+ * Re-render the whole kit sheet with `replaceSync`. Rules are never edited in place:
+ * mutating a rule of the adopted sheet (`rule.style.setProperty`) between a forced layout
+ * and the next frame was observed in Chromium to leave a just-shown popover at its static
+ * position until something else invalidated its style. Replacing the sheet text is a
+ * whole-sheet change and is picked up. The sheet holds one small rule per open layer.
+ */
+function render(): void {
 	if (!sheet) {
 		sheet = new CSSStyleSheet();
 		document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
 	}
-	let rule = rules.get(id);
-	if (!rule) {
-		const index = sheet.insertRule(`#${CSS.escape(id)} {}`, sheet.cssRules.length);
-		rule = sheet.cssRules[index] as CSSStyleRule;
-		rules.set(id, rule);
+	let text = '';
+	for (const [id, decls] of blocks) {
+		text += `#${CSS.escape(id)} { ${[...decls].map(([p, v]) => `${p}: ${v};`).join(' ')} }
+`;
 	}
-	return rule;
+	sheet.replaceSync(text);
+}
+
+/** Merge `decls` into the rule for `id`; later writes of a property move it last. */
+function write(id: string, decls: Record<string, string>): void {
+	const block = blocks.get(id) ?? new Map<string, string>();
+	let changed = !blocks.has(id);
+	blocks.set(id, block);
+	for (const [property, value] of Object.entries(decls)) {
+		if (block.get(property) === value) continue;
+		block.delete(property);
+		block.set(property, value);
+		changed = true;
+	}
+	if (changed) render();
 }
 
 function dropRule(id: string): void {
-	const rule = rules.get(id);
-	rules.delete(id);
-	if (!rule || !sheet) return;
-	const index = Array.prototype.indexOf.call(sheet.cssRules, rule);
-	if (index >= 0) sheet.deleteRule(index);
-}
-
-function write(rule: CSSStyleRule, decls: Record<string, string>): void {
-	for (const [property, value] of Object.entries(decls)) {
-		if (rule.style.getPropertyValue(property) !== value) rule.style.setProperty(property, value);
-	}
+	if (blocks.delete(id)) render();
 }
 
 /** Several layers may anchor to one element (a menu button with a tooltip): names stack. */
@@ -107,7 +118,7 @@ function addAnchorName(anchorId: string, name: string): void {
 	const names = anchorNames.get(anchorId) ?? new Set();
 	names.add(name);
 	anchorNames.set(anchorId, names);
-	write(ruleFor(anchorId), { 'anchor-name': [...names].join(', ') });
+	write(anchorId, { 'anchor-name': [...names].join(', ') });
 }
 
 function removeAnchorName(anchorId: string, name: string): void {
@@ -118,7 +129,7 @@ function removeAnchorName(anchorId: string, name: string): void {
 		anchorNames.delete(anchorId);
 		dropRule(anchorId);
 	} else {
-		write(ruleFor(anchorId), { 'anchor-name': [...names].join(', ') });
+		write(anchorId, { 'anchor-name': [...names].join(', ') });
 	}
 }
 
@@ -165,7 +176,6 @@ export function startPositioning(floating: HTMLElement, target: PositionTarget):
 	const placement = physical(target.placement, anchorEl);
 	const requested = placement.side ?? 'bottom';
 	const native = anchorEl !== null && anchorEl.id !== '' && forced !== 'fallback' && supportsNativeAnchoring();
-	const rule = ruleFor(id);
 	floating.setAttribute('data-ak-position', native ? 'native' : 'fallback');
 
 	let raf = 0;
@@ -175,12 +185,12 @@ export function startPositioning(floating: HTMLElement, target: PositionTarget):
 	if (native) {
 		const anchorId = anchorEl.id;
 		addAnchorName(anchorId, target.anchorName);
-		write(rule, toNativeCss(target.anchorName, placement));
+		write(id, toNativeCss(target.anchorName, placement));
 		const measure = () => {
 			if (stopped || !anchorEl.isConnected) return;
 			const a = toRect(anchorEl.getBoundingClientRect());
 			const side = sideFromRects(a, toRect(floating.getBoundingClientRect()), requested);
-			write(rule, sizeVars(a, side, placement));
+			write(id, sizeVars(a, side, placement));
 			target.onSide(side);
 		};
 		const loop = () => {
@@ -194,11 +204,13 @@ export function startPositioning(floating: HTMLElement, target: PositionTarget):
 		const anchorRect = (): Rect => (anchorEl ? toRect(anchorEl.getBoundingClientRect()) : pointRect(point?.x ?? 0, point?.y ?? 0));
 		const update = () => {
 			if (stopped) return;
-			// Measure at the origin so shrink-to-fit width is not limited by the last position.
-			write(rule, { position: 'fixed', inset: 'auto', margin: '0', left: '0px', top: '0px' });
+			// One measure, then ONE write: never an intermediate write between them (see render()).
 			const a = anchorRect();
 			const pos = computePosition(a, { width: floating.offsetWidth, height: floating.offsetHeight }, viewport(), placement);
-			write(rule, {
+			write(id, {
+				position: 'fixed',
+				inset: 'auto',
+				margin: '0',
 				left: `${Math.round(pos.x)}px`,
 				top: `${Math.round(pos.y)}px`,
 				'min-width': pos.minWidth === null ? 'auto' : `${Math.round(pos.minWidth)}px`,
