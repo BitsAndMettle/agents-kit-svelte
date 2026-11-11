@@ -1,3 +1,10 @@
+import { PRIMITIVES_ACTIONS } from './catalog/primitives-actions.ts';
+import { PRIMITIVES_FORM } from './catalog/primitives-form.ts';
+import { PRIMITIVES_DISPLAY } from './catalog/primitives-display.ts';
+import { PRIMITIVES_NAVIGATION } from './catalog/primitives-navigation.ts';
+import { PRIMITIVES_OVERLAYS } from './catalog/primitives-overlays.ts';
+import { PRIMITIVES_MENUS } from './catalog/primitives-menus.ts';
+
 export type CatalogCategory =
 	| 'beUI Agents'
 	| 'Beautiful UI'
@@ -7,7 +14,8 @@ export type CatalogCategory =
 	| 'AI Elements & Coding'
 	| 'Agentic Skills'
 	| 'Charts & Timelines'
-	| 'Voice & Effects';
+	| 'Voice & Effects'
+	| 'Primitives';
 
 export interface CatalogItemMeta {
 	slug: string;
@@ -19,7 +27,7 @@ export interface CatalogItemMeta {
 	usageSnippet: string;
 }
 
-export const CATALOG_ITEMS: CatalogItemMeta[] = [
+const COLLECTION_ITEMS: CatalogItemMeta[] = [
 	// 1. beUI Agents (22 components)
 	// 1. beUI Agents (23 components)
 	{
@@ -2807,4 +2815,15 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 <Svelte5MotionLab initialTarget={80} />
 <button onclick={() => (confidence.set(60), progress.set(100))}>Animate</button>`
 	}
+];
+
+/** Every catalogue entry: the original collections, then Primitives (one file per group). */
+export const CATALOG_ITEMS: CatalogItemMeta[] = [
+	...COLLECTION_ITEMS,
+	...PRIMITIVES_ACTIONS,
+	...PRIMITIVES_FORM,
+	...PRIMITIVES_DISPLAY,
+	...PRIMITIVES_NAVIGATION,
+	...PRIMITIVES_OVERLAYS,
+	...PRIMITIVES_MENUS,
 ];

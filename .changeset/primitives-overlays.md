@@ -1,0 +1,5 @@
+---
+'agents-kit-svelte': minor
+---
+
+Primitives: overlays. `Dialog` (sizes sm, md, lg and full-on-phones; title and description wired for screen readers; header, body and footer snippets with a scrolling body; `bind:open`, `onOpenChange`, `initialFocus`, `dismiss`), `AlertDialog` (`role="alertdialog"`, focus starts on Cancel, `tone` (`UiTone`), async `onConfirm` with a loading state and inline error), `Sheet` (slides from the right, left, bottom or top, safe-area aware, drag handle on bottom sheets), `Popover` (anchored, flips, optional arrow that keeps pointing at the trigger when the card shifts, `placement` shorthand such as `"top-start"`, `matchWidth`) and `Tooltip` (delay group, closes first on Escape, string or snippet content). All are built on `agents-kit-svelte/headless`, animate with CSS only (`@starting-style`, `transition-behavior: allow-discrete`) and skip motion under reduced motion. Every overlay takes `open`/`defaultOpen`/`onOpenChange` (Tooltip follows hover and focus only) and a bindable `ref` to its surface; every visible string is a prop with an English default.

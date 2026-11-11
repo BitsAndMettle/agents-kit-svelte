@@ -40,6 +40,7 @@
 		--ak-color-fg-inverse: oklch(0.985 0.004 84);
 		--ak-color-border: oklch(0.9 0.009 78);
 		--ak-color-border-subtle: oklch(0.928 0.008 80);
+		--ak-color-scrim: oklch(0.18 0.01 60 / 0.45);
 
 		/* Accent and status */
 		--ak-color-accent: oklch(0.575 0.145 40);
@@ -111,6 +112,7 @@
 		--ak-color-fg-inverse: oklch(0.2 0.005 70);
 		--ak-color-border: oklch(0.335 0.008 70);
 		--ak-color-border-subtle: oklch(0.295 0.007 70);
+		--ak-color-scrim: oklch(0 0 0 / 0.6);
 
 		/* Accent and status */
 		--ak-color-accent: oklch(0.73 0.13 45);
@@ -182,6 +184,7 @@
 			--ak-color-fg-inverse: oklch(0.2 0.005 70);
 			--ak-color-border: oklch(0.335 0.008 70);
 			--ak-color-border-subtle: oklch(0.295 0.007 70);
+			--ak-color-scrim: oklch(0 0 0 / 0.6);
 
 			/* Accent and status */
 			--ak-color-accent: oklch(0.73 0.13 45);

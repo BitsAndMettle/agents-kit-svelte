@@ -4,33 +4,17 @@
 			"color-contrast"
 		]
 	},
-	"agent-activity": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"agent-artifact": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-checkpoint": {
 		"light": [
 			"color-contrast"
 		]
 	},
 	"agent-context-meter": {
 		"light": [
-			"color-contrast",
 			"label-content-name-mismatch"
 		],
 		"dark": [
 			"label-content-name-mismatch"
-		]
-	},
-	"agent-disclosure": {
-		"light": [
-			"color-contrast"
 		]
 	},
 	"agent-evaluator": {
@@ -52,11 +36,6 @@
 			"color-contrast"
 		]
 	},
-	"agent-handoff-gantt": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"agent-ops-monitor": {
 		"light": [
 			"color-contrast"
@@ -68,11 +47,6 @@
 		]
 	},
 	"agent-parallel-processor": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-progress": {
 		"light": [
 			"color-contrast"
 		]
@@ -92,11 +66,6 @@
 			"color-contrast"
 		]
 	},
-	"agent-thinking-indicator": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"agent-tool-palette": {
 		"light": [
 			"color-contrast"
@@ -106,11 +75,6 @@
 		]
 	},
 	"agent-work-trace": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"ai-sidebar": {
 		"light": [
 			"color-contrast"
 		]
@@ -144,17 +108,7 @@
 			"scrollable-region-focusable"
 		]
 	},
-	"citations": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"cited-answer": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"code-block": {
 		"light": [
 			"color-contrast"
 		]
@@ -226,19 +180,13 @@
 	},
 	"file-tree": {
 		"light": [
-			"aria-required-parent",
-			"color-contrast"
+			"aria-required-parent"
 		],
 		"dark": [
 			"aria-required-parent"
 		]
 	},
 	"filter-table": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"fine-tune-card": {
 		"light": [
 			"color-contrast"
 		]
@@ -251,32 +199,12 @@
 			"color-contrast"
 		]
 	},
-	"flowchart": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"generative-chart": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"github-bento-layout": {
 		"light": [
 			"color-contrast"
 		]
 	},
 	"github-branch-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-checks-panel": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-checks-waterfall": {
 		"light": [
 			"color-contrast"
 		]
@@ -323,7 +251,6 @@
 	},
 	"github-pr-action-bar": {
 		"light": [
-			"color-contrast",
 			"label-content-name-mismatch"
 		],
 		"dark": [
@@ -358,11 +285,6 @@
 			"color-contrast"
 		]
 	},
-	"image-generation": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"insight-cards": {
 		"light": [
 			"color-contrast"
@@ -374,11 +296,6 @@
 		]
 	},
 	"level-dial": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"message": {
 		"light": [
 			"color-contrast"
 		]
@@ -406,7 +323,6 @@
 	},
 	"model-phase-stream": {
 		"light": [
-			"color-contrast",
 			"target-size"
 		],
 		"dark": [
@@ -438,32 +354,12 @@
 			"label-content-name-mismatch"
 		]
 	},
-	"prompt-suggestions": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"reasoning-text": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"recommendation-card": {
 		"light": [
 			"color-contrast"
 		]
 	},
 	"records-table": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"result-actions": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"risk-toggle": {
 		"light": [
 			"color-contrast"
 		]
@@ -478,16 +374,6 @@
 		]
 	},
 	"schema-display": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"search-list": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"selection-actions": {
 		"light": [
 			"color-contrast"
 		]
@@ -540,17 +426,7 @@
 			"color-contrast"
 		]
 	},
-	"streaming-response": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"svelte5-motion-lab": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"terminal": {
 		"light": [
 			"color-contrast"
 		]
@@ -560,44 +436,17 @@
 			"color-contrast"
 		]
 	},
-	"thinking-shimmer": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"todo-list": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"token-burn-chart": {
 		"light": [
-			"color-contrast",
 			"target-size"
 		],
 		"dark": [
 			"target-size"
 		]
 	},
-	"tool-approval": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"tool-chips": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"tool-result": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"voice-wave-visualizer": {
 		"light": [
-			"aria-prohibited-attr",
-			"color-contrast"
+			"aria-prohibited-attr"
 		],
 		"dark": [
 			"aria-prohibited-attr"
