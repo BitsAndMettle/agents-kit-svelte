@@ -17,6 +17,12 @@
 		/** Shows a spinner, sets `aria-busy` and ignores activation, but stays focusable. */
 		loading?: boolean;
 		disabled?: boolean;
+		/**
+		 * Disabled for now, but keeps keyboard focus: looks disabled, ignores activation and is
+		 * announced as unavailable (`aria-disabled`). Use it for a wait the person may be
+		 * focused on, like a resend cooldown; `disabled` would drop their focus to the page.
+		 */
+		softDisabled?: boolean;
 		/** Renders an `<a>` instead of a `<button>`. */
 		href?: string;
 		target?: string;
@@ -39,6 +45,7 @@
 		pill = false,
 		loading = false,
 		disabled = false,
+		softDisabled = false,
 		href,
 		target,
 		rel,
@@ -53,11 +60,11 @@
 		...rest
 	}: Props = $props();
 
-	let attrs = $derived(actionAttrs({ disabled, loading, href }));
+	let attrs = $derived(actionAttrs({ disabled, loading, href, softDisabled }));
 
 	/** Loading blocks activation, and with it form submission (a click's default action). */
 	function guard(event: MouseEvent): void {
-		if (isBlocked({ disabled, loading })) {
+		if (isBlocked({ disabled, loading, softDisabled })) {
 			event.preventDefault();
 			event.stopImmediatePropagation();
 			return;
@@ -80,11 +87,11 @@
 {/snippet}
 
 {#if href !== undefined}
-	<a {...rest as HTMLAnchorAttributes} bind:this={ref} {...attrs} {target} {rel} {download} onclick={guard} class={cn(actionClass(variant, size, pill), disabled && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
+	<a {...rest as HTMLAnchorAttributes} bind:this={ref} {...attrs} {target} {rel} {download} onclick={guard} class={cn(actionClass(variant, size, pill), (disabled || softDisabled) && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
 		{@render content()}
 	</a>
 {:else}
-	<button {...rest} bind:this={ref} {...attrs} {type} onclick={guard} class={cn(actionClass(variant, size, pill), loading && 'cursor-progress', className)}>
+	<button {...rest} bind:this={ref} {...attrs} {type} onclick={guard} class={cn(actionClass(variant, size, pill), softDisabled && !disabled && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
 		{@render content()}
 	</button>
 {/if}
