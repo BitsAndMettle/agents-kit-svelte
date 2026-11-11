@@ -368,15 +368,80 @@ test.describe('headless menu', () => {
 		});
 	}
 
-	test('Tab closes the menu and moves on', async ({ page }) => {
-		await trigger(page, 'actions').focus();
+	test('moving the highlight off a hover-opened submenu trigger by keyboard closes the submenu', async ({ page }) => {
+		const button = trigger(page, 'actions');
+		await button.click();
+		const shareItem = item(page, 'Share');
+		await shareItem.hover();
+		await expectShown(share(page), true);
+		await expect(shareItem).toBeFocused();
+
 		await page.keyboard.press('ArrowDown');
-		await page.keyboard.press('Tab');
+		await expect(item(page, 'Rename')).toBeFocused();
+		await expectShown(share(page), false);
+		await expect(shareItem).toHaveAttribute('aria-expanded', 'false');
+
+		// Escape now closes the menu itself, not a stale submenu.
+		await page.keyboard.press('Escape');
 		await expectShown(actions(page), false);
-		await expect(page.getByRole('button', { name: 'After actions' })).toBeFocused();
-		expect(await logEntries(page)).toEqual(['actions:open:trigger', 'actions:closed:focus-out']);
+		await expect(button).toBeFocused();
+		expect(await logEntries(page)).toEqual([
+			'actions:open:trigger',
+			'share:open:hover',
+			'share:closed:focus-out',
+			'actions:closed:escape'
+		]);
 	});
 });
+
+for (const motion of ['no-preference', 'reduce'] as const) {
+	test.describe(`Tab out of a menu (motion: ${motion})`, () => {
+		test.beforeEach(async ({ page }) => {
+			await page.emulateMedia({ reducedMotion: motion });
+			await openMenuFixture(page);
+		});
+
+		/** Opens the menu from its button and moves to Copy, or into the Share submenu. */
+		async function openAt(page: Page, level: 'menu' | 'submenu'): Promise<void> {
+			await trigger(page, 'actions').focus();
+			await page.keyboard.press('ArrowDown');
+			await page.keyboard.press('ArrowDown');
+			await expect(item(page, 'Copy')).toBeFocused();
+			if (level === 'submenu') {
+				await page.keyboard.press('ArrowDown');
+				await page.keyboard.press('ArrowRight');
+				await expect(item(page, 'Email link')).toBeFocused();
+			}
+		}
+
+		for (const level of ['menu', 'submenu'] as const) {
+			test(`Tab from the ${level} closes the chain and lands on the next control`, async ({ page }) => {
+				await openAt(page, level);
+				await page.keyboard.press('Tab');
+				await expect(page.getByRole('button', { name: 'After actions' })).toBeFocused();
+				await expectShown(actions(page), false);
+				expect(await isShown(share(page))).toBe(false);
+				await page.waitForTimeout(200);
+				await expect(page.getByRole('button', { name: 'After actions' })).toBeFocused();
+				expect(await logEntries(page)).toContain('actions:closed:focus-out');
+			});
+
+			test(`Shift+Tab from the ${level} closes the chain and lands on the menu button`, async ({ page }) => {
+				await openAt(page, level);
+				await page.keyboard.press('Shift+Tab');
+				await expect(trigger(page, 'actions')).toBeFocused();
+				await expectShown(actions(page), false);
+				expect(await isShown(share(page))).toBe(false);
+				await page.waitForTimeout(200);
+				await expect(trigger(page, 'actions')).toBeFocused();
+				expect(await logEntries(page)).toContain('actions:closed:focus-out');
+				// Once more from the button reaches the control before it.
+				await page.keyboard.press('Shift+Tab');
+				await expect(page.getByRole('button', { name: 'Before actions' })).toBeFocused();
+			});
+		}
+	});
+}
 
 for (const strategy of ['native', 'fallback'] as Strategy[]) {
 	test.describe(`menu positioning (${strategy})`, () => {

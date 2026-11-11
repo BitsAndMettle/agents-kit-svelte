@@ -175,7 +175,9 @@ export class Menu {
 			disabledFocusable: () => read(options.disabledFocusable ?? false),
 			typeahead: true,
 			highlightOnHover: true,
-			onActivate: (value, event) => this.#activate(value, event)
+			onActivate: (value, event) => this.#activate(value, event),
+			// The highlight left a submenu's trigger (keys, typeahead, hover): close that submenu.
+			onHighlight: (value) => this.#closeChildrenExcept(value, 'focus-out')
 		});
 		this.#layer = new Layer({
 			id: options.id,
@@ -502,7 +504,17 @@ export class Menu {
 		// Keys from a nested submenu pass through here first; they are not ours.
 		if (!target || target.closest('[data-ak-nav-root]') !== el) return;
 		if (event.key === 'Tab') {
-			this.#root.#write(false, 'focus-out');
+			// The browser's own Tab / Shift+Tab moves focus out of the chain; close it with
+			// 'focus-out', which never moves focus (writing desired state would close as 'api'
+			// and pull focus back to the menu button first). Every level sits inside the root's
+			// content: make it inert for this task, so the move skips the parent levels' roving
+			// tab stops while they are still visible during their exit animation.
+			const rootContent = this.#root.#layer.contentEl;
+			this.#root.#layer.close('focus-out');
+			if (rootContent && !rootContent.inert) {
+				rootContent.inert = true;
+				setTimeout(() => (rootContent.inert = false));
+			}
 			return;
 		}
 		// Pointer-opened: the surface itself has focus and no item is highlighted yet. Hand
@@ -546,7 +558,14 @@ export class Menu {
 		const item = target.closest(`[data-ak-nav="${CSS.escape(this.#id)}"]`);
 		if (!item) return;
 		for (const child of this.#children.values()) {
-			if (child.open && child.#layer.triggerEl !== item) child.#write(false, 'hover');
+			if (child.#layer.triggerEl !== item) child.#layer.close('hover');
+		}
+	}
+
+	/** Close every open submenu whose trigger item is not `value`. */
+	#closeChildrenExcept(value: string | null, reason: ChangeReason): void {
+		for (const [key, child] of this.#children) {
+			if (key !== value) child.#layer.close(reason);
 		}
 	}
 

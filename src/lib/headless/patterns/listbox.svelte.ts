@@ -433,14 +433,9 @@ class ListboxCore {
 							const to = event.relatedTarget instanceof Node ? event.relatedTarget : null;
 							// No related target: the window lost focus; not a dismissal.
 							if (!to || this.#listEl?.contains(to)) return;
-							// Close after focus has landed. This close goes through desired state
-							// (stack.close, reason 'api'), which restores focus when it is on <body>,
-							// as it is during focusout; the stack's own no-pull-back focus-out path
-							// only covers focus leaving the layer's content, which never has focus here.
-							setTimeout(() => {
-								const now = document.activeElement;
-								if (now !== el && !this.#listEl?.contains(now)) this.writeOpen(false, 'focus-out');
-							});
+							// Through the layer, as 'focus-out': it reports the close and never moves
+							// focus, so Tab and Shift+Tab land where the browser sends them.
+							this.layer?.close('focus-out');
 						})
 					);
 				}

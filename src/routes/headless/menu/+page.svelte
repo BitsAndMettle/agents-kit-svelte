@@ -56,6 +56,7 @@
 
 	<section class="space-y-2">
 		<h2 class={SURFACE.title}>Menu button</h2>
+		<button type="button" class={buttonClass('ghost', 'sm')}>Before actions</button>
 		<button {...actions.trigger} data-testid="actions-trigger" class={buttonClass('secondary', 'md')}>Actions</button>
 		<div {...actions.content} class={SURFACE_CLASS}>
 			<div {...actions.item({ value: 'new', onSelect: choose('new') })} class={ITEM}>New file</div>

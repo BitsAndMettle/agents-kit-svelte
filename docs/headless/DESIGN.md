@@ -579,15 +579,15 @@ Notes for the next units:
 3. **Radio items are keyed `name:value`** in the menu's ListNav, so two groups can both have a `none` option. `highlighted` and item ids show that key.
 4. **Options added:** `MenuOptions.disabledFocusable`, `dismiss`, `label` (accessible name for a context menu); `submenu(value, { onOpenChange })`; exported `MenuSubmenuOptions` and `MenuSelectEvent`.
 5. **Menu button:** ArrowDown/ArrowUp are handled on keydown; Enter and Space go through the native click and are told apart from a pointer click by `click.detail === 0` (focus first item vs. focus the surface). APG focuses the first item on a pointer click too; the sketch's "click focuses content" was kept.
-6. **Tab (and Shift+Tab) inside any level closes the root** with `'focus-out'`, explicitly, before the browser moves focus.
+6. **Tab (and Shift+Tab) inside any level closes the root** by calling `layer.close('focus-out')` on the root's layer before the browser moves focus. That close never moves focus, so Tab lands on the control after the menu and Shift+Tab on the menu button. All levels sit inside the root content, which stays `inert` until the end of that task. Without this, during an exit animation, Shift+Tab from a submenu could land on the parent's roving tab stop (the submenu's own trigger), which is still visible. That race showed up under parallel load. The specs check this from the menu and from a submenu, with and without reduced motion. The first build wrote desired state instead. That closed as `'api'` and pulled focus back to the button, so Shift+Tab skipped past it (pattern red-team).
 7. **Context menu:** Shift+F10 / ContextMenu open at the centre of the focused element (clamped to the viewport) and focus the first item; a native `contextmenu` that follows the key is swallowed (a flag that every pointer `pointerdown` clears). The region is the layer's trigger, so the stack counts a press in it as a hit; the Menu itself closes on a primary press in the region outside the content (`'outside'`). Menu content always suppresses the native context menu.
-8. **Submenu hover:** opens after 100 ms; leaving the trigger while the submenu is open stores `graceArea()` for 300 ms. The parent content's capture-phase `pointermove` stops propagation while the pointer is inside it (siblings get no highlight or hover-open); outside it, moving onto another item closes the open submenu with `'hover'`. Default placement right/start, offset 2, or left in RTL (read from the trigger's `direction`).
+8. **Submenu hover:** opens after 100 ms; leaving the trigger while the submenu is open stores `graceArea()` for 300 ms. The parent content's capture-phase `pointermove` stops propagation while the pointer is inside it (siblings get no highlight or hover-open); outside it, moving onto another item closes the open submenu with `'hover'`. Whenever the parent's highlight leaves a submenu's trigger by keyboard or typeahead, ListNav's `onHighlight` closes that submenu with `'focus-out'`. Before this, a hover-opened submenu stayed open while the keyboard moved on, and the next Escape closed only that stale submenu (pattern red-team). Default placement right/start, offset 2, or left in RTL (read from the trigger's `direction`).
 9. **Keys on the surface itself** (pointer-opened, nothing highlighted) are passed to `ListNav.handleKey` by the Menu's capture handler, so the Menu does not depend on ListNav's root listener serving non-item targets (red-team item b).
 10. **Kept:** disabled items are skipped by default (`disabledFocusable` opts in), as in the sketch; the owner question stays open.
 
 The Menu depends on `ListNav.item` keeping its `id`. A submenu's trigger is a ListNav item with no id of its own, and the native anchor and the submenu's `aria-labelledby` use the item id (red-team item a).
 
-After merging the core fixes: the menu button keeps `id=${id}-trigger`, under the parts.ts rule for a trigger the pattern owns that is not a nav item, because the content's `aria-labelledby` points at it. The context-menu region part no longer sets an id. Key-driven highlights pass `{ focus: true, scroll: true }`. A Tab close (`'focus-out'`) no longer restores focus; the browser's own Tab move lands on the next control, as the spec expects.
+After merging the core fixes: the menu button keeps `id=${id}-trigger`, under the parts.ts rule for a trigger the pattern owns that is not a nav item, because the content's `aria-labelledby` points at it. The context-menu region part no longer sets an id. Key-driven highlights pass `{ focus: true, scroll: true }`. A Tab close (`'focus-out'`) no longer restores focus (see item 6).
 
 **Unit (listbox family: Select, Combobox, Listbox over internal ListboxCore), branch `ref/hl-listbox`.** Accepted by the Phase D implementer under the "decide, record, keep going" brief. No core file changed. The deviations are local and of different shapes, so no Phase E.
 
@@ -600,11 +600,9 @@ After merging the core fixes: the menu button keeps `id=${id}-trigger`, under th
    - Enter and Space are handled on keydown. A flag swallows the button's own keyboard click, because Space's click fires on keyup and would toggle the list back.
 4. **Combobox Escape when closed (or inline)** clears the text and, in single mode, the selection. It is consumed only when there was text, so an empty CommandPalette lets Escape close its Dialog. The sketch said it was always consumed.
 5. **Combobox `autoHighlight` follows the rendered option set.** A MutationObserver (childList) on the list moves the highlight to the first option when the set changes, rather than on each `input` event. This also covers a query the caller resets in code: a reopened palette used to keep its old highlight. ListNav's own revalidation still guarantees no stale id.
-6. **Owner blur closes after a `setTimeout`.** Closing inside `focusout` (where `activeElement` is `<body>`) with no exit animation made focus return pull focus back to the owner, which undid Tab. Core item 10 (focus-out never pulls focus back) does not cover this path:
-   - It sets `restoreFocus: false` only on the stack's own content-`focusout` path.
-   - This blur closes through desired state (`stack.close(layer, 'api')`), which still treats `<body>` as lost focus.
-   - So the deferral stays after the core merge, and the Tab specs (Select, Combobox) prove it.
-   A Layer-level "close as focus-out" entry would let it go.
+6. **Owner blur closes through `layer.close('focus-out')`** (step 6, after core 3bba96c). It used to defer the close by one task, writing the open state itself. That close ran as `'api'` while focus was on `<body>` during `focusout`, so focus return pulled focus back to the owner and undid Tab. The new core entry reports the close through `onOpenChange(false, 'focus-out')` and never moves focus, so the deferral is gone. Specs:
+   - Tab and Shift+Tab from an open Select or Combobox land on exactly the element they reach with the list closed, and stay there.
+   - A touch tap and a mouse click on an option still select. Option mousedown is prevented, so no blur races the choice.
 7. **Single Listbox: selection does not follow focus.** Arrows move the highlight, and Enter, Space or a click selects. Multiple implements APG's recommended model: Shift+Arrow, Shift+Space range, Ctrl+Shift+Home/End, Ctrl/Cmd+A toggle-all, Shift+click range. The list takes focus explicitly on mousedown, because ListNav prevents option mousedown.
 8. **Parts and attributes:**
    - The `option` part is ListNav's item part plus role, `aria-selected` and `data-selected`. Its only id is the ListNav item id (`${id}-item-<value>`).
@@ -627,7 +625,7 @@ Red-team fixes (coordinator-directed):
 
 Evidence:
 - 7 unit tests (`tests/headless-listbox.test.ts`).
-- After the red-team fixes: 21 Playwright specs in `tests/browser/headless/listbox.spec.ts`, 42/42 over 2 repeats. They include axe on the fixture with scripts blocked (SSR markup only) and with an open, empty combobox.
+- After the red-team fixes and step 6: 24 Playwright specs in `tests/browser/headless/listbox.spec.ts`, 48/48 over 2 repeats. They include axe on the fixture with scripts blocked (SSR markup only) and with an open, empty combobox.
 - `corepack pnpm check` reports 0/0, and `corepack pnpm test` 165/165.
 
 Unproven:

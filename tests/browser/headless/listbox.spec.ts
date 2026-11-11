@@ -429,6 +429,69 @@ test.describe('Listbox (multiple)', () => {
 	});
 });
 
+test.describe('Focus-out', () => {
+	test.beforeEach(async ({ page }) => open(page));
+
+	/** Describes the focused element well enough to tell two apart. */
+	const focused = (page: Page) =>
+		page.evaluate(() => {
+			const el = document.activeElement;
+			return el ? `${el.tagName}#${el.id}|${el.getAttribute('aria-label') ?? el.textContent?.trim().slice(0, 30)}` : null;
+		});
+
+	for (const key of ['Tab', 'Shift+Tab']) {
+		test(`${key} from an open list closes it and lands exactly where it would with the list closed`, async ({
+			page
+		}) => {
+			const cases = [
+				{ owner: selectTrigger(page), list: selectList(page), reopen: () => page.keyboard.press('ArrowDown'), name: 'select' },
+				{ owner: comboInput(page), list: comboList(page), reopen: () => page.keyboard.type('e'), name: 'combo' }
+			];
+			for (const { owner, list, reopen, name } of cases) {
+				await owner.focus();
+				await page.keyboard.press(key);
+				const expected = await focused(page);
+				expect(expected).not.toBeNull();
+
+				await owner.focus();
+				await reopen();
+				await expectShown(list, true);
+				await page.keyboard.press(key);
+				await expectShown(list, false);
+				expect(await focused(page)).toBe(expected);
+				await page.waitForTimeout(50); // nothing pulls it back later
+				expect(await focused(page)).toBe(expected);
+				expect((await logEntries(page)).at(-1)).toBe(`${name}:closed:focus-out`);
+			}
+		});
+	}
+});
+
+test.describe('Touch', () => {
+	test.use({ hasTouch: true });
+	test.beforeEach(async ({ page }) => open(page));
+
+	test('a tap on an option selects it in the Select and the Combobox (blur never wins the race)', async ({ page }) => {
+		const trigger = selectTrigger(page);
+		await trigger.tap();
+		await expectShown(selectList(page), true);
+		await page.getByRole('option', { name: 'Cherry' }).tap();
+		await expectShown(selectList(page), false);
+		await expect(page.getByTestId('select-value')).toHaveText('cherry');
+		await expect(trigger).toBeFocused();
+
+		const input = comboInput(page);
+		await input.tap();
+		await page.keyboard.type('b');
+		await expectShown(comboList(page), true);
+		await page.getByRole('option', { name: 'Blueberry' }).tap();
+		await expect(page.getByTestId('combo-value')).toHaveText('blueberry');
+		await expect(input).toHaveValue('Blueberry');
+		await expect(input).toBeFocused();
+		await expectShown(comboList(page), false);
+	});
+});
+
 test.describe('Names before hydration', () => {
 	test('with scripts blocked, every control has its name and axe finds nothing', async ({ page }) => {
 		await page.route('**/*', (route) =>
