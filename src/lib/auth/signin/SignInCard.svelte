@@ -160,11 +160,27 @@
 
 	// Another method is another form: errors and a submit in flight belong to the one that was left.
 	let shownMethod = untrack(() => method);
+	/**
+	 * The `errors` prop that was current at the last method switch. clear() forgets which fields the person edited,
+	 * so without this a server error they already corrected by typing would come back. It stays hidden until the
+	 * prop changes or the next submit. Raw: the identity is what is compared.
+	 */
+	let switchedAt = $state.raw<{ errors: typeof errors } | null>(null);
 	$effect.pre(() => {
 		if (method === shownMethod) return;
 		shownMethod = method;
 		submit.clear();
+		switchedAt = { errors: untrack(() => errors) };
 	});
+	const propErrorsHidden = $derived(switchedAt !== null && switchedAt.errors === errors);
+	const emailError = $derived(propErrorsHidden ? undefined : submit.fieldError('email'));
+	const passwordError = $derived(propErrorsHidden ? undefined : submit.fieldError('password'));
+
+	/** A new submit shows the next errors in full, so a hidden prop error may come back. */
+	function onsubmit(event: SubmitEvent): void {
+		switchedAt = null;
+		submit.onsubmit(event);
+	}
 
 	const showAlternatives = $derived(Boolean(providers?.length) || Boolean(onPasskey));
 </script>
@@ -191,18 +207,18 @@
 		</div>
 		<Separator label={text.or} />
 	{/if}
-	<form {...rest} bind:this={ref} {action} method="post" onsubmit={submit.onsubmit} oninput={submit.oninput} class="grid gap-4">
+	<form {...rest} bind:this={ref} {action} method="post" {onsubmit} oninput={submit.oninput} class="grid gap-4">
 		{#each Object.entries(hidden ?? {}) as [name, value] (name)}
 			<input type="hidden" {name} {value} />
 		{/each}
 		{#if submit.error}
 			<Alert tone="danger" live description={submit.error} data-auth-error tabindex={-1} />
 		{/if}
-		<Field label={text.email} error={submit.fieldError('email')} required>
+		<Field label={text.email} error={emailError} required>
 			<Input name="email" type="email" autocomplete={onPasskey ? 'username webauthn' : 'username'} defaultValue={email} />
 		</Field>
 		{#if method === 'password'}
-			<Field label={text.password} error={submit.fieldError('password')} required>
+			<Field label={text.password} error={passwordError} required>
 				<PasswordInput autocomplete="current-password" showLabel={text.showPassword} hideLabel={text.hidePassword} capsLockLabel={text.capsLock} />
 			</Field>
 			{#if showRemember || forgotHref}

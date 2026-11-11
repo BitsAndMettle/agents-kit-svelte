@@ -8,6 +8,9 @@
 	let lastProvider = $state('github');
 	let calls = $state(0);
 	let translated = $state(false);
+	let flaggedMethod = $state<'password' | 'magic-link'>('password');
+	const flag = () => ({ email: 'The server did not accept that address.', password: 'The server did not accept that password.' });
+	let flagged = $state(flag());
 
 	/** The words of the card's buttons and fields, in another language, to show that every one can be replaced. */
 	const spanish: Partial<SignInCardLabels> = {
@@ -76,4 +79,16 @@
 		forgotHref="https://example.com/forgot"
 		data-testid="signin-native"
 	/>
+	<SignInCard
+		headingLevel={3}
+		title="Server-flagged fields"
+		description="The errors come in as a prop, like a server action's."
+		method={flaggedMethod}
+		errors={flagged}
+		data-testid="signin-prop"
+	/>
+	<div class="flex flex-wrap items-center justify-center gap-2">
+		<Button size="sm" variant="secondary" onclick={() => (flaggedMethod = flaggedMethod === 'password' ? 'magic-link' : 'password')}>Switch flagged method</Button>
+		<Button size="sm" variant="secondary" onclick={() => (flagged = flag())}>Flag the fields again</Button>
+	</div>
 </div>

@@ -182,6 +182,33 @@ test.describe('SignInCard', () => {
 		await expect(form.getByText('That password is not right.')).toHaveCount(0);
 	});
 
+	test('server errors given as props stay hidden after editing and switching method, until the props change', async ({ page }) => {
+		const section = await openSection(page, 'sign-in-card');
+		const card = section.getByTestId('signin-prop');
+		const mail = 'The server did not accept that address.';
+		const pass = 'The server did not accept that password.';
+		await expect(card.getByText(mail)).toBeVisible();
+		await expect(card.getByText(pass)).toBeVisible();
+		await card.locator('input[name=email]').focus();
+		await page.keyboard.type('a');
+		await card.locator('input[name=password]').focus();
+		await page.keyboard.type('b');
+		await expect(card.getByText(mail)).toHaveCount(0);
+		await expect(card.getByText(pass)).toHaveCount(0);
+		const toggle = section.getByRole('button', { name: 'Switch flagged method' });
+		await toggle.click();
+		await expect(card.locator('input[name=password]')).toHaveCount(0);
+		await expect(card.getByText(mail)).toHaveCount(0);
+		await toggle.click();
+		await expect(card.locator('input[name=password]')).toHaveCount(1);
+		await expect(card.getByText(mail)).toHaveCount(0);
+		await expect(card.getByText(pass)).toHaveCount(0);
+		// A new response from the server is news again.
+		await section.getByRole('button', { name: 'Flag the fields again' }).click();
+		await expect(card.getByText(mail)).toBeVisible();
+		await expect(card.getByText(pass)).toBeVisible();
+	});
+
 	test('every word of the building blocks can be replaced through labels', async ({ page }) => {
 		const section = await openSection(page, 'sign-in-card');
 		await section.getByRole('button', { name: 'Other language' }).click();
