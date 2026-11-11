@@ -1,0 +1,611 @@
+{
+	"action-receipt": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-activity": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-artifact": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-checkpoint": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-context-meter": {
+		"light": [
+			"color-contrast",
+			"label-content-name-mismatch"
+		],
+		"dark": [
+			"label-content-name-mismatch"
+		]
+	},
+	"agent-disclosure": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-evaluator": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-form-generator": {
+		"light": [
+			"color-contrast",
+			"scrollable-region-focusable"
+		],
+		"dark": [
+			"scrollable-region-focusable"
+		]
+	},
+	"agent-generative-surface": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-handoff-gantt": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-ops-monitor": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-orchestrator": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-parallel-processor": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-progress": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-routing-hub": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-sequential-workflow": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-task-queue": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-thinking-indicator": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"agent-tool-palette": {
+		"light": [
+			"color-contrast"
+		],
+		"dark": [
+			"color-contrast"
+		]
+	},
+	"agent-work-trace": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"ai-sidebar": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"approval-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"blocked-work-list": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"chain-of-thought": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"chat-workbench": {
+		"light": [
+			"aria-required-parent",
+			"color-contrast",
+			"label-content-name-mismatch",
+			"scrollable-region-focusable"
+		],
+		"dark": [
+			"aria-required-parent",
+			"color-contrast",
+			"label-content-name-mismatch",
+			"scrollable-region-focusable"
+		]
+	},
+	"citations": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"cited-answer": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"code-block": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"context-cards": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"device-approval": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"diff-table": {
+		"light": [
+			"color-contrast"
+		],
+		"dark": [
+			"color-contrast"
+		]
+	},
+	"environment-variables": {
+		"light": [
+			"color-contrast",
+			"label-content-name-mismatch"
+		],
+		"dark": [
+			"label-content-name-mismatch"
+		]
+	},
+	"feature-card": {
+		"light": [
+			"color-contrast",
+			"definition-list"
+		],
+		"dark": [
+			"definition-list"
+		]
+	},
+	"feature-lineage": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"feature-proposal": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"feature-timeline": {
+		"light": [
+			"color-contrast",
+			"label-content-name-mismatch",
+			"target-size"
+		],
+		"dark": [
+			"label-content-name-mismatch",
+			"target-size"
+		]
+	},
+	"file-diff": {
+		"light": [
+			"color-contrast"
+		],
+		"dark": [
+			"color-contrast"
+		]
+	},
+	"file-tree": {
+		"light": [
+			"aria-required-parent",
+			"color-contrast"
+		],
+		"dark": [
+			"aria-required-parent"
+		]
+	},
+	"filter-table": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"fine-tune-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"fleet-status": {
+		"light": [
+			"color-contrast"
+		],
+		"dark": [
+			"color-contrast"
+		]
+	},
+	"flowchart": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"generative-chart": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-bento-layout": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-branch-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-checks-panel": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-checks-waterfall": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-commit-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-deployment-pipeline": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-incident-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-issue-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-issue-triage": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-kanban-board": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-lifecycle-timeline": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-merge-queue": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-pr-action-bar": {
+		"light": [
+			"color-contrast",
+			"label-content-name-mismatch"
+		],
+		"dark": [
+			"label-content-name-mismatch"
+		]
+	},
+	"github-pr-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-pr-graph": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-pr-review": {
+		"light": [
+			"color-contrast"
+		],
+		"dark": [
+			"color-contrast"
+		]
+	},
+	"github-release-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"github-review-thread": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"image-generation": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"insight-cards": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"intelligent-ui-renderer": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"level-dial": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"message": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"message-bubble": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"message-scroller": {
+		"light": [
+			"color-contrast",
+			"scrollable-region-focusable",
+			"target-size"
+		],
+		"dark": [
+			"scrollable-region-focusable",
+			"target-size"
+		]
+	},
+	"metric-tiles": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"model-phase-stream": {
+		"light": [
+			"color-contrast",
+			"target-size"
+		],
+		"dark": [
+			"target-size"
+		]
+	},
+	"package-info": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"plan-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"presence-banner": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"prompt-input": {
+		"light": [
+			"color-contrast",
+			"label-content-name-mismatch"
+		],
+		"dark": [
+			"color-contrast",
+			"label-content-name-mismatch"
+		]
+	},
+	"prompt-suggestions": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"reasoning-text": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"recommendation-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"records-table": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"result-actions": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"risk-toggle": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"run-replay-scrubber": {
+		"light": [
+			"color-contrast",
+			"nested-interactive"
+		],
+		"dark": [
+			"nested-interactive"
+		]
+	},
+	"schema-display": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"search-list": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"selection-actions": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"skill-card": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"skill-editor": {
+		"light": [
+			"color-contrast",
+			"scrollable-region-focusable"
+		],
+		"dark": [
+			"color-contrast",
+			"scrollable-region-focusable"
+		]
+	},
+	"skill-invocation": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"skill-library": {
+		"light": [
+			"color-contrast"
+		],
+		"dark": [
+			"color-contrast"
+		]
+	},
+	"skill-proposal-card": {
+		"light": [
+			"color-contrast",
+			"scrollable-region-focusable"
+		],
+		"dark": [
+			"color-contrast",
+			"scrollable-region-focusable"
+		]
+	},
+	"skill-router": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"stack-trace": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"streaming-response": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"svelte5-motion-lab": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"terminal": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"test-results": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"thinking-shimmer": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"todo-list": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"token-burn-chart": {
+		"light": [
+			"color-contrast",
+			"target-size"
+		],
+		"dark": [
+			"target-size"
+		]
+	},
+	"tool-approval": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"tool-chips": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"tool-result": {
+		"light": [
+			"color-contrast"
+		]
+	},
+	"voice-wave-visualizer": {
+		"light": [
+			"aria-prohibited-attr",
+			"color-contrast"
+		],
+		"dark": [
+			"aria-prohibited-attr"
+		]
+	},
+	"web-preview": {
+		"light": [
+			"color-contrast"
+		]
+	}
+}
