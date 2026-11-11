@@ -1,83 +1,75 @@
 <script lang="ts" generics="Multiple extends boolean = false">
 	import { untrack } from 'svelte';
-	import type { HTMLAttributes } from 'svelte/elements';
+	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { Check, ChevronDown } from '@lucide/svelte';
 	import { Select } from '../../headless/patterns/listbox.svelte';
-	import type { Placement } from '../../headless/logic/placement';
-	import type { ChangeReason } from '../../headless/runtime/parts';
 	import { cn } from '../../ui/cn';
 	import { badgeClass, INPUT_CLASS } from '../../ui/styles';
-	import { GROUP_LABEL, PICKER_LABEL, PICKER_LIST, PICKER_OPTION } from './classes';
+	import { fieldControlAttrs, getFieldContext } from '../form/field';
+	import { toPlacement } from '../placement';
+	import { GROUP_LABEL, PICKER_INVALID, PICKER_LABEL, PICKER_LIST, PICKER_OPTION, PICKER_SIZES } from './classes';
 	import { groupBy } from './helpers';
-	import type { PickerOption, PickerValue } from './types';
+	import type { PickerOption, PickerValue, SelectProps } from './types';
 
-	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
-		/** Visible label; names the control. */
-		label: string;
-		options: PickerOption[];
-		/** Several values, toggled one by one; the list stays open while choosing. */
-		multiple?: Multiple;
-		/** Bindable. A value, or a list of values with `multiple`. */
-		value?: PickerValue<Multiple>;
-		onValueChange?: (value: PickerValue<Multiple>) => void;
-		/** Bindable. */
-		open?: boolean;
-		onOpenChange?: (open: boolean, reason: ChangeReason) => void;
-		/** Shown while nothing is chosen. */
-		placeholder?: string;
-		/** With `multiple`: chips for each choice, or "3 selected". Default `chips`. */
-		display?: 'chips' | 'count';
-		/** Form field name: one hidden input per chosen value; form reset restores the first value. */
-		name?: string;
-		/** Blocks form submission while nothing is chosen. */
-		required?: boolean;
-		disabled?: boolean;
-		/** Keep the label for screen readers only. */
-		hideLabel?: boolean;
-		/** Merged over `{ side: 'bottom', align: 'start', matchWidth: true }`. */
-		placement?: Placement;
-		class?: string;
-	}
+	interface Props extends Omit<HTMLButtonAttributes, keyof SelectProps<Multiple>>, SelectProps<Multiple> {}
 
 	let {
 		label,
 		options,
 		multiple,
 		value = $bindable(),
+		defaultValue,
 		onValueChange,
-		open = $bindable(false),
+		open = $bindable(),
+		defaultOpen = false,
 		onOpenChange,
 		placeholder = 'Choose…',
 		display = 'chips',
+		formatCount = (count: number) => `${count} selected`,
 		name,
 		required = false,
 		disabled = false,
+		invalid = false,
+		size = 'md',
 		hideLabel = false,
 		placement,
+		ref = $bindable(null),
+		id,
+		'aria-describedby': describedBy,
+		'aria-labelledby': labelledByProp,
 		class: className = '',
 		...rest
 	}: Props = $props();
 
 	type AnyValue = string[] | string | null;
 	const many = (): boolean => multiple === true;
+	// `defaultValue` seeds an unbound value; the headless pattern restores this start on form reset.
+	if (untrack(() => value) === undefined) value = untrack(() => defaultValue ?? ((many() ? [] : null) as PickerValue<Multiple>));
+	if (untrack(() => open) === undefined) open = untrack(() => defaultOpen);
 	const current = (): AnyValue => value ?? (many() ? [] : null);
 
-	const id = $props.id();
+	const field = getFieldContext();
+	const inField = field !== undefined && !field.group;
+	// Inside a Field its label names the trigger; otherwise our own label, or the caller's aria-label(ledby).
+	const labelledBy = untrack(() => (inField ? field.labelId : label !== undefined ? undefined : (labelledByProp ?? false)));
+
+	const uid = $props.id();
 	const select = new Select<boolean>({
-		id,
+		id: uid,
 		multiple: untrack(() => many()),
 		name: untrack(() => name),
+		labelledBy,
 		value: current,
 		onValueChange: (next) => {
 			value = next as PickerValue<Multiple>;
 			onValueChange?.(next as PickerValue<Multiple>);
 		},
-		open: () => open,
+		open: () => open ?? false,
 		onOpenChange: (next, reason) => {
 			open = next;
 			onOpenChange?.(next, reason);
 		},
-		placement: () => placement ?? {}
+		placement: () => toPlacement(placement, { side: 'bottom', align: 'start', offset: 4 })
 	});
 
 	const chosen = $derived.by(() => {
@@ -86,17 +78,40 @@
 		return values.map((x) => options.find((o) => o.value === x) ?? { value: x, label: x });
 	});
 	const sections = $derived(groupBy(options));
+
+	/** Set when a submit was blocked for want of a value; choosing one clears the invalid look. */
+	let blocked = $state(false);
+	const control = $derived(
+		fieldControlAttrs(field, {
+			id,
+			describedBy,
+			invalid: invalid || (blocked && chosen.length === 0),
+			required,
+			disabled
+		})
+	);
+	// A button cannot be `required`; the validation proxy below enforces it.
+	const triggerAttrs = $derived.by(() => {
+		const { required: needed, ...attrs } = control;
+		return { ...attrs, 'aria-required': needed ? ('true' as const) : undefined };
+	});
+	const listName = $derived(labelledBy === false ? rest['aria-label'] : undefined);
 </script>
 
-<div {...rest} class={cn('grid min-w-0 gap-1.5', className)}>
-	<span {...select.label} class={cn(PICKER_LABEL, hideLabel && 'sr-only')}>{label}</span>
+<div class={cn('grid min-w-0 gap-1.5', className)}>
+	{#if label !== undefined && !inField}
+		<span {...select.label} class={cn(PICKER_LABEL, hideLabel && 'sr-only')}>{label}</span>
+	{/if}
 	<div class="relative min-w-0">
-		<button
+		<button {...rest}
 			{...select.trigger}
-			{disabled}
+			{...triggerAttrs}
+			bind:this={ref}
 			class={cn(
 				INPUT_CLASS,
-				'flex h-auto min-h-8 items-center gap-2 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-accent-primary/50'
+				PICKER_SIZES[size],
+				PICKER_INVALID,
+				'flex h-auto items-center gap-2 py-1 text-left disabled:cursor-not-allowed disabled:opacity-50 data-[state=open]:border-accent-primary/50'
 			)}
 		>
 			<span class="flex min-w-0 flex-1 flex-wrap items-center gap-1">
@@ -105,7 +120,7 @@
 				{:else if !many()}
 					<span class="truncate">{chosen[0].label}</span>
 				{:else if display === 'count'}
-					<span class="truncate">{chosen.length === 1 ? chosen[0].label : `${chosen.length} selected`}</span>
+					<span class="truncate">{chosen.length === 1 ? chosen[0].label : formatCount(chosen.length)}</span>
 				{:else}
 					{#each chosen as option (option.value)}
 						<span class={badgeClass('neutral', 'max-w-full truncate')}>{option.label}</span>
@@ -114,19 +129,21 @@
 			</span>
 			<ChevronDown aria-hidden="true" class="size-4 shrink-0 text-fg-light" />
 		</button>
-		{#if required}
-			<!-- Validation only: posts nothing; sits under the trigger so the browser's message points at it. -->
+		{#if control.required}
+			<!-- Validation only: posts nothing. An invalid submit focuses it; it hands focus to the trigger. -->
 			<input
 				tabindex="-1"
 				aria-hidden="true"
 				required
-				{disabled}
+				disabled={control.disabled}
 				value={chosen.length > 0 ? 'chosen' : ''}
+				oninvalid={() => (blocked = true)}
+				onfocus={() => ref?.focus()}
 				class="pointer-events-none absolute inset-x-0 bottom-0 h-px w-full opacity-0"
 			/>
 		{/if}
 	</div>
-	<div {...select.list} class={PICKER_LIST}>
+	<div {...select.list} aria-label={listName} class={PICKER_LIST}>
 		{#each sections as section (section.name)}
 			{#if section.name === null}
 				{#each section.items as option (option.value)}{@render row(option)}{/each}
@@ -139,7 +156,7 @@
 			{/if}
 		{/each}
 	</div>
-	{#if !disabled}
+	{#if !control.disabled}
 		{#each select.formInputs as input (input.value)}<input {...input} />{/each}
 	{/if}
 </div>

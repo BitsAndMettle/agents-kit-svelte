@@ -211,22 +211,45 @@ test.describe('Select', () => {
 		await expect(section.getByRole('combobox', { name: 'Reviewers' })).toHaveText('2 selected');
 	});
 
-	test('in a form: required blocks submit, the value posts, reset restores the start', async ({ page }) => {
+	test('in a Field: one label names the trigger; required blocks submit, focuses the trigger and links the error', async ({ page }) => {
 		const section = await openSection(page, 'select');
 		const priority = section.getByRole('combobox', { name: 'Priority' });
 		const submit = section.getByRole('button', { name: 'Submit' });
 		const out = section.getByTestId('select-submitted');
+		// The Field's <label for> points at the trigger, and it is the only label.
+		const triggerId = await priority.getAttribute('id');
+		await expect(section.locator(`label[for="${triggerId}"]`)).toHaveText(/Priority/);
+		await expect(section.locator('form label', { hasText: 'Priority' })).toHaveCount(1);
+		await expect(section.locator('form span', { hasText: /^Priority$/ })).toHaveCount(0);
+		await expect(priority).toHaveAttribute('aria-required', 'true');
+
 		await submit.click();
 		await expect(out).toHaveText('not sent');
-		await priority.click();
+		await expect(priority).toBeFocused();
+		await expect(priority).toHaveAttribute('aria-invalid', 'true');
+		const errorId = await priority.getAttribute('aria-errormessage');
+		await expect(page.locator(`[id="${errorId}"]`)).toHaveText('Pick a priority before sending.');
+		await expect(priority).toHaveAttribute('aria-describedby', new RegExp(errorId!));
+
+		await press(page, 'Enter');
 		await section.getByRole('option', { name: 'P2 · soon' }).click();
 		await expect(priority).toHaveText(/P2 · soon/);
+		await expect(priority).not.toHaveAttribute('aria-invalid');
 		await submit.click();
 		await expect(out).toHaveText('priority=p2');
 		await section.getByRole('button', { name: 'Reset' }).click();
 		await expect(priority).toHaveText(/Pick a priority/);
 		await submit.click();
 		await expect(out).toHaveText('not sent');
+	});
+
+	test('extra attributes reach the trigger: aria-label names it and its list', async ({ page }) => {
+		const section = await openSection(page, 'select');
+		const sort = section.getByRole('combobox', { name: 'Sort order' });
+		await expect(sort).toHaveText(/Newest first/);
+		await sort.click();
+		await expect(section.getByRole('listbox', { name: 'Sort order' })).toBeVisible();
+		await press(page, 'Escape');
 	});
 });
 
@@ -287,7 +310,7 @@ test.describe('Combobox', () => {
 		await page.keyboard.type(' typo');
 		await press(page, 'Tab');
 		await expect(input).toHaveValue('Ana Silva');
-		await section.getByRole('button', { name: 'Clear Assignee' }).click();
+		await input.locator('xpath=..').getByRole('button', { name: 'Clear', exact: true }).click();
 		await expect(input).toHaveValue('');
 		await expect(input).toBeFocused();
 		await expect(section.locator('p', { hasText: 'Assignee none' })).toBeVisible();
@@ -320,10 +343,11 @@ test.describe('Combobox', () => {
 		await expect.poll(() => optionNames(list)).toEqual(['worker']);
 	});
 
-	test('in a form: the value posts and reset restores it', async ({ page }) => {
+	test('in a Field: the value posts and reset restores it', async ({ page }) => {
 		const section = await openSection(page, 'combobox');
 		const input = section.getByRole('combobox', { name: 'Reviewer' });
 		const out = section.getByTestId('combobox-submitted');
+		await expect(section.locator(`label[for="${await input.getAttribute('id')}"]`)).toHaveText(/Reviewer/);
 		await expect(input).toHaveValue('Ben Okafor');
 		await section.getByRole('button', { name: 'Submit' }).click();
 		await expect(out).toHaveText('reviewer=ben');
@@ -336,6 +360,28 @@ test.describe('Combobox', () => {
 		await expect(input).toHaveValue('Ben Okafor');
 		await section.getByRole('button', { name: 'Submit' }).click();
 		await expect(out).toHaveText('reviewer=ben');
+	});
+
+	test('required needs a chosen value: text that matches nothing does not submit', async ({ page }) => {
+		const section = await openSection(page, 'combobox');
+		const input = section.getByRole('combobox', { name: 'Reviewer' });
+		const out = section.getByTestId('combobox-submitted');
+		await input.focus();
+		await press(page, 'Escape');
+		await expect(input).toHaveValue('');
+		await page.keyboard.type('zzz');
+		await press(page, 'Enter');
+		await expect(out).toHaveText('not sent');
+		await section.getByRole('button', { name: 'Submit' }).click();
+		await expect(out).toHaveText('not sent');
+		await expect(input).toBeFocused();
+		await expect(input).toHaveAttribute('aria-invalid', 'true');
+		expect(await input.evaluate((el: HTMLInputElement) => el.validity.customError)).toBe(true);
+		await input.fill('ana');
+		await press(page, 'Enter');
+		await expect(input).not.toHaveAttribute('aria-invalid');
+		await section.getByRole('button', { name: 'Submit' }).click();
+		await expect(out).toHaveText('reviewer=ana');
 	});
 });
 

@@ -61,10 +61,10 @@
 
 <div class="mx-auto flex max-w-xl flex-col gap-4">
 	<div class="flex flex-wrap items-center gap-3">
-		<DropdownMenu label="File" {items} bind:open />
+		<DropdownMenu triggerLabel="File" {items} bind:open />
 		<div class="flex items-center gap-2 rounded-control border border-card-border px-3 py-1.5 text-[13px] text-fg-main">
 			<span class="flex-1">release-notes.md</span>
-			<DropdownMenu items={rowActions} placement={{ side: 'bottom', align: 'end' }} class="min-w-40">
+			<DropdownMenu items={rowActions} placement="bottom-end" menuClass="min-w-40">
 				{#snippet trigger(part)}
 					<button {...part} aria-label="More actions for release-notes.md" class={buttonClass('ghost', 'icon-sm')}>
 						<Ellipsis aria-hidden="true" />

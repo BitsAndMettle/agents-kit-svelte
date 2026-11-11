@@ -28,7 +28,7 @@
 <div class="mx-auto flex max-w-xl flex-col gap-3">
 	<ContextMenu
 		{items}
-		label="File actions"
+		menuLabel="File actions"
 		class="rounded-card border border-dashed border-card-border bg-canvas-primary p-3"
 		data-testid="context-region"
 	>

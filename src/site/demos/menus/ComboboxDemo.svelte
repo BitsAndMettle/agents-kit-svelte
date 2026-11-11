@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Field } from '$lib/primitives/form';
 	import { Combobox, type PickerOption } from '$lib/primitives/menus';
 	import { buttonClass } from '$lib/ui/styles';
 
@@ -57,7 +58,9 @@
 		}}
 		onreset={() => (submitted = '')}
 	>
-		<Combobox label="Reviewer" name="reviewer" options={people} value="ben" required />
+		<Field label="Reviewer" required>
+			<Combobox name="reviewer" options={people} defaultValue="ben" />
+		</Field>
 		<div class="flex gap-2">
 			<button type="submit" class={buttonClass('secondary', 'sm')}>Submit</button>
 			<button type="reset" class={buttonClass('ghost', 'sm')}>Reset</button>

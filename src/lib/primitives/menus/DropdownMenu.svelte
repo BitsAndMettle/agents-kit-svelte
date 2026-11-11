@@ -1,8 +1,9 @@
 <script lang="ts" module>
+	import { untrack } from 'svelte';
 	import { Check, ChevronRight, Circle } from '@lucide/svelte';
 	import type { Menu as MenuPattern } from '../../headless/patterns/menu.svelte';
 	import { cn } from '../../ui/cn';
-	import { GROUP_LABEL, MENU_ITEM, MENU_ITEM_DANGER, MENU_SHORTCUT, MENU_SURFACE, SEPARATOR } from './classes';
+	import { GROUP_LABEL, MENU_ITEM, MENU_ITEM_TONES, MENU_SHORTCUT, MENU_SURFACE, SEPARATOR } from './classes';
 	import type { MenuEntry } from './types';
 
 	/** Keys an entry within its level: values, radio names and group names are unique per level. */
@@ -24,54 +25,78 @@
 
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import type { HTMLAttributes } from 'svelte/elements';
+	import { createAttachmentKey, type Attachment } from 'svelte/attachments';
+	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { ChevronDown } from '@lucide/svelte';
 	import { Menu } from '../../headless/patterns/menu.svelte';
-	import type { Placement } from '../../headless/logic/placement';
 	import type { ChangeReason, Part } from '../../headless/runtime/parts';
 	import { pillClass } from '../../ui/styles';
+	import { toPlacement, type OverlayPlacement } from '../placement';
 
-	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
+	export interface Props extends Omit<HTMLButtonAttributes, 'class' | 'children'> {
 		/** The rows, as data. Submenus and groups nest. */
 		items: MenuEntry[];
 		/** Text of the default trigger button. Ignored when `trigger` is given. */
-		label?: string;
-		/** Renders your own opener: spread the part on a `<button>`. */
+		triggerLabel?: string;
+		/**
+		 * Renders your own opener: spread the part on a `<button>`. The part already carries
+		 * your extra attributes and `ref`.
+		 */
 		trigger?: Snippet<[Part]>;
 		/** Bindable. */
 		open?: boolean;
+		defaultOpen?: boolean;
 		onOpenChange?: (open: boolean, reason: ChangeReason) => void;
-		/** Default `{ side: 'bottom', align: 'start' }`. */
-		placement?: Placement;
+		/** `'bottom-start'` (default), `'bottom-end'`, … or a full placement. */
+		placement?: OverlayPlacement;
 		/** Arrow keys wrap at the ends. Default true. */
 		loop?: boolean;
-		/** Class for the menu surface (extra attributes land there too). */
+		/** The trigger element. Bindable. */
+		ref?: HTMLElement | null;
+		/** Classes for the menu surface. */
+		menuClass?: string;
+		/** Classes for the default trigger button. */
 		class?: string;
 	}
 
 	let {
 		items,
-		label = 'Options',
+		triggerLabel = 'Options',
 		trigger,
-		open = $bindable(false),
+		open = $bindable(),
+		defaultOpen = false,
 		onOpenChange,
-		placement = { side: 'bottom', align: 'start' },
+		placement,
 		loop = true,
+		ref = $bindable(null),
+		menuClass = '',
 		class: className = '',
 		...rest
 	}: Props = $props();
 
+	if (untrack(() => open) === undefined) open = untrack(() => defaultOpen);
+
 	const id = $props.id();
 	const menu = new Menu({
 		id,
-		open: () => open,
+		open: () => open ?? false,
 		onOpenChange: (next, reason) => {
 			open = next;
 			onOpenChange?.(next, reason);
 		},
-		placement: () => placement,
+		placement: () => toPlacement(placement, { side: 'bottom', align: 'start', offset: 4 }),
 		loop: () => loop
 	});
+
+	const captureRef: Attachment<HTMLElement> = (el) => {
+		ref = el;
+		return () => {
+			if (ref === el) ref = null;
+		};
+	};
+	const refKey = createAttachmentKey();
+	/** Your attributes, then the menu's, then the ref: what a custom trigger spreads. */
+	const triggerPart = $derived({ ...rest, ...menu.trigger, [refKey]: captureRef } as Part);
 </script>
 
 {#snippet menuEntries(m: MenuPattern, entries: MenuEntry[])}
@@ -135,9 +160,9 @@
 					closeOnSelect: entry.closeOnSelect,
 					onSelect: entry.onSelect
 				})}
-				class={cn(MENU_ITEM, entry.tone === 'danger' && MENU_ITEM_DANGER)}
+				class={cn(MENU_ITEM, MENU_ITEM_TONES[entry.tone ?? 'neutral'])}
 			>
-				{#if entry.icon}<entry.icon class={entry.tone === 'danger' ? '' : 'text-fg-light'} />{/if}
+				{#if entry.icon}<entry.icon class={(entry.tone ?? 'neutral') === 'neutral' ? 'text-fg-light' : ''} />{/if}
 				<span class="min-w-0 flex-1 truncate">{entry.label}</span>
 				{#if entry.shortcut}<kbd class={MENU_SHORTCUT}>{entry.shortcut}</kbd>{/if}
 			</div>
@@ -146,14 +171,14 @@
 {/snippet}
 
 {#if trigger}
-	{@render trigger(menu.trigger)}
+	{@render trigger(triggerPart)}
 {:else}
-	<button {...menu.trigger} class={pillClass('secondary', 'md')}>
-		{label}
+	<button {...rest} {...menu.trigger} {@attach captureRef} class={cn(pillClass('secondary', 'md'), className)}>
+		{triggerLabel}
 		<ChevronDown aria-hidden="true" class="text-fg-light" />
 	</button>
 {/if}
 
-<div {...rest} {...menu.content} class={cn(MENU_SURFACE, className)}>
+<div {...menu.content} class={cn(MENU_SURFACE, menuClass)}>
 	{@render menuEntries(menu, items)}
 </div>
