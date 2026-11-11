@@ -2,6 +2,14 @@
 	/** The three steps of the setup: scan, verify, save backup codes. */
 	export type TwoFactorStep = 1 | 2 | 3;
 
+	/** What `onVerify` receives. */
+	export interface TwoFactorSetupValues {
+		code: string;
+	}
+
+	/** Field names an error can be keyed by. */
+	export type TwoFactorSetupField = 'code';
+
 	/** Every word the two-factor setup shows or announces. */
 	export interface TwoFactorSetupLabels {
 		title: string;
@@ -38,7 +46,7 @@
 </script>
 
 <script lang="ts">
-	import { tick, type Snippet } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import type { HTMLFormAttributes } from 'svelte/elements';
 	import { Copy } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
@@ -47,9 +55,9 @@
 	import { Button } from '../../primitives/actions';
 	import { Field } from '../../primitives/form';
 	import { AuthCard, OtpInput } from '../fields';
-	import { BackupCodes, type BackupCodesProps } from '../account';
+	import { BackupCodes, type BackupCodesLabels, type BackupCodesProps } from '../account';
 	import { AuthSubmit, readText, type AuthSubmitHandler } from '../shared';
-		import { groupSecret, plainSecret } from './secret';
+	import { groupSecret, plainSecret } from './secret';
 	import { copyText } from './clipboard';
 
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'title' | 'hidden' | 'onsubmit' | 'oninput' | 'method'> {
@@ -68,7 +76,7 @@
 		/** The account the code is for, shown with the key, e.g. an email. */
 		account?: string;
 		/** Called with the six-digit code. Without it the form posts natively to `action`. Return an `AuthResult` (`errors.code`) to show errors. */
-		onVerify?: AuthSubmitHandler<{ code: string }, 'code'>;
+		onVerify?: AuthSubmitHandler<TwoFactorSetupValues, TwoFactorSetupField>;
 		/** Where a native post goes. */
 		action?: string;
 		/** Controlled pending state (wins over the handler's own). */
@@ -79,10 +87,19 @@
 		errors?: { code?: string };
 		/** Extra values for the post, rendered as hidden inputs. */
 		hidden?: Record<string, string>;
-		/** Backup codes your server made. With them, a successful verify goes on to a save step; without, it finishes. Bindable. */
+		/** Backup codes your server made. A successful verify goes on to the save step when `withBackupCodes` is on (see it); otherwise it finishes. Bindable. */
 		backupCodes?: string[];
-		/** Extra props for the backup codes box (`filename`, `heading`, `onRegenerate`, ...). */
-		backupCodesProps?: Partial<Omit<BackupCodesProps, 'codes'>>;
+		/**
+		 * Whether the setup has a third step that saves backup codes. It decides the step count ("Step 1 of 3") from the start, so
+		 * the total never changes mid-flow, even when the codes only arrive after the verify. Defaults to true when `backupCodes`
+		 * or `backupCodesProps` is given when the component mounts, else false. Without it a successful verify finishes the setup.
+		 */
+		withBackupCodes?: boolean;
+		/**
+		 * Extra props for the backup codes box (`filename`, `heading`, `onRegenerate`, ...). Its `labels` are merged over the
+		 * localised title. `requireAcknowledge` and `onConfirm` are fixed: the step always ends with Continue, which calls `onComplete`.
+		 */
+		backupCodesProps?: Partial<Omit<BackupCodesProps, 'codes' | 'requireAcknowledge' | 'onConfirm' | 'labels'>> & { labels?: Partial<BackupCodesLabels> };
 		/** Setup is finished: after a verify with no backup codes, or after the backup codes are confirmed. */
 		onComplete?: () => void;
 		/** Shows a Cancel button on the first two steps. */
@@ -118,6 +135,7 @@
 		errors,
 		hidden,
 		backupCodes = $bindable(),
+		withBackupCodes,
 		backupCodesProps,
 		onComplete,
 		onCancel,
@@ -165,9 +183,13 @@
 	let copyFailed = $state(false);
 	let shown = step;
 
-	const total = $derived(backupCodes?.length ? 3 : 2);
+	// Decided once, so the step total cannot jump when the codes arrive after the verify.
+	const initialWithCodes = untrack(() => backupCodes !== undefined || backupCodesProps !== undefined);
+	const hasBackupStep = $derived(withBackupCodes ?? initialWithCodes);
+	const total = $derived(hasBackupStep ? 3 : 2);
+	const { labels: backupLabels, ...backupRest } = $derived(backupCodesProps ?? {});
 	const subLevel = $derived(Math.min(6, headingLevel + 1) as 2 | 3 | 4 | 5 | 6);
-	const submit = new AuthSubmit<{ code: string }, 'code'>({
+	const submit = new AuthSubmit<TwoFactorSetupValues, TwoFactorSetupField>({
 		handler: () => onVerify,
 		read: (data) => ({ code: readText(data, 'code', false) }),
 		pending: () => pending,
@@ -175,7 +197,7 @@
 		errors: () => errors,
 		genericError: () => text.genericError,
 		onSuccess: () => {
-			if (backupCodes?.length) step = 3;
+			if (hasBackupStep) step = 3;
 			else onComplete?.();
 		}
 	});
@@ -184,9 +206,16 @@
 	$effect(() => {
 		const current = step;
 		if (current === shown) return;
+		// Leaving the verify step forgets a verify still in flight, so it cannot move the person on or call onComplete.
+		if (shown === 2) submit.clear();
 		shown = current;
 		void tick().then(() => heading?.focus());
 	});
+
+	function back(): void {
+		submit.clear();
+		step = 1;
+	}
 
 	async function copySecret(): Promise<void> {
 		copyNote = '';
@@ -230,7 +259,8 @@
 					<div class="mt-2 grid gap-2">
 						<p class={STEP_TEXT}>{text.manualDescription}</p>
 						<div class="flex flex-wrap items-center gap-2">
-							<code aria-label={text.secret} class="min-w-52 flex-1 break-words rounded-control bg-card-bg px-2.5 py-1.5 font-mono text-[13px] tracking-wider text-fg-main select-all">{groupSecret(secret)}</code>
+							<span class="sr-only">{text.secret}: </span>
+							<code class="min-w-52 flex-1 break-words rounded-control bg-card-bg px-2.5 py-1.5 font-mono text-[13px] tracking-wider text-fg-main select-all">{groupSecret(secret)}</code>
 							<Button size="sm" variant="secondary" onclick={copySecret}>
 								{#snippet leading()}<Copy aria-hidden="true" />{/snippet}
 								{text.copy}
@@ -271,17 +301,17 @@
 				<div class="grid gap-2">
 					<Button type="submit" variant="primary" size="lg" loading={submit.pending}>{text.verify}</Button>
 					<div class={cn('grid gap-2', onCancel ? 'grid-cols-2' : 'grid-cols-1')}>
-						<Button variant="ghost" size="lg" onclick={() => (step = 1)}>{text.back}</Button>
+						<Button variant="ghost" size="lg" onclick={back}>{text.back}</Button>
 						{#if onCancel}<Button variant="ghost" size="lg" onclick={() => onCancel()}>{text.cancel}</Button>{/if}
 					</div>
 				</div>
 			</form>
 		{:else}
 			<BackupCodes
-				requireAcknowledge
 				headingLevel={Math.min(6, subLevel + 1) as 3 | 4 | 5 | 6}
-				labels={{ title: text.backupCodesTitle }}
-				{...backupCodesProps}
+				{...backupRest}
+				requireAcknowledge
+				labels={{ title: text.backupCodesTitle, ...backupLabels }}
 				codes={backupCodes ?? []}
 				onConfirm={() => onComplete?.()}
 			/>

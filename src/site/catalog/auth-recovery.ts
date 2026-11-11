@@ -11,13 +11,15 @@ export const AUTH_RECOVERY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/recovery/ForgotPasswordCard.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'The "forgot password" screen: an email form that reports the address through onSubmit, or posts natively to action. After a successful submit (or when you set sent, for a native post that comes back) it shows a confirmation that never says whether the account exists, with a Resend button that counts down until resendAvailableAt and a Back to sign in link. Focus moves to the confirmation. Your app sends the email and decides the wait.',
+			'The "forgot password" screen: an email form that reports the address through onSubmit, or posts natively to action. After a successful submit (or when you set sent, for a native post that comes back) it shows a confirmation that never says whether the account exists, with a Resend button that stays focusable and keeps its name until resendAvailableAt (a separate line counts down) and a Back to sign in link. Focus moves to the confirmation. Your app sends the email and decides the wait.',
 		usageSnippet: `<script lang="ts">
   import { ForgotPasswordCard, type AuthResult } from 'agents-kit-svelte/auth';
 
   let resendAvailableAt = $state<number | undefined>(undefined);
+  let submittedEmail = '';
 
   async function requestLink({ email }: { email: string }): Promise<AuthResult<'email'> | void> {
+    submittedEmail = email;
     const response = await fetch('/api/password/forgot', { method: 'POST', body: JSON.stringify({ email }) });
     // Answer the same way whether or not the account exists.
     if (response.status === 429) return { error: 'Too many requests. Try again in a minute.' };
@@ -25,7 +27,8 @@ export const AUTH_RECOVERY: CatalogItemMeta[] = [
   }
 
   async function resend() {
-    await fetch('/api/password/forgot', { method: 'POST' });
+    // Resend to the address that was submitted.
+    await fetch('/api/password/forgot', { method: 'POST', body: JSON.stringify({ email: submittedEmail }) });
     resendAvailableAt = Date.now() + 30_000;
   }
 </script>
@@ -47,6 +50,10 @@ export const AUTH_RECOVERY: CatalogItemMeta[] = [
   const token = 'token-from-the-link';
   const email = 'ada@example.com';
   let expired = $state(false);
+  let score = $state<0 | 1 | 2 | 3 | 4>(0);
+
+  // Your own scoring (the kit does not judge passwords).
+  const scorePassword = (value: string): 0 | 1 | 2 | 3 | 4 => Math.min(4, Math.floor(value.length / 4)) as 0 | 1 | 2 | 3 | 4;
 
   const rules = [
     { label: 'At least 10 characters', test: (v: string) => v.length >= 10 },
@@ -56,6 +63,7 @@ export const AUTH_RECOVERY: CatalogItemMeta[] = [
   async function reset({ password }: { password: string }): Promise<AuthResult<'password'> | void> {
     const response = await fetch('/api/password/reset', { method: 'POST', body: JSON.stringify({ token, password }) });
     if (response.status === 410) {
+      // The expired state wins over the success state, so returning nothing here is fine.
       expired = true;
       return;
     }
@@ -68,6 +76,8 @@ export const AUTH_RECOVERY: CatalogItemMeta[] = [
   hidden={{ token }}
   {email}
   {rules}
+  onPasswordChange={(value) => (score = scorePassword(value))}
+  strength={score}
   minlength={10}
   {expired}
   signInHref="/login"
@@ -81,7 +91,7 @@ export const AUTH_RECOVERY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/recovery/TwoFactorSetup.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Enrolling an authenticator app, in steps on one card: scan the QR code you provide (as a snippet or an image; the kit never makes one) with a copyable setup key for people who cannot scan, then enter the six-digit code, then save backup codes you provide. The code goes to onVerify, which may return errors.code. onComplete runs when the last step is done. Your app makes the secret, QR code and backup codes and checks the code.',
+			'Enrolling an authenticator app, in steps on one card: scan the QR code you provide (as a snippet or an image; the kit never makes one) with a copyable setup key for people who cannot scan, then enter the six-digit code, then save backup codes you provide. The code goes to onVerify, which may return errors.code. withBackupCodes fixes the count at three steps even when the codes arrive after the verify. onComplete runs when the last step is done. Your app makes the secret, QR code and backup codes and checks the code.',
 		usageSnippet: `<script lang="ts">
   import { TwoFactorSetup, type AuthResult } from 'agents-kit-svelte/auth';
 
@@ -106,6 +116,7 @@ export const AUTH_RECOVERY: CatalogItemMeta[] = [
   issuer="Example app"
   account="ada@example.com"
   {backupCodes}
+  withBackupCodes
   onVerify={verify}
   onComplete={() => (location.href = '/account')}
   onCancel={() => history.back()}

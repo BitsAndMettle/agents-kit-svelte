@@ -67,7 +67,7 @@ export const AUTH_ACCOUNT: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/account/VerifyEmailBanner.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A warning banner saying an email address is not verified, with a Resend button. Resend calls onResend() (a promise shows loading), then a polite "Sent" confirmation appears. The button waits until resendAvailableAt (set it from your server), counting down. Optional dismiss and "Change email" buttons only call back.',
+			'A warning banner saying an email address is not verified, with a Resend button. Resend calls onResend() (a promise shows loading), then a polite "Sent" confirmation appears. The button waits until resendAvailableAt (set it from your server): it stays focusable and keeps its name, and a separate line beside it counts down. Optional dismiss and "Change email" buttons only call back.',
 		usageSnippet: `<script lang="ts">
   import { VerifyEmailBanner } from 'agents-kit-svelte/auth';
 

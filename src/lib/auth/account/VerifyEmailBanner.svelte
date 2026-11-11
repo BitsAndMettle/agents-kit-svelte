@@ -5,7 +5,7 @@
 		/** The sentence about the unverified address. */
 		message: (email: string) => string;
 		resend: string;
-		/** Button text while the wait runs. */
+		/** The visible line next to the Resend button while the wait runs. The button's own name stays `resend`. */
 		resendIn: (seconds: number) => string;
 		/** Polite confirmation after a resend. */
 		sent: string;
@@ -17,8 +17,8 @@
 </script>
 
 <script lang="ts">
-	import { LoaderCircle } from '@lucide/svelte';
-	import { actionClass } from '../../primitives/actions/shared';
+	import { tick } from 'svelte';
+	import { Button } from '../../primitives/actions';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { isThenable } from './promise';
 	import { cn } from '../../ui/cn';
@@ -58,13 +58,18 @@
 	});
 
 	const cooldown = new Cooldown(() => resendAvailableAt);
+	const waitId = $props.id();
+	let starting = false;
 	let pending = $state(false);
 	let outcome = $state<'sent' | 'failed' | null>(null);
 
 	async function resend(): Promise<void> {
 		// aria-disabled leaves the button focusable, so the click is guarded here.
-		if (pending || cooldown.active || !onResend) return;
+		if (pending || starting || cooldown.active || !onResend) return;
+		starting = true;
 		outcome = null;
+		// Let the cleared message reach the page first, so a failure that comes straight back is announced again.
+		await tick();
 		try {
 			const result = onResend();
 			if (isThenable(result)) {
@@ -75,6 +80,7 @@
 		} catch {
 			outcome = 'failed';
 		} finally {
+			starting = false;
 			pending = false;
 		}
 	}
@@ -84,11 +90,9 @@
 	<Alert tone="warning" title={text.title} description={text.message(email)} onDismiss={onDismiss ? () => onDismiss() : undefined} dismissLabel={text.dismiss}>
 		{#snippet actions()}
 			{#if onResend}
-				<!-- aria-disabled from markup (also on the server) keeps the button focusable during a wait; Button would drop it. -->
-				<button type="button" onclick={resend} aria-disabled={pending || cooldown.active ? 'true' : undefined} aria-busy={pending || undefined} data-loading={pending || undefined} class={cn(actionClass('secondary', 'xs', false), pending && 'cursor-progress', cooldown.active && 'cursor-not-allowed opacity-60')}>
-					<span class={cn('inline-flex items-center justify-center gap-[inherit]', pending && 'opacity-0')}>{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}</span>
-					{#if pending}<span class="absolute inset-0 flex items-center justify-center" aria-hidden="true"><LoaderCircle class="animate-spin motion-reduce:animate-none" /></span>{/if}
-				</button>
+				<Button type="button" size="xs" variant="secondary" loading={pending} softDisabled={cooldown.active} aria-describedby={cooldown.active ? waitId : undefined} onclick={resend}>{text.resend}</Button>
+				<!-- The name of the button stays put; the countdown is its own line, tied to the button, not live. -->
+				{#if cooldown.active}<span id={waitId} class="text-xs text-fg-light">{text.resendIn(cooldown.remaining)}</span>{/if}
 			{/if}
 			{#if onChangeEmail}
 				<button type="button" onclick={() => onChangeEmail()} class="rounded-sm text-[13px] font-medium text-fg-main underline underline-offset-2 hover:text-accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary/70">

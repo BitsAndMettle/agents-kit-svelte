@@ -118,6 +118,9 @@
 	/** Per revoke in flight: where focus should go once that row is gone (its position among the other sessions). */
 	const restores = new Map<string, number>();
 	let restoreOthers = false;
+	/** Revokes that have started but not settled, so a second call for the same target is ignored. */
+	const starting = new Set<string>();
+	let startingOthers = false;
 
 	const others = $derived(sessions.filter((session) => !session.current));
 	const askingOthers = $derived(asking === 'others' || asking === null);
@@ -149,8 +152,12 @@
 
 	async function revoke(id: string): Promise<void> {
 		const index = others.findIndex((session) => session.id === id);
+		if (starting.has(id)) return;
+		starting.add(id);
 		restores.set(id, Math.max(0, index));
 		failed[id] = false;
+		// Let the cleared message reach the page first, so a failure that comes straight back is announced again.
+		await tick();
 		try {
 			const result = onRevoke?.(id);
 			if (isThenable(result)) {
@@ -163,12 +170,16 @@
 			failed[id] = true;
 		} finally {
 			delete revoking[id];
+			starting.delete(id);
 		}
 	}
 
 	async function revokeAll(): Promise<void> {
+		if (startingOthers) return;
+		startingOthers = true;
 		restoreOthers = true;
 		failedOthers = false;
+		await tick();
 		try {
 			const result = onRevokeOthers?.();
 			if (isThenable(result)) {
@@ -180,6 +191,7 @@
 			failedOthers = true;
 		} finally {
 			revokingOthers = false;
+			startingOthers = false;
 		}
 	}
 

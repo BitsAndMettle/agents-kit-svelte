@@ -14,6 +14,11 @@
 		resendAvailableAt = Date.now() + 5000;
 	}
 
+	/** Throws at once, before any promise exists. */
+	function refuseAtOnce(): void {
+		throw new Error('refused');
+	}
+
 	async function refuse(): Promise<void> {
 		throw new Error('refused');
 	}
@@ -34,5 +39,6 @@
 	<VerifyEmailBanner data-testid="banner-waiting" email="linus@example.com" onResend={refuse} resendAvailableAt={waitUntil} labels={{ title: 'Verify while waiting' }} />
 	<VerifyEmailBanner data-testid="banner-plain" email="grace@example.com" labels={{ title: 'Verify without a handler' }} />
 	<VerifyEmailBanner data-testid="banner-failing" email="alan@example.com" onResend={refuse} labels={{ title: 'Verify with a failing server' }} />
+	<VerifyEmailBanner data-testid="banner-throwing" email="edsger@example.com" onResend={refuseAtOnce} labels={{ title: 'Verify with a throwing handler' }} />
 	<p class="m-0 text-[13px] text-fg-light">Emails sent: <span data-testid="verify-sends">{sends}</span></p>
 </div>
