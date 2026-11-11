@@ -91,7 +91,7 @@ export function tipArrowClass(align: Align): string {
  * translucent dark that reads in both colour schemes.
  */
 export const BACKDROP =
-	'backdrop:bg-[var(--ak-color-scrim,oklch(0.18_0.01_60/0.45))] not-open:backdrop:invisible data-[state=closed]:backdrop:opacity-0 motion-safe:backdrop:transition-[opacity,display,overlay] motion-safe:backdrop:duration-200 motion-safe:backdrop:transition-discrete motion-safe:starting:open:backdrop:opacity-0';
+	'backdrop:bg-[var(--ak-color-scrim)] not-open:backdrop:invisible data-[state=closed]:backdrop:opacity-0 motion-safe:backdrop:transition-[opacity,display,overlay] motion-safe:backdrop:duration-200 motion-safe:backdrop:transition-discrete motion-safe:starting:open:backdrop:opacity-0';
 
 /**
  * Enter and exit for centred surfaces: fade and a slight scale. `data-state` turns
