@@ -26,7 +26,7 @@
 	<div class="flex flex-col gap-2">
 		<p class="text-xs font-medium text-fg-light">Underline, automatic activation. Selected: {value}</p>
 		<Tabs
-			label="Workspace sections"
+			aria-label="Workspace sections"
 			bind:value
 			items={[
 				{ value: 'overview', label: 'Overview', content: overview },
@@ -40,7 +40,7 @@
 	<div class="flex flex-col gap-2">
 		<p class="text-xs font-medium text-fg-light">Segmented, manual activation (Enter or Space selects). Selected: {manual}</p>
 		<Tabs
-			label="Manual sections"
+			aria-label="Manual sections"
 			variant="segmented"
 			activation="manual"
 			mount="lazy"
@@ -56,7 +56,7 @@
 	<div class="flex flex-col gap-2">
 		<p class="text-xs font-medium text-fg-light">Vertical underline</p>
 		<Tabs
-			label="Vertical sections"
+			aria-label="Vertical sections"
 			orientation="vertical"
 			defaultValue="alerts"
 			items={[

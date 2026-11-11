@@ -159,7 +159,7 @@ test.describe('Breadcrumb', () => {
 	test('marks the current page and hides separators from assistive technology', async ({ page }) => {
 		const section = await openSection(page, 'breadcrumb');
 		const nav = section.getByRole('navigation', { name: 'Breadcrumb' });
-		await expect(nav.locator('[aria-current="page"]')).toHaveText('Run 42');
+		await expect(nav.locator('[aria-current="page"]')).toHaveText('Report 42');
 		await expect(nav.locator('ol')).toBeVisible();
 		await expect(nav.locator('span[aria-hidden="true"]')).toHaveCount(5);
 		// Wide screens show every item and no ellipsis button.
@@ -171,18 +171,18 @@ test.describe('Breadcrumb', () => {
 		const section = await openSection(page, 'breadcrumb');
 		await page.setViewportSize({ width: 375, height: 800 });
 		const nav = section.getByRole('navigation', { name: 'Breadcrumb' });
-		await expect(nav.getByRole('link', { name: 'Projects' })).toBeHidden();
-		await expect(nav.getByRole('link', { name: 'Trailside' })).toBeHidden();
+		await expect(nav.getByRole('link', { name: 'Teams' })).toBeHidden();
+		await expect(nav.getByRole('link', { name: 'Acme' })).toBeHidden();
 		await expect(nav.getByRole('link', { name: 'Workspace' })).toBeVisible();
-		await expect(nav.getByRole('link', { name: 'Runs' })).toBeVisible();
+		await expect(nav.getByRole('link', { name: 'Reports' })).toBeVisible();
 
 		const more = nav.getByRole('button', { name: /Show 2 more levels/ });
 		await expect(more).toHaveAttribute('aria-expanded', 'false');
 		await more.focus();
 		await press(page, 'Enter');
-		await expect(nav.getByRole('link', { name: 'Projects' })).toBeVisible();
-		await expect(nav.getByRole('link', { name: 'Trailside' })).toBeVisible();
-		await expect(nav.getByRole('link', { name: 'Projects' })).toBeFocused();
+		await expect(nav.getByRole('link', { name: 'Teams' })).toBeVisible();
+		await expect(nav.getByRole('link', { name: 'Acme' })).toBeVisible();
+		await expect(nav.getByRole('link', { name: 'Teams' })).toBeFocused();
 		await expect(nav.getByRole('button')).toHaveCount(0);
 	});
 
@@ -236,8 +236,8 @@ test.describe('Pagination', () => {
 		const nav = section.getByRole('navigation', { name: 'Search result pages' });
 		const current = nav.getByRole('link', { name: 'Page 5' });
 		await expect(current).toHaveAttribute('aria-current', 'page');
-		await expect(current).toHaveAttribute('href', '#page-5');
-		await expect(nav.getByRole('link', { name: 'Next' })).toHaveAttribute('href', '#page-6');
+		await expect(current).toHaveAttribute('href', '#pagination');
+		await expect(nav.getByRole('link', { name: 'Next' })).toHaveAttribute('href', '#pagination');
 		// Ellipses are decorative: not in the accessibility tree as pages.
 		await expect(nav.getByRole('link')).toHaveCount(10);
 	});
@@ -248,5 +248,25 @@ test.describe('Pagination', () => {
 		const nav = section.getByRole('navigation', { name: 'Run list pages' });
 		await expect(nav.getByText('Page 6 of 12')).toBeVisible();
 		await expect(nav.getByRole('button', { name: 'Page 6' })).toBeHidden();
+	});
+});
+
+test.describe('Pagination edge cases', () => {
+	test('fewer than two pages render nothing; two and 1000 pages render a sane bar', async ({ page }) => {
+		const section = await openSection(page, 'pagination');
+		await expect(section.getByRole('navigation', { name: 'No pages' })).toHaveCount(0);
+		await expect(section.getByRole('navigation', { name: 'One page' })).toHaveCount(0);
+
+		const two = section.getByRole('navigation', { name: 'Two pages' });
+		await expect(two.getByRole('button', { name: 'Page 1' })).toHaveAttribute('aria-current', 'page');
+		await expect(two.getByRole('button', { name: 'Page 2' })).toBeVisible();
+		await expect(two.getByRole('button', { name: 'Previous' })).toBeDisabled();
+
+		const many = section.getByRole('navigation', { name: 'Many pages' });
+		await expect(many.getByRole('button', { name: 'Page 500' })).toHaveAttribute('aria-current', 'page');
+		await expect(many.getByRole('button', { name: 'Page 1000' })).toBeVisible();
+		// Previous, Next and five page slots (the summary is hidden on wide screens); two of them ellipses hidden from assistive technology.
+		await expect(many.locator('li[aria-hidden="true"]')).toHaveCount(2);
+		await expect(many.getByRole('listitem')).toHaveCount(7);
 	});
 });

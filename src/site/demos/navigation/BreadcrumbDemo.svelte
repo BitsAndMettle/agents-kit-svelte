@@ -10,23 +10,23 @@
 		<p class="text-xs font-medium text-fg-light">Narrow screens fold the middle behind a "…" button</p>
 		<Breadcrumb
 			items={[
-				{ label: 'Workspace', href: '#workspace' },
-				{ label: 'Projects', href: '#projects' },
-				{ label: 'Trailside', href: '#trailside' },
-				{ label: 'Runs', href: '#runs' },
-				{ label: 'Run 42' }
+				{ label: 'Workspace', href: '#tabs' },
+				{ label: 'Teams', href: '#accordion' },
+				{ label: 'Acme', href: '#breadcrumb' },
+				{ label: 'Reports', href: '#pagination' },
+				{ label: 'Report 42' }
 			]}
 		/>
 	</div>
 	<div class="flex flex-col gap-2">
 		<p class="text-xs font-medium text-fg-light">Custom separator, never folded</p>
 		<Breadcrumb
-			label="Settings path"
+			aria-label="Settings path"
 			collapse={false}
 			separator={slash}
 			items={[
-				{ label: 'Settings', href: '#settings' },
-				{ label: 'Models', href: '#models' },
+				{ label: 'Settings', href: '#tabs' },
+				{ label: 'Models', href: '#accordion' },
 				{ label: 'Keys' }
 			]}
 		/>

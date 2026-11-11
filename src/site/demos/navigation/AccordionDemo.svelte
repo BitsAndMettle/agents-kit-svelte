@@ -16,9 +16,9 @@
 		<Accordion
 			bind:value={single}
 			items={[
-				{ value: 'runs', title: 'What is a run?', content: runs },
-				{ value: 'logs', title: 'Where do logs go?', content: logs },
-				{ value: 'keys', title: 'Who can see my keys?', content: keys }
+				{ value: 'runs', label: 'What is a run?', content: runs },
+				{ value: 'logs', label: 'Where do logs go?', content: logs },
+				{ value: 'keys', label: 'Who can see my keys?', content: keys }
 			]}
 		/>
 	</div>
@@ -29,9 +29,9 @@
 			headingLevel={4}
 			bind:value={several}
 			items={[
-				{ value: 'runs', title: 'What is a run?', content: runs },
-				{ value: 'logs', title: 'Where do logs go?', content: logs },
-				{ value: 'off', title: 'Disabled item', disabled: true, content: off }
+				{ value: 'runs', label: 'What is a run?', content: runs },
+				{ value: 'logs', label: 'Where do logs go?', content: logs },
+				{ value: 'off', label: 'Disabled item', disabled: true, content: off }
 			]}
 		/>
 	</div>
@@ -41,8 +41,8 @@
 			collapsible={false}
 			defaultValue="runs"
 			items={[
-				{ value: 'runs', title: 'What is a run?', content: runs },
-				{ value: 'logs', title: 'Where do logs go?', content: logs }
+				{ value: 'runs', label: 'What is a run?', content: runs },
+				{ value: 'logs', label: 'Where do logs go?', content: logs }
 			]}
 		/>
 	</div>
