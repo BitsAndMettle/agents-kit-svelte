@@ -67,6 +67,8 @@
 	let colW = $derived(Math.max(NODE_W + 24, (width - NODE_W - PAD * 2) / Math.max(1, layout.cols - 1)));
 	let innerW = $derived(PAD * 2 + NODE_W + colW * Math.max(0, layout.cols - 1));
 	let hasBacklinks = $derived(edges.some((e) => e.backlink));
+	/** Backlinks are drawn but are not lineage: they neither fold nor trace. */
+	let forwardEdges = $derived(edges.filter((e) => !e.backlink));
 	let height = $derived(PAD * 2 + layout.rows * ROW_H - (ROW_H - NODE_H) + (hasBacklinks ? 36 : 0));
 
 	type Pos = { x: number; y: number; o: number };
@@ -91,8 +93,9 @@
 	});
 
 	let childCount = $derived.by(() => {
+		const known = new Set(nodes.map((n) => n.id));
 		const map = new Map<string, number>();
-		for (const e of edges) map.set(e.from, (map.get(e.from) ?? 0) + 1);
+		for (const e of forwardEdges) if (known.has(e.to) && e.from !== e.to) map.set(e.from, (map.get(e.from) ?? 0) + 1);
 		return map;
 	});
 	/** How many nodes are folded into `id`. */
@@ -102,7 +105,7 @@
 		return n;
 	}
 
-	let trace = $derived(hovered ? traceLineage(hovered, edges) : null);
+	let trace = $derived(hovered ? traceLineage(hovered, forwardEdges) : null);
 
 	function nodeOpacity(id: string): number {
 		const o = pos.current[id]?.o ?? 0;
@@ -231,6 +234,7 @@
 						style:height="{NODE_H}px"
 						style:opacity={nodeOpacity(node.id)}
 						style:pointer-events={visible ? 'auto' : 'none'}
+						inert={!visible}
 						style:z-index={hovered === node.id ? 5 : 2}
 						in:rise={{ y: 6, duration: 240, delay: 60 + colOf(node.id) * 110 }}
 					>
