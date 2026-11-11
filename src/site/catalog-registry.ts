@@ -1,3 +1,7 @@
+import { AUTH_FIELDS } from './catalog/auth-fields.ts';
+import { AUTH_ACCOUNT } from './catalog/auth-account.ts';
+import { AUTH_SIGNIN } from './catalog/auth-signin.ts';
+import { AUTH_RECOVERY } from './catalog/auth-recovery.ts';
 import { PRIMITIVES_ACTIONS } from './catalog/primitives-actions.ts';
 import { PRIMITIVES_FORM } from './catalog/primitives-form.ts';
 import { PRIMITIVES_DISPLAY } from './catalog/primitives-display.ts';
@@ -15,7 +19,8 @@ export type CatalogCategory =
 	| 'Agentic Skills'
 	| 'Charts & Timelines'
 	| 'Voice & Effects'
-	| 'Primitives';
+	| 'Primitives'
+	| 'Auth';
 
 export interface CatalogItemMeta {
 	slug: string;
@@ -2817,7 +2822,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 	}
 ];
 
-/** Every catalogue entry: the original collections, then Primitives (one file per group). */
+/** Every catalogue entry: the original collections, then Primitives and Auth (one file per group). */
 export const CATALOG_ITEMS: CatalogItemMeta[] = [
 	...COLLECTION_ITEMS,
 	...PRIMITIVES_ACTIONS,
@@ -2826,4 +2831,8 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 	...PRIMITIVES_NAVIGATION,
 	...PRIMITIVES_OVERLAYS,
 	...PRIMITIVES_MENUS,
+	...AUTH_FIELDS,
+	...AUTH_ACCOUNT,
+	...AUTH_SIGNIN,
+	...AUTH_RECOVERY,
 ];

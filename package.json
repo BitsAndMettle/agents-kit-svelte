@@ -43,6 +43,11 @@
       "svelte": "./dist/entries/primitives.js",
       "default": "./dist/entries/primitives.js"
     },
+    "./auth": {
+      "types": "./dist/entries/auth.d.ts",
+      "svelte": "./dist/entries/auth.js",
+      "default": "./dist/entries/auth.js"
+    },
     "./chat": {
       "types": "./dist/entries/chat.d.ts",
       "svelte": "./dist/entries/chat.js",

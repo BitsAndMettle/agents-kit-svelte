@@ -13,4 +13,5 @@ export * from './entries/charts';
 export * from './entries/data';
 export * from './entries/effects';
 export * from './entries/primitives';
+export * from './entries/auth';
 export * from './entries/core';
