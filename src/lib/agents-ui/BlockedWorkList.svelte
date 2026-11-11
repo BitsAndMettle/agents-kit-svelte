@@ -61,7 +61,7 @@
 										{#if item.ref}<span class="mr-1.5 font-mono text-[12px] font-normal text-fg-light">{item.ref}</span>{/if}{item.title}
 									</p>
 									<p class="mt-0.5 text-[12px] leading-5 text-fg-light">
-										<span class="font-medium text-status-warning">{item.reason.label}</span>{#if item.reason.since}<span> · {item.reason.since}</span>{/if}
+										<span class="font-medium text-status-warning">{item.reason.label}</span>{#if item.reason.since}<span>&nbsp;· {item.reason.since}</span>{/if}
 									</p>
 									{#if item.reason.detail}<p class="text-[12px] leading-5 text-fg-light">{item.reason.detail}</p>{/if}
 								</div>

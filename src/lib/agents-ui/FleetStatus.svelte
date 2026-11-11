@@ -92,7 +92,7 @@
 							<p class="flex items-center gap-2 py-1">{@render identity()}</p>
 						{/if}
 						<p class={cn('mt-0.5 text-xs', PRESENCE_TEXT[m.presence])}>
-							{PRESENCE_LABEL[m.presence]}{#if seen && m.presence !== 'online'}<span class="text-fg-light"> · seen {seen}</span>{/if}
+							{PRESENCE_LABEL[m.presence]}{#if seen && m.presence !== 'online'}<span class="text-fg-light">&nbsp;· seen {seen}</span>{/if}
 						</p>
 					</div>
 

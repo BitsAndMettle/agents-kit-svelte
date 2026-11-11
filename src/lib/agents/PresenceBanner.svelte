@@ -54,8 +54,8 @@
 	</span>
 	<p class="min-w-0 flex-1 text-fg-main">
 		<span class="font-semibold">{subject}</span>
-		<span class="text-fg-light"> · </span><span class={cn('font-medium', meta.tone.split(' ').at(-1))}>{meta.label}</span>
-		{#if clock}<span class="text-fg-light"> since {clock}{utcNote}{#if ago} · {ago} ago{/if}</span>{/if}
+		<span class="text-fg-light">&nbsp;·&nbsp;</span><span class={cn('font-medium', meta.tone.split(' ').at(-1))}>{meta.label}</span>
+		{#if clock}<span class="text-fg-light">&nbsp;since {clock}{utcNote}{#if ago} · {ago} ago{/if}</span>{/if}
 		{#if detail}<span class="block text-[12px] text-fg-light">{detail}</span>{/if}
 	</p>
 	{#if action}

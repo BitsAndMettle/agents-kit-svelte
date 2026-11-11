@@ -167,7 +167,7 @@
 					</span>
 				</span>
 				<span
-					class="w-full break-words text-xs leading-4 {isShown
+					class="w-full text-[11px] leading-4 [overflow-wrap:normal] [word-break:keep-all] sm:text-xs {isShown
 						? 'font-semibold text-fg-main'
 						: 'font-medium text-fg-light'}"
 				>

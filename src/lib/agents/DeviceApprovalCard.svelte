@@ -148,7 +148,7 @@
 					<p class="text-xs text-fg-light">{meta}</p>
 				{/if}
 				<p class="mt-0.5 text-xs text-fg-light">
-					{#if ago}Requested {ago}{/if}{#if ago && left}<span aria-hidden="true"> · </span><span class="sr-only">, </span>{/if}{#if left}
+					{#if ago}Requested {ago}{/if}{#if ago && left}<span aria-hidden="true">&nbsp;·&nbsp;</span><span class="sr-only">, </span>{/if}{#if left}
 						<span class={left.expired ? 'font-medium text-status-danger' : left.ms < 60_000 ? 'font-medium text-status-warning' : ''}>{left.label}</span>
 					{/if}
 				</p>

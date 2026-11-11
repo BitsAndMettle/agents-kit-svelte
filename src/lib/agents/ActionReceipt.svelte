@@ -87,7 +87,7 @@
 
 		{#if reason}
 			<p class={cn('mt-1 text-xs', outcome === 'refused' ? 'text-fg-main' : 'text-fg-light', compact && 'line-clamp-2')}>
-				{#if outcome === 'refused'}<span class="font-medium">Why: </span>{/if}{reason}
+				{#if outcome === 'refused'}<span class="font-medium">Why:&nbsp;</span>{/if}{reason}
 			</p>
 		{/if}
 	</div>
