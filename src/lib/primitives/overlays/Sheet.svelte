@@ -15,6 +15,10 @@
 	export interface Props extends Omit<HTMLDialogAttributes, 'class' | 'children' | 'open' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
 		open?: boolean;
+		/** Whether it starts open when `open` is not bound. */
+		defaultOpen?: boolean;
+		/** The `<dialog>` element. Bindable. */
+		ref?: HTMLDialogElement | null;
 		/** The edge it slides from. Default `right`. */
 		side?: SheetSide;
 		/** Names the sheet (wired to `aria-labelledby`). */
@@ -58,7 +62,9 @@
 	} from './overlay';
 
 	let {
-		open = $bindable(false),
+		defaultOpen = false,
+		open = $bindable(defaultOpen),
+		ref = $bindable(null),
 		side = 'right',
 		title,
 		description,
@@ -114,7 +120,7 @@
 
 {@render trigger?.(dialog.trigger)}
 
-<dialog {...rest} {...dialog.content} data-side={side} class={cn(MODAL_SURFACE, SIDES[side], SLIDE_MOTION[side], BACKDROP, className)}>
+<dialog {...rest} bind:this={ref} {...dialog.content} data-side={side} class={cn(MODAL_SURFACE, SIDES[side], SLIDE_MOTION[side], BACKDROP, className)}>
 	{#if side === 'bottom'}
 		<div aria-hidden="true" class="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-card-border"></div>
 	{/if}

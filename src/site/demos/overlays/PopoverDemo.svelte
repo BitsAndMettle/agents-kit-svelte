@@ -14,6 +14,15 @@
 </script>
 
 <div class="flex flex-wrap items-start gap-6">
+	<!-- Near the right edge the card shifts left to stay in view; the arrow still points at the trigger. -->
+	<div class="flex w-full justify-end">
+		<Popover arrow placement="bottom" title="Share this run" description="Anyone with the link can read the log, not change it.">
+			{#snippet trigger(t)}
+				<button {...t} class={buttonClass('secondary', 'md')}>Share</button>
+			{/snippet}
+		</Popover>
+	</div>
+
 	<div class="grid gap-3">
 		<div class={SEGMENT_GROUP_CLASS} role="group" aria-label="Popover side">
 			{#each sides as s (s)}

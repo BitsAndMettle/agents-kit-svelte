@@ -15,6 +15,10 @@
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
 		open?: boolean;
+		/** Whether it starts open when `open` is not bound. */
+		defaultOpen?: boolean;
+		/** The floating surface element. Bindable. */
+		ref?: HTMLDivElement | null;
 		/** `'bottom'` (default), `'top-start'`, … or a full placement object. */
 		placement?: OverlayPlacement;
 		/** Show an arrow pointing at the trigger. */
@@ -38,11 +42,13 @@
 <script lang="ts">
 	import { Popover } from '../../headless/patterns/popover.svelte';
 	import { cn } from '../../ui/cn';
-	import { ARROW_GAP, cardArrowClass, FLOAT_MOTION, POPOVER_SURFACE } from './overlay';
+	import { ARROW_GAP, cardArrowClass, FLOAT_MOTION, followAnchor, POPOVER_SURFACE } from './overlay';
 	import { toPlacement } from '../placement';
 
 	let {
-		open = $bindable(false),
+		defaultOpen = false,
+		open = $bindable(defaultOpen),
+		ref = $bindable(null),
 		placement,
 		arrow = false,
 		matchWidth = false,
@@ -60,6 +66,9 @@
 		...toPlacement(placement, { side: 'bottom', align: 'center', offset: 6 }, arrow ? ARROW_GAP : 0),
 		matchWidth
 	});
+
+	/** The trigger points at the surface with aria-controls; its centre is where the arrow points. */
+	const findTrigger = (surface: HTMLElement) => document.querySelector(`[aria-controls="${CSS.escape(surface.id)}"]`);
 
 	const id = $props.id();
 	const popover = new Popover({
@@ -79,11 +88,17 @@
 {@render trigger?.(popover.trigger)}
 
 <div {...rest}
+	bind:this={ref}
 	{...popover.content}
 	class={cn(POPOVER_SURFACE, matchWidth && 'min-w-(--ak-anchor-width)', FLOAT_MOTION, className)}
 >
 	{#if arrow}
-		<span aria-hidden="true" data-side={popover.side ?? resolved.side} class={cardArrowClass(resolved.align)}></span>
+		<span
+			aria-hidden="true"
+			data-side={popover.side ?? resolved.side}
+			class={cardArrowClass(resolved.align)}
+			{@attach followAnchor(findTrigger, 12)}
+		></span>
 	{/if}
 	{#if title}
 		<p {...popover.title} class="text-[13px] font-semibold text-fg-main">{title}</p>

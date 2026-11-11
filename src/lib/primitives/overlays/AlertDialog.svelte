@@ -9,12 +9,15 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLDialogAttributes } from 'svelte/elements';
 	import type { ChangeReason, Part } from '../../headless/runtime/parts';
-
-	export type AlertDialogTone = 'default' | 'danger';
+	import type { UiTone } from '../../ui/styles';
 
 	export interface Props extends Omit<HTMLDialogAttributes, 'class' | 'children' | 'open' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
 		open?: boolean;
+		/** Whether it starts open when `open` is not bound. */
+		defaultOpen?: boolean;
+		/** The `<dialog>` element. Bindable. */
+		ref?: HTMLDialogElement | null;
 		/** The question, e.g. "Delete this run?". */
 		title: string;
 		/** What happens if they confirm. */
@@ -24,8 +27,8 @@
 		/** Label of the confirm action while `onConfirm` is pending. */
 		pendingLabel?: string;
 		cancelLabel?: string;
-		/** `danger` styles the confirm action as destructive. */
-		tone?: AlertDialogTone;
+		/** Colour of the confirm action: `danger` (destructive) and `accent` change it; the rest use the primary look. Default `neutral`. */
+		tone?: UiTone;
 		/**
 		 * Runs on confirm. Return nothing to close at once, or a Promise to keep the dialog
 		 * open (loading) until it settles: resolved closes, rejected shows the error.
@@ -33,8 +36,10 @@
 		onConfirm?: () => unknown;
 		/** Runs when the cancel action is pressed. */
 		onCancel?: () => void;
-		/** Turns a rejection into the message shown. Default: the Error's message. */
+		/** Turns a rejection into the message shown. Default: the Error's message, else `fallbackErrorMessage`. */
 		errorMessage?: (error: unknown) => string;
+		/** Shown when a rejection carries no message of its own. */
+		fallbackErrorMessage?: string;
 		/** Renders the opener; spread the part onto a `<button>`. */
 		trigger?: Snippet<[Part<HTMLButtonElement>]>;
 		/** Extra content between the description and the actions. */
@@ -52,16 +57,19 @@
 	import { BACKDROP, FADE_SCALE_MOTION, MODAL_DESCRIPTION, MODAL_SURFACE, MODAL_TITLE } from './overlay';
 
 	let {
-		open = $bindable(false),
+		defaultOpen = false,
+		open = $bindable(defaultOpen),
+		ref = $bindable(null),
 		title,
 		description,
 		confirmLabel = 'Confirm',
 		pendingLabel,
 		cancelLabel = 'Cancel',
-		tone = 'default',
+		tone = 'neutral',
 		onConfirm,
 		onCancel,
 		errorMessage = defaultMessage,
+		fallbackErrorMessage = 'That did not work. Try again.',
 		trigger,
 		children,
 		onOpenChange,
@@ -96,7 +104,7 @@
 	function defaultMessage(reason: unknown): string {
 		if (reason instanceof Error && reason.message) return reason.message;
 		if (typeof reason === 'string' && reason) return reason;
-		return 'That did not work. Try again.';
+		return fallbackErrorMessage;
 	}
 
 	function isThenable(value: unknown): value is PromiseLike<unknown> {
@@ -131,7 +139,7 @@
 
 {@render trigger?.(dialog.trigger)}
 
-<dialog {...rest}
+<dialog {...rest} bind:this={ref}
 	{...dialog.content}
 	aria-busy={pending}
 	class={cn(MODAL_SURFACE, 'm-auto w-[min(26rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] rounded-card', FADE_SCALE_MOTION, BACKDROP, className)}
@@ -156,7 +164,7 @@
 			type="button"
 			aria-disabled={pending}
 			onclick={confirm}
-			class={buttonClass(tone === 'danger' ? 'danger' : 'primary', 'md', 'aria-disabled:cursor-progress')}
+			class={buttonClass(tone === 'danger' ? 'danger' : tone === 'accent' ? 'accent' : 'primary', 'md', 'aria-disabled:cursor-progress')}
 		>
 			{#if pending}
 				<LoaderCircle aria-hidden="true" class="animate-spin motion-reduce:animate-none" />

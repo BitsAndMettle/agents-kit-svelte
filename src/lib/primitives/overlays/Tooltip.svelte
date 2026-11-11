@@ -29,6 +29,8 @@
 		skipDelay?: number;
 		/** Never open. */
 		disabled?: boolean;
+		/** The tooltip surface. Bindable. */
+		ref?: HTMLDivElement | null;
 		class?: string;
 	}
 </script>
@@ -36,7 +38,7 @@
 <script lang="ts">
 	import { Tooltip } from '../../headless/patterns/tooltip.svelte';
 	import { cn } from '../../ui/cn';
-	import { ARROW_GAP, FLOAT_MOTION, tipArrowClass, TOOLTIP_SURFACE } from './overlay';
+	import { ARROW_GAP, FLOAT_MOTION, followAnchor, tipArrowClass, TOOLTIP_SURFACE } from './overlay';
 	import { toPlacement } from '../placement';
 
 	let {
@@ -47,11 +49,15 @@
 		delay,
 		skipDelay,
 		disabled = false,
+		ref = $bindable(null),
 		class: className = '',
 		...rest
 	}: Props = $props();
 
 	const resolved = $derived(toPlacement(placement, { side: 'top', align: 'center', offset: 6 }, arrow ? ARROW_GAP - 1 : 0));
+
+	/** While shown, the trigger is described by the surface; its centre is where the arrow points. */
+	const findTrigger = (surface: HTMLElement) => document.querySelector(`[aria-describedby~="${CSS.escape(surface.id)}"]`);
 
 	const id = $props.id();
 	const tip = new Tooltip({
@@ -70,11 +76,17 @@
 {@render trigger(tip.trigger)}
 
 <div {...rest}
+	bind:this={ref}
 	{...tip.content}
 	class={cn(TOOLTIP_SURFACE, FLOAT_MOTION, 'data-instant:transition-none', className)}
 >
 	{#if arrow}
-		<span aria-hidden="true" data-side={tip.side ?? resolved.side} class={tipArrowClass(resolved.align)}></span>
+		<span
+			aria-hidden="true"
+			data-side={tip.side ?? resolved.side}
+			class={tipArrowClass(resolved.align)}
+			{@attach followAnchor(findTrigger, 6)}
+		></span>
 	{/if}
 	{#if typeof content === 'string'}
 		{content}

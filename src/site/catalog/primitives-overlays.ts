@@ -11,7 +11,7 @@ export const PRIMITIVES_OVERLAYS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/overlays/Dialog.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Modal dialog on a native <dialog>: title and description wired for screen readers, focus trapped inside and returned to the trigger, Escape, backdrop press and a close button to dismiss. The body scrolls between a fixed header and footer; sizes sm, md, lg, and full (fills a phone screen). bind:open, onOpenChange, initialFocus.',
+			'Modal dialog on a native <dialog>: title and description wired for screen readers, focus trapped inside and returned to the trigger, Escape, backdrop press and a close button to dismiss. The body scrolls between a fixed header and footer; sizes sm, md, lg, and full (fills a phone screen). bind:open or defaultOpen, onOpenChange, initialFocus, bind:ref.',
 		usageSnippet: `<script lang="ts">
   import { Dialog, buttonClass, INPUT_CLASS } from 'agents-kit-svelte/primitives';
 
@@ -37,7 +37,7 @@ export const PRIMITIVES_OVERLAYS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/overlays/AlertDialog.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Confirmation with role="alertdialog": a backdrop press does nothing, Escape cancels, and focus starts on the safe Cancel action. tone="danger" for destructive actions. When onConfirm returns a Promise, the confirm button shows a loading state and the dialog stays open until it resolves; a rejection keeps it open and shows the error.',
+			'Confirmation with role="alertdialog": a backdrop press does nothing, Escape cancels, and focus starts on the safe Cancel action. tone (UiTone): "danger" for destructive actions. When onConfirm returns a Promise, the confirm button shows a loading state and the dialog stays open until it resolves; a rejection keeps it open and shows the error.',
 		usageSnippet: `<script lang="ts">
   import { AlertDialog, buttonClass } from 'agents-kit-svelte/primitives';
 
@@ -91,7 +91,7 @@ export const PRIMITIVES_OVERLAYS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/overlays/Popover.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Non-modal floating card anchored to its trigger in the top layer: flips to stay in view, closes on Escape, an outside press or when focus leaves it. Optional arrow that follows the side it lands on, placement shorthand ("top-start"), and matchWidth for a surface as wide as its trigger. Inside a Dialog, Escape closes the popover first.',
+			'Non-modal floating card anchored to its trigger in the top layer: flips to stay in view, closes on Escape, an outside press or when focus leaves it. Optional arrow that follows the side it lands on and keeps pointing at the trigger when the card shifts to stay in view, placement shorthand ("top-start"), and matchWidth for a surface as wide as its trigger. Inside a Dialog, Escape closes the popover first.',
 		usageSnippet: `<script lang="ts">
   import { Popover, buttonClass } from 'agents-kit-svelte/primitives';
 
