@@ -1215,7 +1215,7 @@
 					>
 						<!-- Upstream FamilyPreview Header -->
 						<header class="mb-4 flex flex-wrap items-start justify-between gap-3 px-1">
-							<div class="max-w-2xl">
+							<div class="min-w-0 max-w-2xl">
 								<div class="flex flex-wrap items-center gap-2">
 									<h3 class="text-[15px] font-semibold text-fg-main">
 										{item.name}
@@ -1241,7 +1241,7 @@
 										class={segmentClass(tabMode === 'preview')}
 									>
 										<Eye aria-hidden="true" />
-										Preview
+										<span class="max-[400px]:sr-only">Preview</span>
 									</button>
 									<button
 										type="button"
@@ -1251,7 +1251,7 @@
 										class={segmentClass(tabMode === 'usage')}
 									>
 										<Code aria-hidden="true" />
-										Usage
+										<span class="max-[400px]:sr-only">Usage</span>
 									</button>
 									<button
 										type="button"
@@ -1261,7 +1261,7 @@
 										class={segmentClass(tabMode === 'source')}
 									>
 										<FileCode aria-hidden="true" />
-										Source
+										<span class="max-[400px]:sr-only">Source</span>
 									</button>
 								</div>
 
