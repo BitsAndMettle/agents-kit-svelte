@@ -5,7 +5,7 @@
 	import { buttonClass } from '../ui/styles';
 	import { formatElapsed } from '../core/time';
 	import { useClock } from '../state/clock.svelte';
-	import { clockTime, type TimeInput } from './presence';
+	import { clockTime, type TimeInput } from '../core/time';
 	import type { PresenceAction, PresenceState } from '../types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {

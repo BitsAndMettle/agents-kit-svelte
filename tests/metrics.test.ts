@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { capacityPercent, deltaVerdict, describeMetric, formatDeltaAmount, formatMetricDuration, formatMetricValue, formatNumber, metricDelta, sparkline } from '../src/lib/charts/metrics.ts';
 import { SAMPLE_FLEET_METRICS } from '../src/lib/fixtures/charts.ts';
-import { clockTime } from '../src/lib/agents/presence.ts';
-import { formatElapsed as relativeTime } from '../src/lib/core/time.ts';
+import { clockTime, formatElapsed as relativeTime } from '../src/lib/core/time.ts';
 
 test('metricDelta gives direction, size and percent, and no percent from a zero previous', () => {
 	assert.deepEqual(metricDelta(3, 2), { diff: 1, direction: 'up', percent: 50 });

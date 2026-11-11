@@ -48,8 +48,7 @@ export { ChatWorkbench };
 export const TrailsideClaudeChat: typeof ChatWorkbench = ChatWorkbench;
 
 export * from '../state/chat-helpers';
-export * from '../agents/presence';
-export { formatElapsed } from '../core/time';
+export { clockTime, formatElapsed, type TimeInput } from '../core/time';
 export * from '../core/agent';
 export { groupCode, speakCode, timeLeft, formatRequestedAgo } from '../agents/device-approval';
 export type { TimeLeft } from '../agents/device-approval';
