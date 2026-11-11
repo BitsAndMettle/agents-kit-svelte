@@ -393,7 +393,15 @@ export class LayerStack {
 	#outside(event: MouseEvent): void {
 		const target = event.target instanceof Node ? event.target : null;
 		const hit = this.#hitIndex(target, event.clientX, event.clientY);
-		this.#apply(dismissOnPointer(this.#snapshot(event), hit), () => 'outside', { bodyIsLost: false });
+		const change = dismissOnPointer(this.#snapshot(event), hit);
+		// Behind a modal everything is inert, so a press that closes a MODAL (its backdrop)
+		// cannot have aimed at another control: focus goes back to the trigger even from
+		// <body>, and the press's mousedown must not then blur it (preventDefault on
+		// pointerdown suppresses the compatibility mouse events; click still fires).
+		// Non-modal outside presses keep focus wherever the press put it.
+		const closesModal = change.close.some((id) => this.#layers.get(id)?.init.kind === 'modal');
+		if (closesModal && event.type === 'pointerdown') event.preventDefault();
+		this.#apply(change, () => 'outside', { bodyIsLost: closesModal });
 	}
 
 	#focusOut(layer: Layer, event: FocusEvent): void {
