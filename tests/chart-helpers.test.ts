@@ -57,3 +57,26 @@ test('replay shows the run as it stood at a moment', () => {
 	assert.ok(seriesAt(SAMPLE_MODEL_SERIES, 20).every((s) => s.points.every((p) => p.t <= 20)));
 	assert.deepEqual(eventsAt(SAMPLE_MODEL_EVENTS, 70).map((e) => e.id), ['e1']);
 });
+
+import { formatDay, projectBurn } from '../src/lib/charts/scale.ts';
+
+test('formatDay shows a date when a start is known, else a day number', () => {
+	assert.equal(formatDay(0, '2026-10-20'), 'Oct 20');
+	assert.equal(formatDay(11.6, '2026-10-20'), 'Oct 31');
+	assert.equal(formatDay(13, '2026-10-20'), 'Nov 2');
+	assert.equal(formatDay(3), 'Day 3');
+});
+
+test('projectBurn measures the trailing rate and finds where the budget runs out', () => {
+	const points = [
+		{ t: 0, spent: 0 },
+		{ t: 60, spent: 600 },
+		{ t: 120, spent: 1200 }
+	];
+	const burn = projectBurn(points, 240, 2000, 60);
+	assert.equal(burn.rate, 10);
+	assert.equal(burn.projected, 2400);
+	assert.equal(burn.crossesAt, 200);
+	assert.equal(projectBurn(points, 240, 5000).crossesAt, null);
+	assert.equal(projectBurn([...points, { t: 180, spent: 2100 }], 240, 2000).crossesAt, 180);
+});

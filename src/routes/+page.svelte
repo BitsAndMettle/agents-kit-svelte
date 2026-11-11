@@ -40,6 +40,7 @@
 		LayoutTemplate,
 		BookOpenText,
 		ChartGantt,
+		Network,
 		MessagesSquare,
 		RotateCcw,
 		Scale,
@@ -127,6 +128,11 @@
 		GitHubChecksWaterfall,
 		GitHubPrActionBar,
 		GitHubPullRequestGraph,
+		FeatureCard,
+		FeatureLineage,
+		FeatureTimeline,
+		RunReplayScrubber,
+		TokenBurnChart,
 		Terminal,
 		TestResults,
 		ThinkingShimmer,
@@ -139,7 +145,7 @@
 		WebPreview
 	} from '$lib';
 	import { SAMPLE_SKILLS, SAMPLE_SKILL_MANIFEST, SAMPLE_SKILL_PROPOSAL, SAMPLE_SKILL_STEPS } from '$lib/entries/fixtures';
-	import { SAMPLE_CHART_SPECS, SAMPLE_HANDOFFS, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS } from '$lib/fixtures/charts';
+	import { SAMPLE_BURN_POINTS, SAMPLE_CHART_SPECS, SAMPLE_FEATURE, SAMPLE_FEATURE_START, SAMPLE_HANDOFFS, SAMPLE_RUN_DURATION, SAMPLE_RUN_MARKS, SAMPLE_TIMELINE_ITEMS, SAMPLE_TIMELINE_MILESTONES, SAMPLE_TIMELINE_TODAY, SAMPLE_TOKEN_BUDGET, SAMPLE_LINEAGE_EDGES, SAMPLE_LINEAGE_NODES, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS } from '$lib/fixtures/charts';
 	import { CATALOG_ITEMS, type CatalogCategory } from '$site/catalog-registry';
 	import { holdHeight } from '$site/hold-height';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -597,7 +603,7 @@
 
 	const sampleCheckpoint: CheckpointEntry = {
 		id: 'cp-1',
-		title: 'Verified 89 Svelte 5 components + unit suite',
+		title: 'Verified 94 Svelte 5 components + unit suite',
 		description: 'All static and unit checks green',
 		commitSha: '456f3b4',
 		worktreeBranch: 'trailside/2151-drawer-hydration',
@@ -614,7 +620,7 @@
 			tests: [
 				{
 					id: 'tc-1',
-					name: 'all 89 Svelte components comply with Svelte 5 Runes and semantic tokens',
+					name: 'all 94 Svelte components comply with Svelte 5 Runes and semantic tokens',
 					status: 'passed' as const,
 					durationMs: 6
 				}
@@ -738,7 +744,7 @@
 	}
 
 	const STREAM_TEXT =
-		'All 89 Svelte 5 components verified with svelte-check (0 errors, 0 warnings), and every preview on this page is live.';
+		'All 94 Svelte 5 components verified with svelte-check (0 errors, 0 warnings), and every preview on this page is live.';
 
 	function liveStream(): { text: string; done: boolean } {
 		const words = STREAM_TEXT.split(' ');
@@ -759,7 +765,7 @@
 		'▶ svelte5 audit',
 		'  ✔ every component uses Runes (41ms)',
 		'  ✔ no hex colors in components (12ms)',
-		'✔ all 89 Svelte components pass audit (105ms)'
+		'✔ all 94 Svelte components pass audit (105ms)'
 	];
 
 	/**
@@ -871,6 +877,15 @@
 			cta: 'Watch the PR flow'
 		},
 		{
+			href: `${base}/features/`,
+			icon: Network,
+			eyebrow: 'Features & lineage',
+			title: 'Feature cards and lineage',
+			description:
+				'A Feature, its cards, every agent attempt, the PRs they opened and the releases they shipped in, as a graph you can trace and fold.',
+			cta: 'Try the features'
+		},
+		{
 			href: `${base}/intelligent-ui/`,
 			icon: LayoutTemplate,
 			eyebrow: 'Generative surfaces',
@@ -965,7 +980,7 @@
 			</a>
 		</div>
 
-		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each APP_EXAMPLES as example (example.href)}
 				<a
 					href={example.href}
@@ -1308,7 +1323,7 @@
 									summary="corepack pnpm test"
 									status="success"
 									meta="96ms · 9 passed"
-									output="✔ all 89 Svelte components in src/ comply with Svelte 5 Runes, Props typing, and semantic token rules"
+									output="✔ all 94 Svelte components in src/ comply with Svelte 5 Runes, Props typing, and semantic token rules"
 									defaultOpen={true}
 								/>
 							{:else if item.slug === 'file-diff'}
@@ -1358,7 +1373,7 @@
 										author="AK-S Agent"
 										timestamp="21:16"
 										collapsible={true}
-										text="All 89 Svelte 5 components are live with strict TypeScript Props, OKLCH dark/light tokens, and interactive showcases."
+										text="All 94 Svelte 5 components are live with strict TypeScript Props, OKLCH dark/light tokens, and interactive showcases."
 									/>
 								</div>
 							{:else if item.slug === 'message-scroller'}
@@ -1607,6 +1622,18 @@
 								<GitHubPullRequestGraph title="Refresh sessions before they expire" number={128} lanes={SAMPLE_PR_GRAPH_LANES} commits={SAMPLE_PR_GRAPH_COMMITS} head="session" mergeState="clean" footer={{ label: 'Checks 2/5', tone: 'running' }} />
 							{:else if item.slug === 'github-checks-waterfall'}
 								<GitHubChecksWaterfall prNumber={128} commit={{ sha: 'd29f50a', message: 'Add session refresh tests' }} checks={SAMPLE_CHECK_RUNS} />
+							{:else if item.slug === 'feature-card'}
+								<div class="mx-auto max-w-md">
+									<FeatureCard feature={SAMPLE_FEATURE} />
+								</div>
+							{:else if item.slug === 'feature-lineage'}
+								<FeatureLineage title="F-12 lineage" nodes={SAMPLE_LINEAGE_NODES} edges={SAMPLE_LINEAGE_EDGES} />
+							{:else if item.slug === 'feature-timeline'}
+								<FeatureTimeline title="F-12 timeline" items={SAMPLE_TIMELINE_ITEMS} milestones={SAMPLE_TIMELINE_MILESTONES} today={SAMPLE_TIMELINE_TODAY} start={SAMPLE_FEATURE_START} />
+							{:else if item.slug === 'token-burn-chart'}
+								<TokenBurnChart title="Token burn" points={SAMPLE_BURN_POINTS} budget={SAMPLE_TOKEN_BUDGET} marks={SAMPLE_RUN_MARKS} />
+							{:else if item.slug === 'run-replay-scrubber'}
+								<RunReplayScrubber duration={SAMPLE_RUN_DURATION} phases={SAMPLE_PHASE_BANDS} marks={SAMPLE_RUN_MARKS} />
 							{:else if item.slug === 'border-beam'}
 								<BorderBeam />
 							{:else if item.slug === 'svelte5-motion-lab'}

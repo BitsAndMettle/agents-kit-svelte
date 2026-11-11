@@ -193,3 +193,41 @@ export function phaseColor(phase: string, fallbackIndex = 0): string {
 			return seriesColor(fallbackIndex + 4);
 	}
 }
+
+/**
+ * Formats a day offset as a short date when a start date is known (`Oct 28`), else as `Day 3`.
+ *
+ * @param day - Days since `start`.
+ * @param start - ISO date of day 0, e.g. `2026-10-20`.
+ */
+export function formatDay(day: number, start?: string): string {
+	if (!start) return `Day ${Math.round(day)}`;
+	const base = Date.parse(`${start.slice(0, 10)}T00:00:00Z`);
+	if (Number.isNaN(base)) return `Day ${Math.round(day)}`;
+	return new Date(base + Math.floor(day) * 86_400_000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+/**
+ * Burn rate over the trailing `window` of samples and where spend is heading.
+ * Returns the rate (spend per unit of t), the projected spend at `end`, and when the budget is crossed, if it is.
+ *
+ * @param points - Cumulative spend samples, in time order.
+ * @param end - Time to project to.
+ * @param budget - Spend limit, if any.
+ * @param window - How far back (in t units) to measure the rate.
+ */
+export function projectBurn(points: { t: number; spent: number }[], end: number, budget?: number, window = 60): { rate: number; projected: number; crossesAt: number | null } {
+	const last = points.at(-1);
+	if (!last) return { rate: 0, projected: 0, crossesAt: null };
+	const from = [...points].reverse().find((p) => p.t <= last.t - window) ?? points[0];
+	const dt = last.t - from.t;
+	const rate = dt > 0 ? Math.max(0, (last.spent - from.spent) / dt) : 0;
+	const projected = last.spent + rate * Math.max(0, end - last.t);
+	let crossesAt: number | null = null;
+	if (budget !== undefined) {
+		const over = points.find((p) => p.spent >= budget);
+		if (over) crossesAt = over.t;
+		else if (rate > 0 && projected >= budget) crossesAt = last.t + (budget - last.spent) / rate;
+	}
+	return { rate, projected, crossesAt };
+}
