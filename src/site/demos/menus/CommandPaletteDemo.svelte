@@ -9,17 +9,17 @@
 	let recent = $state<string[]>(['run-start']);
 
 	const commands: PaletteCommand[] = [
-		{ id: 'run-start', title: 'Start a run', subtitle: 'Pick a card and start the agent', icon: Play, group: 'Runs', shortcut: 'R' },
-		{ id: 'run-stop', title: 'Stop the current run', icon: Square, group: 'Runs', keywords: ['cancel', 'halt'] },
-		{ id: 'card-new', title: 'New card', icon: FilePlus, group: 'Board', shortcut: 'C' },
-		{ id: 'branch', title: 'Switch branch', subtitle: 'main', icon: GitBranch, group: 'Board' },
-		{ id: 'people', title: 'Invite people', icon: Users, group: 'Workspace', disabled: true },
-		{ id: 'settings', title: 'Open settings', icon: Settings, group: 'Workspace', shortcut: ',' },
-		{ id: 'theme', title: 'Toggle dark mode', icon: Moon, group: 'Workspace', keywords: ['theme', 'light'] }
+		{ id: 'run-start', label: 'Start a run', description: 'Pick a card and start the agent', icon: Play, group: 'Runs', shortcut: 'R' },
+		{ id: 'run-stop', label: 'Stop the current run', icon: Square, group: 'Runs', keywords: ['cancel', 'halt'] },
+		{ id: 'card-new', label: 'New card', icon: FilePlus, group: 'Board', shortcut: 'C' },
+		{ id: 'branch', label: 'Switch branch', description: 'main', icon: GitBranch, group: 'Board' },
+		{ id: 'people', label: 'Invite people', icon: Users, group: 'Workspace', disabled: true },
+		{ id: 'settings', label: 'Open settings', icon: Settings, group: 'Workspace', shortcut: ',' },
+		{ id: 'theme', label: 'Toggle dark mode', icon: Moon, group: 'Workspace', keywords: ['theme', 'light'] }
 	];
 
 	function onRun(command: PaletteCommand): void {
-		ran = command.title;
+		ran = command.label;
 		recent = [command.id, ...recent.filter((id) => id !== command.id)].slice(0, 3);
 	}
 </script>

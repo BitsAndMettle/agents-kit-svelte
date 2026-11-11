@@ -1,5 +1,9 @@
 import type { Component } from 'svelte';
+import type { HTMLButtonAttributes } from 'svelte/elements';
 import type { MenuSelectEvent } from '../../headless/patterns/menu.svelte';
+import type { ChangeReason } from '../../headless/runtime/parts';
+import type { UiTone } from '../../ui/styles';
+import type { OverlayPlacement } from '../placement';
 
 export type { MenuSelectEvent };
 
@@ -15,8 +19,8 @@ export interface MenuItemEntry {
 	icon?: MenuIcon;
 	/** Hint shown at the end of the row, e.g. `⌘C`. Display only: the menu does not bind it. */
 	shortcut?: string;
-	/** `danger` for destructive actions. */
-	tone?: 'default' | 'danger';
+	/** Colour meaning; `danger` for destructive actions. Default `neutral`. */
+	tone?: UiTone;
 	disabled?: boolean;
 	/** Click, Enter or Space. `event.preventDefault()` keeps the menu open. */
 	onSelect?: (event: MenuSelectEvent) => void;
@@ -101,8 +105,9 @@ export type PickerValue<Multiple extends boolean> = Multiple extends true ? stri
 export interface PaletteCommand {
 	/** Unique. */
 	id: string;
-	title: string;
-	subtitle?: string;
+	label: string;
+	/** A second, quieter line. */
+	description?: string;
 	icon?: MenuIcon;
 	/** Hint shown at the end of the row. Display only. */
 	shortcut?: string;
@@ -113,4 +118,49 @@ export interface PaletteCommand {
 	disabled?: boolean;
 	/** Runs after the palette closes. */
 	onRun?: () => void;
+}
+
+/** Height and text size of a form-row control; lines up with Input and NativeSelect. */
+export type PickerSize = 'sm' | 'md' | 'lg';
+
+/** Props of `Select`. Extra attributes land on the trigger button. */
+export interface SelectProps<Multiple extends boolean = false>
+	extends Omit<HTMLButtonAttributes, 'class' | 'children' | 'value' | 'defaultValue' | 'name' | 'type' | 'form'> {
+	/** Visible label. Optional inside a `Field`, which names the control instead; standalone use without it takes `aria-label`. */
+	label?: string;
+	options: PickerOption[];
+	/** Several values, toggled one by one; the list stays open while choosing. */
+	multiple?: Multiple;
+	/** Bindable. A value, or a list of values with `multiple`. */
+	value?: PickerValue<Multiple>;
+	/** Starting value when `value` is not bound; a form reset restores it. */
+	defaultValue?: PickerValue<Multiple>;
+	onValueChange?: (value: PickerValue<Multiple>) => void;
+	/** Bindable. */
+	open?: boolean;
+	defaultOpen?: boolean;
+	onOpenChange?: (open: boolean, reason: ChangeReason) => void;
+	/** Shown while nothing is chosen. */
+	placeholder?: string;
+	/** With `multiple`: chips for each choice, or a count (see `formatCount`). Default `chips`. */
+	display?: 'chips' | 'count';
+	/** Text for several choices with `display="count"`. Default `3 selected`. */
+	formatCount?: (count: number) => string;
+	/** Form field name: one hidden input per chosen value. */
+	name?: string;
+	/** Blocks form submission while nothing is chosen; focus goes to the trigger. */
+	required?: boolean;
+	disabled?: boolean;
+	/** Marks the control invalid (a surrounding Field with an error does too). */
+	invalid?: boolean;
+	/** Default `md`. */
+	size?: PickerSize;
+	/** Keep the label for screen readers only. */
+	hideLabel?: boolean;
+	/** `'bottom-start'` (default), `'top-end'`, … or a full placement. The list always matches the trigger's width. */
+	placement?: OverlayPlacement;
+	/** The trigger button. Bindable. */
+	ref?: HTMLButtonElement | null;
+	/** Classes for the outer box (label, trigger and list). */
+	class?: string;
 }

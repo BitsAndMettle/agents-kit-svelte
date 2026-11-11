@@ -28,7 +28,7 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
   ]);
 </script>
 
-<DropdownMenu label="File" {items} bind:open />`
+<DropdownMenu triggerLabel="File" {items} placement="bottom-start" bind:open />`
 	},
 	{
 		slug: 'context-menu',
@@ -49,7 +49,7 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
   ];
 </script>
 
-<ContextMenu {items} label="File actions" class="rounded-card border p-3">
+<ContextMenu {items} menuLabel="File actions" class="rounded-card border p-3">
   <button type="button">plan.md</button>
 </ContextMenu>`
 	},
@@ -60,9 +60,9 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/menus/Select.svelte',
 		upstreamSource: 'Agents Kit Svelte · Primitives',
 		description:
-			'A labelled select-only combobox for one value or several (as chips or "3 selected"), with groups, descriptions and disabled options. With `name` it posts hidden inputs and restores its first value on form reset; `required` blocks submit.',
+			'A select-only combobox for one value or several (as chips or "3 selected"), with groups, descriptions and disabled options. Reads a surrounding Field (label, error, required); with `name` it posts hidden inputs, resets to `defaultValue`, and `required` blocks submit with focus on the trigger.',
 		usageSnippet: `<script lang="ts">
-  import { Select, type PickerOption } from 'agents-kit-svelte/primitives';
+  import { Field, Select, type PickerOption } from 'agents-kit-svelte/primitives';
 
   const options: PickerOption[] = [
     { value: 'quick', label: 'Quick', description: 'Small edits', group: 'Everyday' },
@@ -73,8 +73,12 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 </script>
 
 <Select label="Model" {options} bind:value={model} />
-<Select label="Labels" options={tags} multiple bind:value={labels} display="count" />
-<form><Select label="Priority" name="priority" options={priorities} required /></form>`
+<Select label="Labels" options={tags} multiple bind:value={labels} display="count" size="sm" />
+<form>
+  <Field label="Priority" required error={error}>
+    <Select name="priority" options={priorities} defaultValue="p2" />
+  </Field>
+</form>`
 	},
 	{
 		slug: 'combobox',
@@ -83,9 +87,9 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/menus/Combobox.svelte',
 		upstreamSource: 'Agents Kit Svelte · Primitives',
 		description:
-			'A text input that filters a list of options as you type, with a clear button, an empty state, optional free text, and a busy state for options you load yourself. Focus stays in the input; Escape closes the list, then clears the text.',
+			'A text input that filters a list of options as you type, with a clear button, an empty state, optional free text, and a busy state for options you load yourself. Reads a surrounding Field; `required` needs a chosen value, not just text. Escape closes the list, then clears the text.',
 		usageSnippet: `<script lang="ts">
-  import { Combobox, type PickerOption } from 'agents-kit-svelte/primitives';
+  import { Combobox, Field, type PickerOption } from 'agents-kit-svelte/primitives';
 
   let assignee = $state<string | null>(null);
   let query = $state('');
@@ -93,7 +97,9 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
   let loading = $state(false);
 </script>
 
-<Combobox label="Assignee" options={people} bind:value={assignee} name="assignee" />
+<Field label="Assignee" required>
+  <Combobox options={people} bind:value={assignee} name="assignee" />
+</Field>
 <Combobox label="Branch" options={branches} allowCustom />
 <Combobox label="Repository" options={results} filter={false} {loading} bind:query />`
 	},
@@ -104,14 +110,14 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/menus/CommandPalette.svelte',
 		upstreamSource: 'Agents Kit Svelte · Primitives',
 		description:
-			'A modal search over grouped commands (icon, title, subtitle, shortcut), opened by a global shortcut (Ctrl+K or ⌘K by default) while it is mounted, with a Recent section and an empty state. Choosing a command closes the palette, then runs it.',
+			'A modal search over grouped commands (icon, label, description, shortcut), opened by a global shortcut (Ctrl+K or ⌘K by default) while it is mounted; with several palettes on one shortcut the most recently mounted answers. Recent section and empty state. Choosing a command closes the palette, then runs it.',
 		usageSnippet: `<script lang="ts">
   import { CommandPalette, type PaletteCommand } from 'agents-kit-svelte/primitives';
 
   let recent = $state<string[]>([]);
   const commands: PaletteCommand[] = [
-    { id: 'new', title: 'New card', group: 'Board', shortcut: 'C', onRun: newCard },
-    { id: 'settings', title: 'Open settings', group: 'Workspace', onRun: openSettings }
+    { id: 'new', label: 'New card', group: 'Board', shortcut: 'C', onRun: newCard },
+    { id: 'settings', label: 'Open settings', description: 'Workspace and account', group: 'Workspace', onRun: openSettings }
   ];
 </script>
 

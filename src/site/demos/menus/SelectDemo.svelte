@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Field } from '$lib/primitives/form';
 	import { Select, type PickerOption } from '$lib/primitives/menus';
 	import { buttonClass } from '$lib/ui/styles';
 
@@ -27,25 +28,35 @@
 		{ value: 'p3', label: 'P3 · later' }
 	];
 
+	const sorts: PickerOption[] = [
+		{ value: 'new', label: 'Newest first' },
+		{ value: 'old', label: 'Oldest first' }
+	];
+
 	let model = $state<string | null>('balanced');
 	let picked = $state<string[]>(['bug', 'docs']);
 	let submitted = $state('');
+	let priorityError = $state('');
 </script>
 
 <div class="mx-auto grid max-w-xl gap-4 sm:grid-cols-2">
 	<Select label="Model" options={models} bind:value={model} />
 	<Select label="Labels" options={labels} multiple bind:value={picked} placeholder="Add labels" />
-	<Select label="Reviewers" options={reviewers} multiple display="count" value={['ana', 'chloe']} />
+	<Select label="Reviewers" options={reviewers} multiple display="count" defaultValue={['ana', 'chloe']} />
 	<Select label="Branch" options={[]} placeholder="No branches yet" disabled />
+	<Select aria-label="Sort order" size="sm" options={sorts} defaultValue="new" class="sm:col-span-2 max-w-40" />
 	<form
 		class="grid gap-3 rounded-card border border-card-border p-3 sm:col-span-2"
 		onsubmit={(event) => {
 			event.preventDefault();
 			submitted = [...new FormData(event.currentTarget)].map(([k, v]) => `${k}=${v}`).join('&') || '(empty)';
 		}}
-		onreset={() => (submitted = '')}
+		onreset={() => ((submitted = ''), (priorityError = ''))}
+		oninvalidcapture={() => (priorityError = 'Pick a priority before sending.')}
 	>
-		<Select label="Priority" name="priority" options={priorities} required placeholder="Pick a priority" />
+		<Field label="Priority" required error={priorityError}>
+			<Select name="priority" options={priorities} placeholder="Pick a priority" onValueChange={() => (priorityError = '')} />
+		</Field>
 		<div class="flex gap-2">
 			<button type="submit" class={buttonClass('secondary', 'sm')}>Submit</button>
 			<button type="reset" class={buttonClass('ghost', 'sm')}>Reset</button>
