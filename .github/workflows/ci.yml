@@ -52,8 +52,12 @@ jobs:
           corepack enable
           corepack pnpm install --frozen-lockfile
 
+      # The runner image already has Chrome's system libraries; only fall back to apt (which
+      # depends on Ubuntu's mirrors being reachable) when the plain install can't launch.
       - name: Install Playwright Chromium
-        run: corepack pnpm exec playwright install --with-deps chromium
+        run: |
+          corepack pnpm exec playwright install chromium
+          node -e "require('@playwright/test').chromium.launch().then((b) => b.close())"             || corepack pnpm exec playwright install --with-deps chromium
 
       - name: Browser tests
         run: corepack pnpm exec playwright test
