@@ -42,8 +42,18 @@ async function recordTimes(page: Page): Promise<void> {
 	});
 }
 
-/** ms from `from` (e.g. 'enter:Bold') to the tooltip `name` opening. */
+/**
+ * ms from `from` (e.g. 'enter:Bold') to the tooltip `name` opening. The `toggle` event is
+ * queued as a task, so it can land after `:popover-open` already matches: wait for an open
+ * stamped after `from` (an earlier open of the same tooltip does not count).
+ */
 async function openedAfter(page: Page, from: string, name: string): Promise<number> {
+	const since = async () =>
+		page.evaluate(([from, name]) => {
+			const times = (window as unknown as { times: Record<string, number> }).times;
+			return (times[`open:${name}`] ?? -Infinity) >= times[from];
+		}, [from, name]);
+	await expect.poll(since).toBe(true);
 	return page.evaluate(([from, name]) => {
 		const times = (window as unknown as { times: Record<string, number> }).times;
 		return times[`open:${name}`] - times[from];
@@ -181,13 +191,14 @@ test.describe('tooltip and popover on one element', () => {
 		await openGroups(page);
 	});
 
-	test('both parts compose: the popover keeps its id, the tooltip adds only aria-describedby', async ({ page }) => {
+	test('both parts compose: the popover part keeps its aria, the tooltip adds only aria-describedby', async ({ page }) => {
 		const share = button(page, 'Share');
-		await expect(share).toHaveAttribute('id', /-share-trigger$/);
+		// Trigger parts set no id, so two parts on one element cannot fight over it.
+		await expect(share).not.toHaveAttribute('id');
 		await expect(share).toHaveAttribute('aria-controls', /-share-content$/);
 		await share.hover();
 		await expectShown(tip(page, 'share'), true);
-		await expect(share).toHaveAttribute('id', /-share-trigger$/);
+		await expect(share).toHaveAttribute('aria-controls', /-share-content$/);
 		await expect(share).toHaveAttribute('aria-describedby', /-tip-share-content$/);
 		await expect(share).toHaveAttribute('aria-expanded', 'false');
 	});
@@ -222,6 +233,24 @@ test.describe('tooltip and popover on one element', () => {
 		await expectShown(popover, false);
 		expect(await logEntries(page)).toEqual(['share:open:trigger', 'share:closed:escape']);
 	});
+
+	test('focus returned to the trigger by Escape does not reopen its tooltip; arriving by Tab does', async ({ page }) => {
+		const share = button(page, 'Share');
+		const popover = page.locator('[role="dialog"][id$="-share-content"]');
+		await share.focus();
+		await page.keyboard.press('Enter');
+		await expectShown(popover, true);
+		await page.keyboard.press('Escape');
+		await expectShown(popover, false);
+		await expect(share).toBeFocused();
+		await page.waitForTimeout(900);
+		expect(await isShown(tip(page, 'share'))).toBe(false);
+		// Leaving and coming back by keyboard is a real arrival: it opens.
+		await page.keyboard.press('Shift+Tab');
+		await page.keyboard.press('Tab');
+		await expect(share).toBeFocused();
+		await expectShown(tip(page, 'share'), true);
+	});
 });
 
 test.describe('tooltip motion', () => {
@@ -254,14 +283,16 @@ for (const strategy of ['native', 'fallback'] as Strategy[]) {
 			await openGroups(page, strategy);
 		});
 
-		test('it sits centred above its trigger, which gets an id to anchor to', async ({ page }) => {
+		test('it sits centred above its trigger, which needs no id', async ({ page }) => {
 			const bold = button(page, 'Bold');
-			await expect(bold).toHaveAttribute('id', /-tip-bold-trigger$/);
+			await expect(bold).not.toHaveAttribute('id');
 			await bold.hover();
 			const content = tip(page, 'bold');
 			await expectShown(content, true);
 			await settled(content);
 			await expect(content).toHaveAttribute('data-ak-position', strategy);
+			await expect(bold).not.toHaveAttribute('id');
+			if (strategy === 'native') await expect(bold).toHaveAttribute('data-ak-anchor', /.+/);
 			await expect(content).toHaveAttribute('data-side', 'top');
 			const a = (await bold.boundingBox())!;
 			const f = (await content.boundingBox())!;
@@ -293,6 +324,7 @@ for (const strategy of ['native', 'fallback'] as Strategy[]) {
 			expect(Math.abs(f.y - (a.y + a.height + 6))).toBeLessThanOrEqual(1.5);
 			await moveAway(page);
 			await expectShown(content, false);
+			await expect(edge).not.toHaveAttribute('data-ak-anchor');
 			const leftovers = await page.evaluate(() =>
 				document.adoptedStyleSheets.flatMap((s) => [...s.cssRules].map((r) => r.cssText)).filter((t) => t.includes('tip-edge'))
 			);

@@ -27,15 +27,15 @@
  * Parts:
  *   trigger   aria-describedby → content id while shown. Sets NO id and no data-state, so it
  *             composes with another part on the same element (`{...menu.trigger}
- *             {...tip.trigger}`): on one element the last spread id wins. Native anchoring
- *             needs an anchor id, so a trigger without one gets `<id>-trigger` written by
- *             the attachment (removed again on detach).
+ *             {...tip.trigger}`). Native anchoring marks the trigger with the shared
+ *             `data-ak-anchor` token, so the trigger needs no id.
  *   content   popover="manual", role="tooltip", id, data-state, data-side, data-instant
  */
 import { untrack } from 'svelte';
 import { createAttachmentKey, type Attachment } from 'svelte/attachments';
 import { openDelay } from '../logic/delay-group';
 import type { Placement, Side } from '../logic/placement';
+import { isRestoringFocus } from '../runtime/layers.svelte';
 import { cleanups, listen, part, read, subId, type MaybeGetter, type Part } from '../runtime/parts';
 import { startPositioning } from '../runtime/position';
 
@@ -271,8 +271,6 @@ export class Tooltip {
 	#wireTrigger(el: HTMLElement): () => void {
 		this.#triggerEl = el;
 		const slot = tooltipSlot();
-		const ownId = el.id === '' ? subId(this.#id, 'trigger') : null;
-		if (ownId) el.id = ownId;
 		const isTouch = (event: PointerEvent) => event.pointerType === 'touch';
 		const clearTouch = () => {
 			clearTimeout(this.#longPressTimer);
@@ -289,7 +287,9 @@ export class Tooltip {
 			}),
 			listen(el, 'focus', () => {
 				// Keyboard focus only: a mouse press focuses the trigger too, and must not reopen.
-				if (el.matches(':focus-visible')) this.#request();
+				// Focus the layer stack restores (Escape closed a popover on this trigger) is not
+				// the person arriving here, so it does not open either.
+				if (el.matches(':focus-visible') && !isRestoringFocus(el)) this.#request();
 			}),
 			listen(el, 'blur', () => this.#close()),
 			listen(el, 'pointerdown', (event) => {
@@ -328,7 +328,6 @@ export class Tooltip {
 			() => {
 				clearTouch();
 				this.#close(false);
-				if (ownId && el.id === ownId) el.removeAttribute('id');
 				if (this.#triggerEl === el) this.#triggerEl = null;
 			}
 		);
@@ -369,7 +368,7 @@ export class Tooltip {
 			return false;
 		}
 		this.#stopPositioning ??= startPositioning(el, {
-			anchor: () => this.#triggerEl,
+			anchor,
 			placement: this.#placement,
 			onSide: (side) => (this.#side = side),
 			anchorName: `--ak-tip-${this.#id.replace(/[^A-Za-z0-9_-]/g, '_')}`
