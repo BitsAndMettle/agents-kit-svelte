@@ -2,6 +2,10 @@ import { AUTH_FIELDS } from './catalog/auth-fields.ts';
 import { AUTH_ACCOUNT } from './catalog/auth-account.ts';
 import { AUTH_SIGNIN } from './catalog/auth-signin.ts';
 import { AUTH_RECOVERY } from './catalog/auth-recovery.ts';
+import { SETTINGS_SHELL } from './catalog/settings-shell.ts';
+import { SETTINGS_ROWS } from './catalog/settings-rows.ts';
+import { SETTINGS_SAVE } from './catalog/settings-save.ts';
+import { SETTINGS_CONTROLS } from './catalog/settings-controls.ts';
 import { PRIMITIVES_ACTIONS } from './catalog/primitives-actions.ts';
 import { PRIMITIVES_FORM } from './catalog/primitives-form.ts';
 import { PRIMITIVES_DISPLAY } from './catalog/primitives-display.ts';
@@ -20,7 +24,8 @@ export type CatalogCategory =
 	| 'Charts & Timelines'
 	| 'Voice & Effects'
 	| 'Primitives'
-	| 'Auth';
+	| 'Auth'
+	| 'Settings';
 
 export interface CatalogItemMeta {
 	slug: string;
@@ -2822,7 +2827,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 	}
 ];
 
-/** Every catalogue entry: the original collections, then Primitives and Auth (one file per group). */
+/** Every catalogue entry: the original collections, then Primitives, Auth and Settings (one file per group). */
 export const CATALOG_ITEMS: CatalogItemMeta[] = [
 	...COLLECTION_ITEMS,
 	...PRIMITIVES_ACTIONS,
@@ -2835,4 +2840,8 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 	...AUTH_ACCOUNT,
 	...AUTH_SIGNIN,
 	...AUTH_RECOVERY,
+	...SETTINGS_SHELL,
+	...SETTINGS_ROWS,
+	...SETTINGS_SAVE,
+	...SETTINGS_CONTROLS,
 ];

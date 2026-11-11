@@ -48,6 +48,11 @@
       "svelte": "./dist/entries/auth.js",
       "default": "./dist/entries/auth.js"
     },
+    "./settings": {
+      "types": "./dist/entries/settings.d.ts",
+      "svelte": "./dist/entries/settings.js",
+      "default": "./dist/entries/settings.js"
+    },
     "./chat": {
       "types": "./dist/entries/chat.d.ts",
       "svelte": "./dist/entries/chat.js",

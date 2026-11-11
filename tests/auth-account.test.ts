@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isThenable } from '../src/lib/auth/account/promise.ts';
+import { isThenable } from '../src/lib/core/promise.ts';
 
 test('isThenable recognises promises and nothing else', () => {
 	assert.equal(isThenable(Promise.resolve()), true);

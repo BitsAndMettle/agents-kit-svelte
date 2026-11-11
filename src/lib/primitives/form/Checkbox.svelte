@@ -3,6 +3,7 @@
 	import type { HTMLInputAttributes } from 'svelte/elements';
 	import { Check, Minus } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
+	import { TOUCH_TARGET_CLASS } from '../../ui/styles';
 	import { fieldControlAttrs, getFieldContext, joinIds } from './field';
 
 	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'type' | 'checked' | 'defaultChecked' | 'indeterminate'> {
@@ -87,7 +88,7 @@
 				onCheckedChange?.(event.currentTarget.checked);
 				rest.onchange?.(event);
 			}}
-			class="peer col-start-1 row-start-1 m-0 size-4 cursor-pointer appearance-none rounded-[5px] border border-fg-light/60 bg-card-bg motion-safe:transition-colors checked:border-accent-primary checked:bg-accent-primary indeterminate:border-accent-primary indeterminate:bg-accent-primary aria-invalid:border-status-danger disabled:cursor-not-allowed"
+			class={['peer col-start-1 row-start-1 m-0 size-4 cursor-pointer appearance-none rounded-[5px] border border-fg-light/60 bg-card-bg motion-safe:transition-colors checked:border-accent-primary checked:bg-accent-primary indeterminate:border-accent-primary indeterminate:bg-accent-primary aria-invalid:border-status-danger disabled:cursor-not-allowed', TOUCH_TARGET_CLASS]}
 		/>
 		<Check aria-hidden="true" strokeWidth={3} class="pointer-events-none col-start-1 row-start-1 size-3 text-fg-inverse opacity-0 motion-safe:transition-opacity peer-checked:opacity-100 peer-indeterminate:opacity-0" />
 		<Minus aria-hidden="true" strokeWidth={3} class="pointer-events-none col-start-1 row-start-1 size-3 text-fg-inverse opacity-0 motion-safe:transition-opacity peer-indeterminate:opacity-100" />

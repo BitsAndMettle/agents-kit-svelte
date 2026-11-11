@@ -1,4 +1,4 @@
-/** Form controls: Field, Input, Textarea, Checkbox, Switch, RadioGroup, NativeSelect, Slider. */
+/** Form controls: Field, Input, Textarea, Checkbox, Switch, RadioGroup, NativeSelect, Slider; plus the shared submit plumbing (`FormSubmit`) and form-data readers. */
 
 export { default as Field } from './Field.svelte';
 export type { Props as FieldProps } from './Field.svelte';
@@ -16,7 +16,10 @@ export { default as NativeSelect } from './NativeSelect.svelte';
 export type { Props as NativeSelectProps, NativeSelectSize, NativeSelectOption, NativeSelectOptionGroup } from './NativeSelect.svelte';
 export { default as Slider } from './Slider.svelte';
 export type { Props as SliderProps } from './Slider.svelte';
-export { getFieldContext, fieldControlAttrs } from './field';
-export type { FieldState, FieldControlAttrs, FieldControlKind } from './field';
+export { getFieldContext, setFieldContext, fieldControlAttrs, createFieldState, joinIds } from './field';
+export type { FieldState, FieldStateOptions, FieldControlAttrs, FieldControlKind } from './field';
+export { FormSubmit } from './submit.svelte';
+export type { FormSubmitOptions, FormResult, FormSubmitContext, FormSubmitHandler } from './submit.svelte';
+export { readText, readCheck, readBoolean } from './form-data';
 export type { FormControlSize } from './classes';
 export type { CharacterCount, CharacterCountFormatter } from './text-count';

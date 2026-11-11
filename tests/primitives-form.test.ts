@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { fieldControlAttrs, joinIds, type FieldState } from '../src/lib/primitives/form/field.ts';
+import { createFieldState, fieldControlAttrs, joinIds, type FieldState } from '../src/lib/primitives/form/field.ts';
+import { readBoolean } from '../src/lib/primitives/form/form-data.ts';
 import { counterMessage, formatCharacterCount, nearLimitThreshold } from '../src/lib/primitives/form/text-count.ts';
 import { sliderRatio } from '../src/lib/primitives/form/slider-ratio.ts';
 
@@ -93,4 +94,61 @@ test('sliderRatio clamps and survives an empty range', () => {
 	assert.equal(sliderRatio(30, 0, 10), 1);
 	assert.equal(sliderRatio(4, 4, 4), 0);
 	assert.equal(sliderRatio(Number.NaN, 0, 10), 0);
+});
+
+test('describedBy ids join after the description and before the error, in a plain field only', () => {
+	const described = field({ describedBy: ['row-status', 'row-lock'], errorId: 'f-error', invalid: true });
+	assert.equal(fieldControlAttrs(described, { describedBy: 'own' })['aria-describedby'], 'own f-hint row-status row-lock f-error');
+	assert.equal(fieldControlAttrs(field({ describedBy: ['row-status'], group: true }), { describedBy: 'own' })['aria-describedby'], 'own');
+	// Without describedBy, nothing changes.
+	assert.equal(fieldControlAttrs(field(), {})['aria-describedby'], 'f-hint');
+});
+
+test("createFieldState uses Field's id scheme and reads its options live", () => {
+	let description = false;
+	let error = false;
+	let lockId: string | undefined;
+	const state = createFieldState({
+		id: 'row1',
+		description: () => description,
+		error: () => error,
+		required: () => true,
+		describedBy: () => [undefined, lockId, '']
+	});
+	assert.equal(state.controlId, 'row1-control');
+	assert.equal(state.labelId, 'row1-label');
+	assert.equal(state.descriptionId, undefined);
+	assert.equal(state.errorId, undefined);
+	assert.equal(state.invalid, false);
+	assert.equal(state.describedBy, undefined);
+	description = true;
+	error = true;
+	lockId = 'row1-lock';
+	assert.equal(state.descriptionId, 'row1-description');
+	assert.equal(state.hintId, 'row1-description');
+	assert.equal(state.errorId, 'row1-error');
+	assert.equal(state.invalid, true);
+	assert.deepEqual(state.describedBy, ['row1-lock']);
+	assert.deepEqual(fieldControlAttrs(state), {
+		id: 'row1-control',
+		'aria-describedby': 'row1-description row1-lock row1-error',
+		'aria-invalid': 'true',
+		'aria-errormessage': 'row1-error',
+		required: true
+	});
+	assert.equal(createFieldState({ id: 'x', controlId: () => 'custom' }).controlId, 'custom');
+});
+
+test('readBoolean reads the hidden-false plus checkbox-true pair, last value wins', () => {
+	const data = new FormData();
+	data.append('on', 'false');
+	data.append('on', 'true');
+	data.append('off', 'false');
+	data.append('box', 'on');
+	data.append('zero', '0');
+	assert.equal(readBoolean(data, 'on'), true);
+	assert.equal(readBoolean(data, 'off'), false);
+	assert.equal(readBoolean(data, 'box'), true);
+	assert.equal(readBoolean(data, 'zero'), false);
+	assert.equal(readBoolean(data, 'missing'), false);
 });

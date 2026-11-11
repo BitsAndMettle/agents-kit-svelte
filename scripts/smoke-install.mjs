@@ -107,9 +107,12 @@ mount(App, { target: document.getElementById('app')! });
 	import { BorderBeam } from 'agents-kit-svelte/effects';
 	import { buttonClass } from 'agents-kit-svelte/primitives';
 	import { SignInCard } from 'agents-kit-svelte/auth';
+	import { pickLock, searchSettings, type SettingsSearchEntry } from 'agents-kit-svelte/settings';
 	import { AgentSession, parseUnifiedDiff } from 'agents-kit-svelte/core';
 	import { SAMPLE_ISSUE, SAMPLE_SKILLS, SAMPLE_SUB_AGENTS } from 'agents-kit-svelte/fixtures';
 
+	const entries: SettingsSearchEntry[] = [{ id: 'retention', label: 'Data retention', section: 'Data', href: '#retention' }];
+	const lock = pickLock({ kind: 'plan' }, { kind: 'readonly' });
 	const session = new AgentSession();
 	const diff = parseUnifiedDiff(['@@ -1 +1 @@', '-a', '+b'].join(String.fromCharCode(10)));
 
@@ -132,6 +135,7 @@ mount(App, { target: document.getElementById('app')! });
 	<IntelligentUIRenderer nodes={[]} />
 	<InsightCards />
 	<SignInCard onSubmit={() => undefined} />
+	<p>{searchSettings(entries, 'ret').length} {lock?.kind}</p>
 	<BorderBeam><button class={buttonClass('primary')}>{session.state.status} {diff.additions}</button></BorderBeam>
 </main>
 `

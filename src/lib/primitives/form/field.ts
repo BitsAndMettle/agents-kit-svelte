@@ -20,6 +20,12 @@ export interface FieldState {
 	readonly disabled: boolean;
 	/** A `<fieldset>` around several controls (or one RadioGroup) instead of one labelled control. */
 	readonly group: boolean;
+	/**
+	 * More ids that describe the control, after the description and before the error: a settings
+	 * row's status line or lock reason, say. Joined by `fieldControlAttrs` for a plain field; in a
+	 * group field the `<fieldset>` should carry them.
+	 */
+	readonly describedBy?: readonly string[];
 }
 
 /**
@@ -100,7 +106,9 @@ export function fieldControlAttrs(
 	const attrs: FieldControlAttrs = {};
 	const id = plain ? field.controlId : (own.id ?? undefined);
 	if (id) attrs.id = id;
-	const describedBy = plain ? joinIds(own.describedBy, field.descriptionId, errorId) : joinIds(own.describedBy);
+	const describedBy = plain
+		? joinIds(own.describedBy, field.descriptionId, ...(field.describedBy ?? []), errorId)
+		: joinIds(own.describedBy);
 	if (describedBy) attrs['aria-describedby'] = describedBy;
 	if (invalid) attrs['aria-invalid'] = 'true';
 	if (errorId) attrs['aria-errormessage'] = errorId;
@@ -109,4 +117,69 @@ export function fieldControlAttrs(
 	else if (required) attrs.required = true;
 	if (disabled) attrs.disabled = true;
 	return attrs;
+}
+
+/** What `createFieldState` reads, each lazily, so the state follows the owner's props. */
+export interface FieldStateOptions {
+	/**
+	 * Base id. The parts are `${id}-control`, `${id}-label`, `${id}-description` and `${id}-error`,
+	 * the same scheme `Field` uses, so a custom layout wires its label, description and error the
+	 * same way. Pass `$props.id()`.
+	 */
+	id: string;
+	/** The control's id, when the owner sets one; defaults to `${id}-control`. */
+	controlId?: () => string | undefined;
+	/** True while a description is rendered at `descriptionId`. */
+	description?: () => boolean;
+	/** True while an error message is rendered at `${id}-error`; it also makes the field invalid. */
+	error?: () => boolean;
+	invalid?: () => boolean;
+	required?: () => boolean;
+	disabled?: () => boolean;
+	group?: () => boolean;
+	/** More describing ids (a status line, a lock reason); blanks are skipped. */
+	describedBy?: () => readonly (string | null | undefined)[] | undefined;
+}
+
+/**
+ * Builds the state a `Field` gives its control, for components that lay out their own label,
+ * description and error (a settings row) but want kit controls inside to wire themselves the
+ * same way. Pass the result to `setFieldContext`. Every property is a getter over `opts`.
+ *
+ * @param opts - The base id and lazy readers of the owner's props.
+ * @returns A live `FieldState`.
+ */
+export function createFieldState(opts: FieldStateOptions): FieldState {
+	const { id } = opts;
+	return {
+		get controlId() {
+			return opts.controlId?.() ?? `${id}-control`;
+		},
+		labelId: `${id}-label`,
+		get descriptionId() {
+			return opts.description?.() ? `${id}-description` : undefined;
+		},
+		get hintId() {
+			return this.descriptionId;
+		},
+		get errorId() {
+			return opts.error?.() ? `${id}-error` : undefined;
+		},
+		get invalid() {
+			return Boolean(opts.invalid?.()) || Boolean(opts.error?.());
+		},
+		get required() {
+			return Boolean(opts.required?.());
+		},
+		get disabled() {
+			return Boolean(opts.disabled?.());
+		},
+		get group() {
+			return Boolean(opts.group?.());
+		},
+		get describedBy() {
+			const ids = (opts.describedBy?.() ?? []).filter((v): v is string => Boolean(v));
+			return ids.length ? ids : undefined;
+		}
+	};
 }

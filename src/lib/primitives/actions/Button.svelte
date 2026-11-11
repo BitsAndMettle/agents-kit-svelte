@@ -5,6 +5,7 @@
 	import { LoaderCircle } from '@lucide/svelte';
 	import type { HTMLAnchorAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
+	import { TOUCH_TARGET_CLASS } from '../../ui/styles';
 	import { actionClass } from './shared';
 	import { actionAttrs, isBlocked } from './state';
 
@@ -87,11 +88,11 @@
 {/snippet}
 
 {#if href !== undefined}
-	<a {...rest as HTMLAnchorAttributes} bind:this={ref} {...attrs} {target} {rel} {download} onclick={guard} class={cn(actionClass(variant, size, pill), (disabled || softDisabled) && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
+	<a {...rest as HTMLAnchorAttributes} bind:this={ref} {...attrs} {target} {rel} {download} onclick={guard} class={cn(actionClass(variant, size, pill), TOUCH_TARGET_CLASS, (disabled || softDisabled) && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
 		{@render content()}
 	</a>
 {:else}
-	<button {...rest} bind:this={ref} {...attrs} {type} onclick={guard} class={cn(actionClass(variant, size, pill), softDisabled && !disabled && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
+	<button {...rest} bind:this={ref} {...attrs} {type} onclick={guard} class={cn(actionClass(variant, size, pill), TOUCH_TARGET_CLASS, softDisabled && !disabled && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
 		{@render content()}
 	</button>
 {/if}

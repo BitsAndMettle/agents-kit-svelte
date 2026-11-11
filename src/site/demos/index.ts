@@ -9,8 +9,12 @@ import { DEMOS_AUTH_FIELDS } from './auth-fields.ts';
 import { DEMOS_AUTH_ACCOUNT } from './auth-account.ts';
 import { DEMOS_AUTH_SIGNIN } from './auth-signin.ts';
 import { DEMOS_AUTH_RECOVERY } from './auth-recovery.ts';
+import { DEMOS_SETTINGS_SHELL } from './settings-shell.ts';
+import { DEMOS_SETTINGS_ROWS } from './settings-rows.ts';
+import { DEMOS_SETTINGS_SAVE } from './settings-save.ts';
+import { DEMOS_SETTINGS_CONTROLS } from './settings-controls.ts';
 
-/** Every Primitives and Auth demo, keyed by catalogue slug. The showcase renders these generically. */
+/** Every Primitives, Auth and Settings demo, keyed by catalogue slug. The showcase renders these generically. */
 export const PRIMITIVE_DEMOS: Record<string, Component> = {
 	...DEMOS_ACTIONS,
 	...DEMOS_FORM,
@@ -22,4 +26,8 @@ export const PRIMITIVE_DEMOS: Record<string, Component> = {
 	...DEMOS_AUTH_ACCOUNT,
 	...DEMOS_AUTH_SIGNIN,
 	...DEMOS_AUTH_RECOVERY,
+	...DEMOS_SETTINGS_SHELL,
+	...DEMOS_SETTINGS_ROWS,
+	...DEMOS_SETTINGS_SAVE,
+	...DEMOS_SETTINGS_CONTROLS,
 };

@@ -193,7 +193,8 @@
 		'Charts & Timelines',
 		'Voice & Effects',
 		'Primitives',
-		'Auth'
+		'Auth',
+		'Settings'
 	];
 
 	type CardTabMode = 'preview' | 'usage' | 'source';
