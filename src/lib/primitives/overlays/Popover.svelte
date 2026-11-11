@@ -40,7 +40,7 @@
 </script>
 
 <script lang="ts">
-	import { Popover } from '../../headless/patterns/popover.svelte';
+	import { Popover as HeadlessPopover } from '../../headless/patterns/popover.svelte';
 	import { cn } from '../../ui/cn';
 	import { ARROW_GAP, cardArrowClass, FLOAT_MOTION, followAnchor, POPOVER_SURFACE } from './overlay';
 	import { toPlacement } from '../placement';
@@ -71,7 +71,7 @@
 	const findTrigger = (surface: HTMLElement) => document.querySelector(`[aria-controls="${CSS.escape(surface.id)}"]`);
 
 	const id = $props.id();
-	const popover = new Popover({
+	const popover = new HeadlessPopover({
 		id,
 		open: () => open,
 		onOpenChange: (next, reason) => {

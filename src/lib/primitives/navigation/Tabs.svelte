@@ -14,7 +14,7 @@
 	import { cn } from '../../ui/cn';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { SEGMENT_GROUP_CLASS, segmentClass } from '../../ui/styles';
-	import { Tabs } from '../../headless/patterns/groups.svelte';
+	import { Tabs as HeadlessTabs } from '../../headless/patterns/groups.svelte';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		items: TabItem[];
@@ -62,7 +62,7 @@
 
 	let current = $derived(value ?? defaultValue ?? items.find((item) => !item.disabled)?.value ?? '');
 
-	const tabs = new Tabs({
+	const tabs = new HeadlessTabs({
 		id,
 		value: () => current,
 		onValueChange: (next) => {

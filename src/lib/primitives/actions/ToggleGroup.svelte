@@ -25,7 +25,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
 	import { segmentClass, SEGMENT_GROUP_CLASS } from '../../ui/styles';
-	import { ToggleGroup } from '../../headless/patterns/groups.svelte';
+	import { ToggleGroup as HeadlessToggleGroup } from '../../headless/patterns/groups.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'role' | 'aria-label'> {
 		/** Names the group for screen readers. */
@@ -76,7 +76,7 @@
 
 	const id = $props.id();
 	// `multiple` is fixed at construction, as the headless pattern requires.
-	const group = new ToggleGroup<boolean>({
+	const group = new HeadlessToggleGroup<boolean>({
 		id,
 		// svelte-ignore state_referenced_locally
 		multiple,

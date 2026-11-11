@@ -36,7 +36,7 @@
 </script>
 
 <script lang="ts">
-	import { Tooltip } from '../../headless/patterns/tooltip.svelte';
+	import { Tooltip as HeadlessTooltip } from '../../headless/patterns/tooltip.svelte';
 	import { cn } from '../../ui/cn';
 	import { ARROW_GAP, FLOAT_MOTION, followAnchor, tipArrowClass, TOOLTIP_SURFACE } from './overlay';
 	import { toPlacement } from '../placement';
@@ -60,7 +60,7 @@
 	const findTrigger = (surface: HTMLElement) => document.querySelector(`[aria-describedby~="${CSS.escape(surface.id)}"]`);
 
 	const id = $props.id();
-	const tip = new Tooltip({
+	const tip = new HeadlessTooltip({
 		id,
 		placement: () => resolved,
 		get delay() {

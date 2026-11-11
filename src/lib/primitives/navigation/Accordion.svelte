@@ -14,7 +14,7 @@
 	import { cn } from '../../ui/cn';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { ChevronDown } from '@lucide/svelte';
-	import { Accordion } from '../../headless/patterns/groups.svelte';
+	import { Accordion as HeadlessAccordion } from '../../headless/patterns/groups.svelte';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		items: AccordionItem[];
@@ -64,13 +64,13 @@
 
 	// The headless layer fixes `multiple` at construction, so both modes are built and the
 	// prop picks one.
-	const single = new Accordion({
+	const single = new HeadlessAccordion({
 		id,
 		collapsible: () => collapsible,
 		value: () => (Array.isArray(current) ? (current[0] ?? null) : current),
 		onValueChange: report
 	});
-	const several = new Accordion({
+	const several = new HeadlessAccordion({
 		id,
 		multiple: true,
 		value: () => (Array.isArray(current) ? current : current === null ? [] : [current]),

@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { Check, ChevronDown } from '@lucide/svelte';
-	import { Select } from '../../headless/patterns/listbox.svelte';
+	import { Select as HeadlessSelect } from '../../headless/patterns/listbox.svelte';
 	import { cn } from '../../ui/cn';
 	import { badgeClass, INPUT_CLASS } from '../../ui/styles';
 	import { fieldControlAttrs, getFieldContext } from '../form/field';
@@ -54,7 +54,7 @@
 	const labelledBy = untrack(() => (inField ? field.labelId : label !== undefined ? undefined : (labelledByProp ?? false)));
 
 	const uid = $props.id();
-	const select = new Select<boolean>({
+	const select = new HeadlessSelect<boolean>({
 		id: uid,
 		multiple: untrack(() => many()),
 		name: untrack(() => name),

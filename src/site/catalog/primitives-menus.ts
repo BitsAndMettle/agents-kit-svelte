@@ -15,6 +15,11 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 
   let wrap = $state(true);
   let open = $state(false);
+  let last = $state('');
+
+  const rename = () => (last = 'rename');
+  const copyLink = () => navigator.clipboard.writeText(location.href);
+  const remove = () => (last = 'delete');
 
   const items: MenuEntry[] = $derived([
     { value: 'rename', label: 'Rename', shortcut: 'F2', onSelect: () => rename() },
@@ -41,8 +46,13 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 		usageSnippet: `<script lang="ts">
   import { ContextMenu, type MenuEntry } from 'agents-kit-svelte/primitives';
 
+  let last = $state('');
+  const openFile = () => (last = 'open');
+  const rename = () => (last = 'rename');
+  const remove = () => (last = 'delete');
+
   const items: MenuEntry[] = [
-    { value: 'open', label: 'Open', onSelect: open },
+    { value: 'open', label: 'Open', onSelect: openFile },
     { value: 'rename', label: 'Rename', shortcut: 'F2', onSelect: rename },
     { kind: 'separator' },
     { value: 'delete', label: 'Delete', tone: 'danger', onSelect: remove }
@@ -68,8 +78,19 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
     { value: 'quick', label: 'Quick', description: 'Small edits', group: 'Everyday' },
     { value: 'deep', label: 'Deep', description: 'Hard bugs', group: 'Heavy' }
   ];
+  const tags: PickerOption[] = [
+    { value: 'bug', label: 'Bug' },
+    { value: 'docs', label: 'Docs' },
+    { value: 'ui', label: 'UI' }
+  ];
+  const priorities: PickerOption[] = [
+    { value: 'p1', label: 'P1, urgent' },
+    { value: 'p2', label: 'P2, soon' },
+    { value: 'p3', label: 'P3, later' }
+  ];
   let model = $state<string | null>('quick');
   let labels = $state<string[]>([]);
+  let error = $state<string | undefined>(undefined);
 </script>
 
 <Select label="Model" {options} bind:value={model} />
@@ -91,6 +112,14 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 		usageSnippet: `<script lang="ts">
   import { Combobox, Field, type PickerOption } from 'agents-kit-svelte/primitives';
 
+  const people: PickerOption[] = [
+    { value: 'ana', label: 'Ana Ruiz' },
+    { value: 'kai', label: 'Kai Tanaka' }
+  ];
+  const branches: PickerOption[] = [
+    { value: 'main', label: 'main' },
+    { value: 'release', label: 'release' }
+  ];
   let assignee = $state<string | null>(null);
   let query = $state('');
   let results = $state<PickerOption[]>([]);
@@ -115,6 +144,9 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
   import { CommandPalette, type PaletteCommand } from 'agents-kit-svelte/primitives';
 
   let recent = $state<string[]>([]);
+  let cards = $state(0);
+  const newCard = () => (cards += 1);
+  const openSettings = () => location.assign('/settings');
   const commands: PaletteCommand[] = [
     { id: 'new', label: 'New card', group: 'Board', shortcut: 'C', onRun: newCard },
     { id: 'settings', label: 'Open settings', description: 'Workspace and account', group: 'Workspace', onRun: openSettings }

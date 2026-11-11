@@ -2,7 +2,7 @@
 	import { flushSync, untrack } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 	import { Check, LoaderCircle, X } from '@lucide/svelte';
-	import { Combobox } from '../../headless/patterns/listbox.svelte';
+	import { Combobox as HeadlessCombobox } from '../../headless/patterns/listbox.svelte';
 	import type { ChangeReason } from '../../headless/runtime/parts';
 	import { cn } from '../../ui/cn';
 	import { INPUT_CLASS } from '../../ui/styles';
@@ -129,7 +129,7 @@
 	const labelledBy = untrack(() => (inField ? field.labelId : label !== undefined ? undefined : (labelledByProp ?? false)));
 
 	const uid = $props.id();
-	const box = new Combobox({
+	const box = new HeadlessCombobox({
 		id: uid,
 		name: untrack(() => name),
 		labelledBy,

@@ -53,7 +53,7 @@
 
 <script lang="ts">
 	import { X } from '@lucide/svelte';
-	import { Dialog } from '../../headless/patterns/dialog.svelte';
+	import { Dialog as HeadlessDialog } from '../../headless/patterns/dialog.svelte';
 	import { cn } from '../../ui/cn';
 	import { buttonClass } from '../../ui/styles';
 	import {
@@ -88,7 +88,7 @@
 	}: Props = $props();
 
 	const id = $props.id();
-	const dialog = new Dialog({
+	const dialog = new HeadlessDialog({
 		id,
 		open: () => open,
 		onOpenChange: (next, reason) => {
