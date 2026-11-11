@@ -360,7 +360,7 @@ class ListboxCore {
 					notify: (open, reason) => this.writeOpen(open, reason),
 					initialFocus: () => {
 						// Shown now: bring the highlighted option into the list's view.
-						this.nav.highlight(this.nav.highlighted);
+						this.nav.highlight(this.nav.highlighted, { scroll: true });
 						return 'none';
 					},
 					placement: () => ({ ...LIST_PLACEMENT, ...(popup.placement === undefined ? {} : read(popup.placement)) })
@@ -377,9 +377,10 @@ class ListboxCore {
 							const to = event.relatedTarget instanceof Node ? event.relatedTarget : null;
 							// No related target: the window lost focus; not a dismissal.
 							if (!to || this.#listEl?.contains(to)) return;
-							// Close after focus has landed: during focusout the active element is
-							// <body>, which the stack's focus return would treat as lost focus and
-							// pull back to this owner.
+							// Close after focus has landed. This close goes through desired state
+							// (stack.close, reason 'api'), which restores focus when it is on <body>,
+							// as it is during focusout; the stack's own no-pull-back focus-out path
+							// only covers focus leaving the layer's content, which never has focus here.
 							setTimeout(() => {
 								const now = document.activeElement;
 								if (now !== el && !this.#listEl?.contains(now)) this.writeOpen(false, 'focus-out');
@@ -432,7 +433,7 @@ class ListboxCore {
 					// The rendered option set changed (the caller filtered, or reset its query in
 					// code): with autoHighlight, the first match takes the highlight.
 					const observer = new MutationObserver(() => {
-						if (read(config.autoHighlight)) this.nav.highlight('first');
+						if (read(config.autoHighlight)) this.nav.highlight('first', { scroll: true });
 					});
 					observer.observe(el, { childList: true, subtree: true });
 					offs.push(() => observer.disconnect());
@@ -643,7 +644,7 @@ class ListboxCore {
 			if (edge === undefined) return true;
 			const from = highlighted !== null && order.includes(highlighted) ? highlighted : edge;
 			this.#setSelected(addValues(this.#selected(), rangeValues(order, from, edge)));
-			this.nav.highlight(edge);
+			this.nav.highlight(edge, { scroll: true });
 			this.#rangeAnchor = edge;
 			return true;
 		}
@@ -688,7 +689,7 @@ class ListboxCore {
 	#onListFocus(): void {
 		const current = this.nav.highlighted;
 		if (current !== null && this.#order().includes(current)) return;
-		this.nav.highlight(this.#firstSelectedRendered() ?? 'first');
+		this.nav.highlight(this.#firstSelectedRendered() ?? 'first', { scroll: true });
 	}
 
 	// ------------------------------------------------------------------ DOM reads
@@ -726,8 +727,8 @@ class ListboxCore {
 	}
 
 	get trigger(): Part<HTMLButtonElement> {
+		// No id: a trigger part never owns one (parts.ts "Ids").
 		return part<HTMLButtonElement>(this.#keys.owner, this.#attachOwner, {
-			id: subId(this.#id, 'trigger'),
 			type: 'button',
 			role: 'combobox',
 			'aria-haspopup': 'listbox',
@@ -740,6 +741,8 @@ class ListboxCore {
 	}
 
 	get input(): Part<HTMLInputElement> {
+		// The input is this pattern's own element and not a nav item, so it may own an id:
+		// the label's `for` needs one.
 		const attrs: Part<HTMLInputElement> & { autocomplete: 'off' } = {
 			id: subId(this.#id, 'input'),
 			role: 'combobox',
