@@ -20,7 +20,7 @@ export interface CatalogItemMeta {
 }
 
 export const CATALOG_ITEMS: CatalogItemMeta[] = [
-	// 1. beUI Agents (21 components)
+	// 1. beUI Agents (23 components)
 	{
 		slug: 'chat-workbench',
 		name: 'ChatWorkbench',
@@ -596,6 +596,63 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   {elapsed}
   bind:expanded
   onSelectFile={(path) => console.log('open', path)}
+/>`
+	},
+
+	{
+		slug: 'device-approval',
+		name: 'DeviceApprovalCard',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/DeviceApprovalCard.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'A new device asks to act with the same rights as this one. Shows the device, a large match code read digit by digit to screen readers, what it will be able to do and the time left; Approve stays off until the person confirms the code matches, Deny is always one press, and the card collapses to a one-line outcome.',
+		usageSnippet: `<script lang="ts">
+  import { DeviceApprovalCard } from 'agents-kit-svelte';
+</script>
+
+<DeviceApprovalCard
+  device={{ name: 'Pixel 9', kind: 'phone', platform: 'Android 16', location: 'Berlin, Germany' }}
+  code="482 913"
+  requestedAt="2026-11-11T08:59:30Z"
+  now="2026-11-11T09:00:00Z"
+  expiresAt="2026-11-11T09:04:00Z"
+  grants={['See your agents and their runs', 'Approve or stop work on your behalf']}
+  onApprove={() => console.log('approved')}
+  onDeny={() => console.log('denied')}
+/>`
+	},
+	{
+		slug: 'cited-answer',
+		name: 'CitedAnswer',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/CitedAnswer.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'An agent answers a question on someone’s behalf and shows what it based the answer on: each source as a quote with its location and a check badge (verified, not checked, or quote not found). A mismatch raises a banner and hides Send.',
+		usageSnippet: `<script lang="ts">
+  import { CitedAnswer, type CitedSource } from 'agents-kit-svelte';
+
+  const sources: CitedSource[] = [
+    {
+      id: 'plan-retry',
+      title: 'Run controls plan',
+      location: 'section 3.2',
+      quote: 'Retry is offered on failed runs only.',
+      check: 'verified'
+    }
+  ];
+</script>
+
+<CitedAnswer
+  question="Should the retry button show on cancelled runs?"
+  askedBy="Builder on card #3412"
+  answer="No. The plan limits Retry to failed runs."
+  {sources}
+  status="draft"
+  onSend={() => console.log('send')}
+  onEdit={() => console.log('edit')}
+  onOpenSource={(source) => console.log('open', source.id)}
 />`
 	},
 
