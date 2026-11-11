@@ -42,7 +42,8 @@
 		if (item.actual?.[1] !== undefined) return item.actual[1];
 		if (item.forecast !== undefined) return item.forecast;
 		const [p0, p1] = item.planned;
-		if (!item.actual && today > p0) return Math.max(p1, today + (p1 - p0));
+		if (item.actual) return Math.max(p1, today);
+		if (today > p0) return Math.max(p1, today + (p1 - p0));
 		return p1;
 	}
 	function slip(item: TimelineItem): number {

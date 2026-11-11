@@ -76,9 +76,11 @@ export function layoutLineage(nodes: LineageNode[], edges: LineageEdge[], collap
 	let rows = 0;
 	for (let c = 0; c < cols; c++) {
 		const inCol = nodes.filter((n) => col.get(n.id) === c && !parkedOn.has(n.id)).map((n) => n.id);
+		const colOrder = new Map(inCol.map((id, i) => [id, i]));
+		// No placed parents: fall back to the node's place within its own column, not the whole list.
 		const weight = (id: string): number => {
 			const rs = (parents.get(id) ?? []).map((p) => row.get(p)).filter((r): r is number => r !== undefined);
-			return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : (order.get(id) ?? 0);
+			return rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : (colOrder.get(id) ?? 0);
 		};
 		inCol.sort((a, b) => weight(a) - weight(b) || (order.get(a) ?? 0) - (order.get(b) ?? 0));
 		let next = 0;

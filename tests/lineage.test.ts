@@ -59,3 +59,18 @@ test('traceLineage collects ancestors and descendants of a node', () => {
 	assert.ok(trace.edges.has('p1→r1'));
 	assert.ok(!trace.edges.has('f→c2'));
 });
+
+test('layoutLineage stacks a second root under the first, not at its index in the node list', () => {
+	const many: LineageNode[] = [
+		{ id: 'f1', kind: 'feature', label: 'F1' },
+		{ id: 'a', kind: 'card', label: 'A' },
+		{ id: 'b', kind: 'card', label: 'B' },
+		{ id: 'c', kind: 'card', label: 'C' },
+		{ id: 'f2', kind: 'feature', label: 'F2' }
+	];
+	const spawned: LineageEdge[] = ['a', 'b', 'c'].map((to) => ({ from: 'f1', to, rel: 'spawned' }));
+	const { slots, rows } = layoutLineage(many, spawned);
+	assert.equal(slots.get('f2')?.col, 0);
+	assert.equal(slots.get('f2')?.row, 1);
+	assert.equal(rows, 3);
+});
