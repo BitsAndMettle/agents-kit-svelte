@@ -102,11 +102,17 @@
 
 	// The checklist is not a live region: a screen reader reads it as the input's description. This quiet
 	// line is announced once typing pauses, and only when the number of met rules changed.
+	// Nothing is announced until the person has edited the field, so a page load stays silent.
 	let summary = $state('');
+	let edited = $state(false);
+	let announcedCount = untrack(() => metCount);
 	$effect(() => {
-		if (!rules?.length) return;
-		const text = rulesSummary(metCount, rules.length);
+		if (!rules?.length || !edited) return;
+		const count = metCount;
+		if (count === announcedCount) return;
+		const text = rulesSummary(count, rules.length);
 		const timer = setTimeout(() => {
+			announcedCount = count;
 			summary = text;
 		}, 900);
 		return () => clearTimeout(timer);
@@ -136,7 +142,12 @@
 
 	const strengthTone = $derived<UiTone>(strength === undefined || strength <= 1 ? 'danger' : strength === 2 ? 'warning' : 'success');
 
-	function sync(event: KeyboardEvent): void {
+	/**
+	 * The browser offers no Caps Lock query on focus itself, only on a key or mouse event. A key press
+	 * reads it (including the Tab key's own key-up, which lands here after focus moves in), and a
+	 * pointer press reads it just before the click focuses the input.
+	 */
+	function sync(event: KeyboardEvent | MouseEvent): void {
 		capsOn = event.getModifierState?.('CapsLock') ?? false;
 	}
 </script>
@@ -160,8 +171,13 @@
 			autocorrect="off"
 			spellcheck="false"
 			oninput={(event) => {
+				edited = true;
 				onValueChange?.(event.currentTarget.value);
 				rest.oninput?.(event);
+			}}
+			onpointerdown={(event) => {
+				sync(event);
+				rest.onpointerdown?.(event);
 			}}
 			onkeydown={(event) => {
 				sync(event);

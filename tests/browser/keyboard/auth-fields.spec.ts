@@ -85,10 +85,13 @@ test.describe('PasswordInput', () => {
 		const section = await openSection(page, 'password-input');
 		const fresh = section.locator('input[name=newPassword]');
 		const status = section.locator('span[role=status]');
+		// Nothing is announced on load, however long the page sits.
+		await page.waitForTimeout(1300);
+		await expect(status).toHaveText('');
 		await fresh.focus();
 		await page.keyboard.type('Abc123', { delay: 30 });
-		// Still inside the quiet period: nothing new was announced.
-		await expect(status).toHaveText('0 of 3 requirements met');
+		// Still inside the quiet period: nothing announced yet.
+		await expect(status).toHaveText('');
 		await expect(status).toHaveText('2 of 3 requirements met', { timeout: 3000 });
 		// The status holds one short line, not the list.
 		await expect(status).not.toContainText('At least');
@@ -109,6 +112,17 @@ test.describe('PasswordInput', () => {
 		await expect(warning).toBeVisible();
 		await section.locator('input[name=password]').focus();
 		await expect(warning).toHaveCount(0);
+	});
+
+	test('Caps Lock is also read from the pointer press that focuses the input', async ({ page }) => {
+		const section = await openSection(page, 'password-input');
+		const fresh = section.locator('input[name=newPassword]');
+		const warning = section.locator('p[aria-live=polite]', { hasText: 'Caps Lock is on' });
+		await fresh.evaluate((el) => {
+			el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, modifierCapsLock: true }));
+			el.focus();
+		});
+		await expect(warning).toBeVisible();
 	});
 
 	test('minlength blocks a native submit and a form post carries the typed text', async ({ page }) => {
@@ -133,16 +147,17 @@ test.describe('OtpInput', () => {
 	test('is one real input with the one-time-code attributes, named by its Field', async ({ page }) => {
 		const section = await openSection(page, 'otp-input');
 		const code = section.locator('input[name=code]');
-		await expect(section.locator('input')).toHaveCount(2);
+		await expect(section.locator('input')).toHaveCount(4);
 		await expect(code).toHaveAccessibleName(/Verification code/);
 		await expect(code).toHaveAttribute('autocomplete', 'one-time-code');
 		await expect(code).toHaveAttribute('inputmode', 'numeric');
-		await expect(code).toHaveAttribute('maxlength', '6');
+		// No maxlength: the browser would cut "123 456" before it could be cleaned.
+		await expect(code).not.toHaveAttribute('maxlength');
 		await expect(code).toHaveAttribute('pattern', '[0-9]{6}');
 		const backup = section.locator('input[name=backup]');
 		await expect(backup).toHaveAttribute('inputmode', 'text');
 		await expect(backup).toHaveAttribute('pattern', '[0-9A-Za-z]{8}');
-		await expect(section.locator('[data-otp-cell]')).toHaveCount(14);
+		await expect(section.locator('[data-otp-cell]')).toHaveCount(26);
 	});
 
 	test('typing fills the cells, highlights the active one, and reports completion once', async ({ page }) => {
@@ -181,6 +196,102 @@ test.describe('OtpInput', () => {
 		await expect(code).toHaveValue('');
 		await paste(code, ' 654-321 ');
 		await expect(code).toHaveValue('654321');
+	});
+
+	test('text inserted by an IME, drop or autofill (not paste) is cleaned before the browser can cut it', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const code = section.locator('input[name=code]');
+		await code.focus();
+		await page.keyboard.insertText('123 456');
+		await expect(code).toHaveValue('123456');
+		await press(page, 'Control+a', 'Backspace');
+		await page.keyboard.insertText('654-321');
+		await expect(code).toHaveValue('654321');
+		await press(page, 'Control+a', 'Backspace');
+		await page.keyboard.insertText('１２３４５６');
+		await expect(code).toHaveValue('123456');
+		await press(page, 'Control+a', 'Backspace');
+		await page.keyboard.insertText('1234567890');
+		await expect(code).toHaveValue('123456');
+	});
+
+	test('a value passed in is cleaned and written back, so native submit is not blocked', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const saved = section.locator('input[name=saved]');
+		const loaded = section.locator('input[name=loaded]');
+		await expect(saved).toHaveValue('123456');
+		await expect(loaded).toHaveValue('123456');
+		const cells = section.locator('[data-otp-cell]');
+		await expect(cells.nth(14)).toHaveText('1');
+		await expect(cells.nth(19)).toHaveText('6');
+		await expect(cells.nth(25)).toHaveText('6');
+		expect(await loaded.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(true);
+		// A pre-filled full code never submits the form by itself.
+		await page.waitForTimeout(500);
+		await expect(sent(section)).toHaveText('');
+	});
+
+	test('paste tells the form with an input event, so a shown Field error clears', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const code = section.locator('input[name=code]');
+		await code.fill('000000');
+		await expect(code).toHaveAttribute('aria-invalid', 'true');
+		await code.focus();
+		await press(page, 'Control+a', 'Backspace');
+		await code.evaluate((el: HTMLInputElement) => {
+			const w = window as unknown as { __seen: string[] };
+			w.__seen = [];
+			el.form!.addEventListener('input', (e) => w.__seen.push((e.target as HTMLInputElement).value));
+		});
+		await paste(code, '123 456');
+		await expect(code).toHaveValue('123456');
+		expect(await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen)).toContain('123456');
+		await expect(code).not.toHaveAttribute('aria-invalid');
+	});
+
+	test('text typed during an IME composition is left alone until it ends', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const code = section.locator('input[name=code]');
+		await code.focus();
+		const result = await code.evaluate((el: HTMLInputElement) => {
+			el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+			el.value = '１２';
+			el.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true, data: '１２' }));
+			const during = el.value;
+			el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '１２' }));
+			return { during, after: el.value };
+		});
+		expect(result.during).toBe('１２');
+		expect(result.after).toBe('12');
+		await expect(section.locator('[data-otp-cell]').nth(1)).toHaveText('2');
+	});
+
+	test('autoSubmit fires once per fill, and an edit while full does not submit again', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const backup = section.locator('input[name=backup]');
+		await backup.evaluate((el: HTMLInputElement) => {
+			const w = window as unknown as { __submits: number };
+			w.__submits = 0;
+			el.form!.addEventListener('submit', () => w.__submits++);
+		});
+		await section.locator('input[name=code]').fill('246810');
+		await backup.focus();
+		await page.keyboard.type('ab12cd34');
+		await expect(sent(section)).toContainText('backup=ab12cd34');
+		await press(page, 'ArrowLeft', 'Shift+ArrowLeft');
+		await page.keyboard.type('Z');
+		await expect(backup).toHaveValue('ab12cdZ4');
+		await page.waitForTimeout(300);
+		expect(await page.evaluate(() => (window as unknown as { __submits: number }).__submits)).toBe(1);
+	});
+
+	test('the input is named, its value is in the accessibility tree, and the cells are hidden decoration', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const code = section.locator('input[name=code]');
+		await expect(code).toHaveAccessibleName(/Verification code/);
+		await code.fill('123456');
+		await expect(section.getByRole('textbox', { name: /Verification code/ })).toMatchAriaSnapshot('- textbox /Verification code/: "123456"');
+		await expect(section.locator('[data-otp-cell]').first().locator('xpath=..')).toHaveAttribute('aria-hidden', 'true');
 	});
 
 	test('Backspace, arrows and select-all edit like a normal text input', async ({ page }) => {
@@ -230,7 +341,7 @@ test.describe('OtpInput', () => {
 		await code.fill('123456');
 		await expect(code).not.toHaveAttribute('aria-invalid');
 		await submit(section);
-		await expect(sent(section)).toHaveText('Sent: code=123456, backup=');
+		await expect(sent(section)).toHaveText('Sent: code=123456, backup=, saved=123456, loaded=123456');
 	});
 
 	test('autoSubmit submits the form once, when the last character arrives', async ({ page }) => {
@@ -241,7 +352,7 @@ test.describe('OtpInput', () => {
 		await page.keyboard.type('ab12cd3');
 		await expect(sent(section)).toHaveText('');
 		await page.keyboard.type('4');
-		await expect(sent(section)).toHaveText('Sent: code=246810, backup=ab12cd34');
+		await expect(sent(section)).toHaveText('Sent: code=246810, backup=ab12cd34, saved=123456, loaded=123456');
 	});
 
 	test('reset restores the empty value and clears the cells', async ({ page }) => {
@@ -261,6 +372,15 @@ test.describe('ProviderButton', () => {
 		await expect(github).toContainText('Last used');
 		await expect(github.locator('svg')).toBeVisible();
 		await expect(section.getByRole('button', { name: 'Continue with Google' })).not.toContainText('Last used');
+	});
+
+	test('an icon snippet renders beside the text, decorative, and the component icon still does too', async ({ page }) => {
+		const section = await openSection(page, 'provider-button');
+		const google = section.getByRole('button', { name: 'Continue with Google' });
+		await expect(google.locator('svg[data-provider-icon=snippet]')).toBeVisible();
+		await expect(google.locator('span[aria-hidden=true] svg')).toHaveCount(1);
+		await expect(google).toHaveAccessibleName('Continue with Google');
+		await expect(section.getByRole('button', { name: /Continue with GitHub/ }).locator('svg')).toHaveCount(1);
 	});
 
 	test('Enter and Space press it; loading keeps the name, blocks a second press and clears when done', async ({ page }) => {
