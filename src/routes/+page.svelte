@@ -1225,7 +1225,7 @@
 									</span>
 								</div>
 								<p class="mt-1 text-[13px] leading-5 text-fg-light">{item.description}</p>
-								<p class="mt-1 truncate font-mono text-[11px] text-fg-light/80">
+								<p class="mt-1 truncate font-mono text-[11px] text-fg-light">
 									{item.sveltePath}
 								</p>
 							</div>
