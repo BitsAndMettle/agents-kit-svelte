@@ -10,6 +10,11 @@
 		value?: string;
 		/** Starting value when `value` is not given, and what a form reset restores. */
 		defaultValue?: string;
+		/**
+		 * Fallback accessible name when no `Field`, native `<label for>`, `aria-label` or `aria-labelledby` names the input.
+		 * A recorded deviation from the no-label-prop rule: the input has no visible text of its own, so an unnamed one would be unusable.
+		 */
+		codeLabel?: string;
 		/** Number of characters, and of cells drawn. */
 		length?: number;
 		/** Cells per visual group, for a wider gap in the middle (3 gives 3 + 3). 0 means no groups. */
@@ -39,6 +44,7 @@
 		groupSize = 0,
 		alphanumeric = false,
 		name = 'code',
+		codeLabel = 'One-time code',
 		size = 'md',
 		invalid = false,
 		onValueChange,
@@ -55,17 +61,34 @@
 	}: Props = $props();
 
 	const field = getFieldContext();
-	const initialValue = untrack(() => value);
 	const control = $derived(fieldControlAttrs(field, { id, describedBy, invalid, required: Boolean(required), disabled: Boolean(disabled) }));
 
 	let focused = $state(false);
 	let start = $state(0);
 	let end = $state(0);
-	let lastComplete = '';
+	/** Whether the code was full at the last edit, so completion fires once per fill and never on mount. */
+	let wasFull = false;
 
-	const chars = $derived(Array.from({ length }, (_, i) => value[i] ?? ''));
+	// Whatever comes in (value, defaultValue, a bound parent) is cleaned the same way typed text is.
+	const initialValue = untrack(() => normalizeCode(value, length, alphanumeric));
+	const clean = $derived(normalizeCode(value, length, alphanumeric));
+	const cleanDefault = $derived(defaultValue === undefined ? undefined : normalizeCode(defaultValue, length, alphanumeric));
+	$effect.pre(() => {
+		if (clean !== value) value = clean;
+		wasFull = length > 0 && clean.length >= length;
+	});
+
+	const chars = $derived(Array.from({ length }, (_, i) => clean[i] ?? ''));
 	const active = $derived(focused && !control.disabled ? activeCells(start, end, length) : Array<boolean>(length).fill(false));
 	const pattern = $derived(`[${alphanumeric ? '0-9A-Za-z' : '0-9'}]{${length}}`);
+
+	/** A group Field has no `for` label to name the input, so it needs its own name like a standalone one. */
+	const needsName = $derived(!field || field.group);
+	/** A native `<label for>` names the input already, and `aria-label` would override it (WCAG 2.5.3), so the fallback steps aside. */
+	let hasNativeLabel = $state(false);
+	$effect(() => {
+		hasNativeLabel = (ref?.labels?.length ?? 0) > 0;
+	});
 
 	const CELLS: Record<FormControlSize, string> = {
 		sm: 'h-9 w-8 text-base',
@@ -98,12 +121,10 @@
 		if (caret !== undefined) setCaret(caret);
 		else readSelection();
 		if (changed) onValueChange?.(next);
-		if (next.length < length) {
-			lastComplete = '';
-			return;
-		}
-		if (next === lastComplete) return;
-		lastComplete = next;
+		const full = length > 0 && next.length >= length;
+		const justFilled = full && !wasFull;
+		wasFull = full;
+		if (!justFilled) return;
 		onComplete?.(next);
 		if (autoSubmit) {
 			const form = ref?.form;
@@ -111,13 +132,46 @@
 		}
 	}
 
+	/**
+	 * Cleans the text the input holds. When the code is already full and an insert would push it past
+	 * `length`, the typed characters overwrite the ones after the caret (as a full code expects), so
+	 * nothing is dropped from the end without the person seeing it.
+	 */
+	function cleanEdit(raw: string, caretRaw: number): { next: string; caret: number } {
+		const all = normalizeCode(raw, Number.MAX_SAFE_INTEGER, alphanumeric);
+		const caretAll = normalizeCode(raw.slice(0, caretRaw), Number.MAX_SAFE_INTEGER, alphanumeric).length;
+		const previous = clean;
+		if (all.length > length && previous.length >= length && all.length > previous.length) {
+			const inserted = all.length - previous.length;
+			const at = Math.max(0, caretAll - inserted);
+			const typed = all.slice(at, at + inserted);
+			const next = (previous.slice(0, at) + typed + previous.slice(at + typed.length)).slice(0, length);
+			return { next, caret: Math.min(at + typed.length, length) };
+		}
+		const next = all.slice(0, length);
+		return { next, caret: Math.min(caretAll, next.length) };
+	}
+
+	/** Cleans what the input holds now. Not while an IME composition is open: rewriting would break it (compositionend commits). */
 	function handleInput(event: Event & { currentTarget: HTMLInputElement }): void {
+		if ((event as unknown as InputEvent).isComposing) {
+			(rest.oninput as ((e: Event) => void) | undefined)?.(event);
+			return;
+		}
 		const input = event.currentTarget;
 		const raw = input.value;
-		const caret = input.selectionStart ?? raw.length;
-		const clean = normalizeCode(raw, length, alphanumeric);
-		commit(clean, normalizeCode(raw.slice(0, caret), length, alphanumeric).length);
+		const { next, caret } = cleanEdit(raw, input.selectionStart ?? raw.length);
+		commit(next, caret);
 		(rest.oninput as ((e: Event) => void) | undefined)?.(event);
+	}
+
+	/** The composed text was never committed (input events during composition are skipped), so always commit it here, clean or not. */
+	function handleCompositionEnd(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
+		(rest.oncompositionend as ((e: CompositionEvent) => void) | undefined)?.(event);
+		const input = event.currentTarget;
+		const raw = input.value;
+		const { next, caret } = cleanEdit(raw, input.selectionStart ?? raw.length);
+		commit(next, caret);
 	}
 
 	/** The browser would cut a pasted "123 456" at the length before we could clean it, so we place the text ourselves. */
@@ -133,6 +187,8 @@
 		const pasted = normalizeCode(text, length, alphanumeric);
 		const next = normalizeCode(input.value.slice(0, from) + pasted + input.value.slice(to), length, alphanumeric);
 		commit(next, Math.min(from + pasted.length, next.length));
+		// We placed the text ourselves, so no native input event came: tell the form (it clears a field error on input).
+		input.dispatchEvent(new Event('input', { bubbles: true }));
 	}
 
 	/** A click goes to the clicked cell (never past the end of the text), as the cells are what the person sees. */
@@ -153,8 +209,8 @@
 		const onReset = () =>
 			setTimeout(() => {
 				if (!ref) return;
-				value = ref.value;
-				lastComplete = '';
+				value = normalizeCode(ref.value, length, alphanumeric);
+				wasFull = length > 0 && value.length >= length;
 				readSelection();
 			});
 		form.addEventListener('reset', onReset);
@@ -191,18 +247,19 @@
 	<input {...rest}
 		{...control}
 		bind:this={ref}
-		{value}
-		defaultValue={defaultValue ?? initialValue}
+		value={clean}
+		defaultValue={cleanDefault ?? initialValue}
 		{name}
 		{autocomplete}
+		aria-label={rest['aria-label'] ?? (needsName && rest['aria-labelledby'] === undefined && !hasNativeLabel ? codeLabel : undefined)}
 		type="text"
 		inputmode={alphanumeric ? 'text' : 'numeric'}
 		{pattern}
-		maxlength={length}
 		autocapitalize="off"
 		autocorrect="off"
 		spellcheck="false"
 		oninput={handleInput}
+		oncompositionend={handleCompositionEnd}
 		onpaste={handlePaste}
 		onmousedown={handleMouseDown}
 		onkeydown={(event) => {

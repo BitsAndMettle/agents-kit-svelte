@@ -13,7 +13,7 @@
 		/** Shows a spinner and ignores presses (the button keeps its name). Overrides the handler's own pending state. */
 		loading?: boolean;
 		disabled?: boolean;
-		/** What to do when the browser has no passkey support: hide the button (`true`, the default) or show it disabled. The server render always shows it, so it works before the check runs. */
+		/** What to do when the browser has no passkey support: hide the button (`true`, the default) or show it disabled. The server render always shows it, because support can only be known in the browser. Before the page hydrates it is a plain `type="button"` that does nothing, and in an unsupported browser hiding it then moves what is below it; pass `false` for a layout that never shifts. */
 		hideWhenUnsupported?: boolean;
 		fullWidth?: boolean;
 		size?: 'sm' | 'md' | 'lg';

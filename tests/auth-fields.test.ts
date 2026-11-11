@@ -12,6 +12,13 @@ test('normalizeCode keeps digits only, cuts to length, and handles spaced or das
 	assert.equal(normalizeCode('12', 0), '');
 });
 
+test('normalizeCode folds full-width characters to plain ones', () => {
+	assert.equal(normalizeCode('１２３４５６', 6), '123456');
+	assert.equal(normalizeCode('１２３ ４５６７', 6), '123456');
+	assert.equal(normalizeCode('ａｂ１２', 8, true), 'ab12');
+	assert.equal(normalizeCode('ａｂ１２', 8), '12');
+});
+
 test('normalizeCode keeps letters when alphanumeric', () => {
 	assert.equal(normalizeCode('ab-12 cD', 8, true), 'ab12cD');
 	assert.equal(normalizeCode('ab-12 cD', 4, true), 'ab12');

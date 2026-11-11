@@ -3,6 +3,7 @@
 /**
  * Keeps only the characters a code may hold: digits, or letters and digits when `alphanumeric`.
  * Spaces, dashes and anything else are dropped, so "123 456" and "123-456" both read "123456".
+ * Full-width characters ("１２３") are folded to plain ones first (NFKC), so an IME or a phone keyboard works.
  *
  * @param text - Typed, pasted or autofilled text.
  * @param length - The code's length; extra characters are cut.
@@ -11,7 +12,7 @@
  */
 export function normalizeCode(text: string, length: number, alphanumeric = false): string {
 	const allowed = alphanumeric ? /[^0-9A-Za-z]/g : /[^0-9]/g;
-	return text.replace(allowed, '').slice(0, Math.max(0, length));
+	return text.normalize('NFKC').replace(allowed, '').slice(0, Math.max(0, length));
 }
 
 /**

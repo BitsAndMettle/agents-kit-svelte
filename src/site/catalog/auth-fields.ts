@@ -64,7 +64,7 @@ export const AUTH_FIELDS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/fields/OtpInput.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A one-time-code entry drawn as cells over one real input, so paste, autofill and screen readers work. "123 456" and "123-456" are cleaned to the allowed characters. It reports the code through onValueChange and onComplete, and can submit its form when complete. Your app checks the code.',
+			'A one-time-code entry drawn as cells over one real input, so paste, autofill and screen readers work. "123 456", "123-456" and full-width digits are cleaned to the allowed characters, whether typed, pasted, autofilled or passed in as a value. It reports the code through onValueChange and onComplete, and can submit its form when complete. Your app checks the code.',
 		usageSnippet: `<script lang="ts">
   import { OtpInput } from 'agents-kit-svelte/auth';
   import { Field } from 'agents-kit-svelte/primitives';
@@ -87,11 +87,15 @@ export const AUTH_FIELDS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/fields/ProviderButton.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'One sign-in provider as a full-width button, or as a link when the provider has an href (so it works without JavaScript). It reports the provider id through onProvider and shows loading while the returned promise runs. You pass the icon, since the kit ships no brand logos.',
+			'One sign-in provider as a full-width button, or as a link when the provider has an href (so it works without JavaScript). It reports the provider id through onProvider and shows loading while the returned promise runs. You pass the icon, since the kit ships no brand logos: a component on the provider, or a snippet on the button.',
 		usageSnippet: `<script lang="ts">
   import { ProviderButton, type AuthProvider } from 'agents-kit-svelte/auth';
 
-  const github: AuthProvider = { id: 'github', label: 'GitHub' };
+  import { Globe, Sparkles } from '@lucide/svelte';
+
+  // The icon is a component, so a provider list can be plain data.
+  const github: AuthProvider = { id: 'github', label: 'GitHub', icon: Sparkles };
+  const google: AuthProvider = { id: 'google', label: 'Google' };
   const sso: AuthProvider = { id: 'sso', label: 'SSO', href: '/auth/sso' };
 
   async function onProvider(id: string): Promise<void> {
@@ -101,7 +105,13 @@ export const AUTH_FIELDS: CatalogItemMeta[] = [
   }
 </script>
 
+{#snippet googleIcon()}
+  <Globe aria-hidden="true" />
+{/snippet}
+
 <ProviderButton provider={github} {onProvider} lastUsed />
+<!-- Or pass the logo as a snippet for a one-off; it wins over provider.icon. -->
+<ProviderButton provider={google} {onProvider} icon={googleIcon} />
 <ProviderButton provider={sso} />`
 	},
 	{
@@ -111,7 +121,7 @@ export const AUTH_FIELDS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/auth/fields/PasskeyButton.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A "Sign in with a passkey" button. It only reports the press through onPasskey and shows loading while your promise runs; your app does the WebAuthn. After the page loads it hides itself (or disables, with hideWhenUnsupported off) in a browser without passkey support.',
+			'A "Sign in with a passkey" button. It only reports the press through onPasskey and shows loading while your promise runs; your app does the WebAuthn. Passkey support is only known in the browser, so the server render always shows the button (inert until the page hydrates), and in a browser without support it then hides itself, which shifts what follows it by one row. Set hideWhenUnsupported to false to keep the button in place, disabled, with no shift.',
 		usageSnippet: `<script lang="ts">
   import { PasskeyButton } from 'agents-kit-svelte/auth';
 
