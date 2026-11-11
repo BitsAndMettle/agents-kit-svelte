@@ -17,6 +17,10 @@
 	export interface Props extends Omit<HTMLDialogAttributes, 'class' | 'children' | 'open' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
 		open?: boolean;
+		/** Whether it starts open when `open` is not bound. */
+		defaultOpen?: boolean;
+		/** The `<dialog>` element. Bindable. */
+		ref?: HTMLDialogElement | null;
 		/** Names the dialog (wired to `aria-labelledby`). */
 		title: string;
 		/** Describes it (wired to `aria-describedby` while rendered). */
@@ -64,7 +68,9 @@
 	} from './overlay';
 
 	let {
-		open = $bindable(false),
+		defaultOpen = false,
+		open = $bindable(defaultOpen),
+		ref = $bindable(null),
 		title,
 		description,
 		size = 'md',
@@ -111,7 +117,7 @@
 
 {@render trigger?.(dialog.trigger)}
 
-<dialog {...rest} {...dialog.content} class={cn(MODAL_SURFACE, SIZES[size], FADE_SCALE_MOTION, BACKDROP, className)}>
+<dialog {...rest} bind:this={ref} {...dialog.content} class={cn(MODAL_SURFACE, SIZES[size], FADE_SCALE_MOTION, BACKDROP, className)}>
 	<div class={MODAL_HEADER}>
 		<h2 {...dialog.title} class={MODAL_TITLE}>{title}</h2>
 		{#if description}

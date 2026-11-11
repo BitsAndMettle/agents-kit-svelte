@@ -272,6 +272,29 @@ test.describe('overlays', () => {
 		await expectShown(popover, false);
 	});
 
+	test('Popover: near the right edge the card shifts into view and the arrow still points at the trigger', async ({ page }) => {
+		const section = await openSection(page, 'popover');
+		await page.setViewportSize({ width: 375, height: 667 });
+		const trigger = section.getByRole('button', { name: 'Share', exact: true });
+		await trigger.scrollIntoViewIfNeeded();
+		await trigger.click();
+		const popover = page.getByRole('dialog', { name: 'Share this run', includeHidden: true });
+		await expectShown(popover, true);
+		const arrow = popover.locator('[aria-hidden="true"]').first();
+		const t = (await trigger.boundingBox())!;
+		const p = (await popover.boundingBox())!;
+		const triggerCentre = t.x + t.width / 2;
+		// It was shifted: its own centre is well left of the trigger's, and it stays in view.
+		expect(p.x + p.width).toBeLessThanOrEqual(375);
+		expect(triggerCentre - (p.x + p.width / 2)).toBeGreaterThan(20);
+		await expect
+			.poll(async () => {
+				const a = (await arrow.boundingBox())!;
+				return Math.abs(a.x + a.width / 2 - triggerCentre);
+			})
+			.toBeLessThanOrEqual(2);
+	});
+
 	test('Popover: focus leaving it closes it (non-modal) without pulling focus back', async ({ page }) => {
 		const section = await openSection(page, 'popover');
 		const trigger = section.getByRole('button', { name: 'Run details' });

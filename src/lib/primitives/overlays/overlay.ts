@@ -1,9 +1,9 @@
 /**
- * Shared pieces of the overlay primitives: placement shorthand, arrow geometry and the
- * motion and surface class strings. Behaviour lives in the headless layer; this file
- * only holds looks and one pure helper.
+ * Shared pieces of the overlay primitives: arrow geometry, the motion and surface class
+ * strings, and the arrow's anchor-following attachment. Behaviour lives in the headless
+ * layer; this file only holds looks.
  */
-import type { Align } from '../../headless/logic/placement';
+import type { Align, Side } from '../../headless/logic/placement';
 
 /** Arrow square edge in px; it pokes out by half of that, so offsets grow by this much. */
 export const ARROW_GAP = 5;
@@ -47,8 +47,7 @@ export function tipArrowClass(align: Align): string {
 }
 
 /**
- * Scrim behind modal surfaces. `--ak-color-scrim` themes it; the fallback is a warm,
- * translucent dark that reads in both colour schemes.
+ * Scrim behind modal surfaces, themed by the `--ak-color-scrim` token.
  */
 export const BACKDROP =
 	'backdrop:bg-[var(--ak-color-scrim)] not-open:backdrop:invisible data-[state=closed]:backdrop:opacity-0 motion-safe:backdrop:transition-[opacity,display,overlay] motion-safe:backdrop:duration-200 motion-safe:backdrop:transition-discrete motion-safe:starting:open:backdrop:opacity-0';
@@ -107,3 +106,73 @@ export const POPOVER_SURFACE =
 /** The inverse chip of a Tooltip. */
 export const TOOLTIP_SURFACE =
 	'w-max max-w-[min(18rem,calc(100vw-1rem))] overflow-visible rounded-chip border-0 bg-fg-main px-2 py-1 text-xs leading-4 font-medium text-fg-inverse ak-shadow-soft-sm';
+
+/** A box in viewport pixels (a DOMRect fits). */
+export interface Box {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+/**
+ * Where the arrow goes along the surface edge that faces the anchor, so it points at the
+ * anchor's centre even when the surface was shifted to stay in view.
+ *
+ * @param anchor - The anchor's rect.
+ * @param surface - The floating surface's rect.
+ * @param side - The side the surface sits on.
+ * @param inset - Closest the arrow may come to a corner (clears the rounded edge), px.
+ * @param size - The arrow's edge length, px.
+ * @returns Offset of the arrow box from the surface's left (top/bottom sides) or top edge.
+ */
+export function arrowOffset(anchor: Box, surface: Box, side: Side, inset: number, size = 10): number {
+	const vertical = side === 'top' || side === 'bottom';
+	const centre = vertical ? anchor.x + anchor.width / 2 - surface.x : anchor.y + anchor.height / 2 - surface.y;
+	const length = vertical ? surface.width : surface.height;
+	const max = Math.max(inset, length - inset - size);
+	return Math.round(Math.min(max, Math.max(inset, centre - size / 2)));
+}
+
+/**
+ * Attachment for an arrow element inside a popover-attribute surface: while the surface is
+ * shown, re-measures every frame (the headless positioning can flip or shift it at any time)
+ * and moves the arrow along its edge to point at the anchor's centre. The arrow's
+ * `data-side` says which edge it is on. Before the first frame the class-based position holds.
+ *
+ * @param findAnchor - Returns the anchor element for the surface.
+ * @param inset - Closest the arrow may come to a corner, px.
+ */
+export function followAnchor(findAnchor: (surface: HTMLElement) => Element | null, inset: number) {
+	return (arrow: HTMLElement): (() => void) => {
+		const surface = arrow.parentElement;
+		if (!surface) return () => {};
+		let frame = 0;
+		const place = () => {
+			frame = 0;
+			if (!surface.matches(':popover-open')) return;
+			const anchor = findAnchor(surface);
+			const side = arrow.dataset.side as Side | undefined;
+			if (anchor && side) {
+				const offset = arrowOffset(anchor.getBoundingClientRect(), surface.getBoundingClientRect(), side, inset);
+				const vertical = side === 'top' || side === 'bottom';
+				arrow.style.left = vertical ? `${offset}px` : '';
+				arrow.style.right = vertical ? 'auto' : '';
+				arrow.style.top = vertical ? '' : `${offset}px`;
+				arrow.style.bottom = vertical ? '' : 'auto';
+			}
+			frame = requestAnimationFrame(place);
+		};
+		const onToggle = () => {
+			cancelAnimationFrame(frame);
+			frame = 0;
+			if (surface.matches(':popover-open')) place();
+		};
+		surface.addEventListener('toggle', onToggle);
+		if (surface.matches(':popover-open')) place();
+		return () => {
+			cancelAnimationFrame(frame);
+			surface.removeEventListener('toggle', onToggle);
+		};
+	};
+}
