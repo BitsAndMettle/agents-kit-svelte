@@ -39,7 +39,7 @@
 	const uid = $props.id();
 
 	let previewId = $state<string | null>(null);
-	let buttons: (HTMLButtonElement | undefined)[] = [];
+	let buttons: (HTMLButtonElement | undefined)[] = $state([]);
 
 	// A new current value (the caller applied a change) ends any preview.
 	$effect(() => {

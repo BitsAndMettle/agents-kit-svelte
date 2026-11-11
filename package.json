@@ -88,6 +88,11 @@
       "svelte": "./dist/entries/fixtures.js",
       "default": "./dist/entries/fixtures.js"
     },
+    "./headless": {
+      "types": "./dist/entries/headless.d.ts",
+      "svelte": "./dist/entries/headless.js",
+      "default": "./dist/entries/headless.js"
+    },
     "./theme.css": {
       "style": "./dist/theme.css",
       "default": "./dist/theme.css"
@@ -144,7 +149,7 @@
     "tailwind-merge": "^3.7.0"
   },
   "peerDependencies": {
-    "svelte": "^5.0.0",
+    "svelte": "^5.29.0",
     "tailwindcss": "^4.0.0"
   }
 }

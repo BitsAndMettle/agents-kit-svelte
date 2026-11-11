@@ -68,6 +68,7 @@ Import everything from `agents-kit-svelte`, or from one collection to keep edito
 | `agents-kit-svelte/data` | Tables, insight and recommendation cards, flowchart, search list, tool chips |
 | `agents-kit-svelte/effects` | `BorderBeam`, `Svelte5MotionLab` |
 | `agents-kit-svelte/primitives` | Style recipes (`buttonClass`, `SURFACE`, ...), `cn()`, motion helpers, `AgentDisclosure`, `ThinkingShimmer` |
+| `agents-kit-svelte/headless` | Accessible behaviour with no markup or styles: `Dialog`, `Popover`, `Menu`, `Select`, `Combobox`, `Listbox`, `Tooltip`, `Tabs`, `Accordion`, `RadioGroup`, `ToggleGroup`, and `ListNav` for your own composites |
 | `agents-kit-svelte/core` | Types, diff parsing, skill ranking, agent events, `AgentSession` and the Claude adapters. No components, safe on a server. |
 | `agents-kit-svelte/fixtures` | Sample data for demos and tests. Not exported from the root. |
 | `agents-kit-svelte/theme.css` | `--ak-*` design tokens and light/dark palettes |
@@ -112,6 +113,26 @@ The main tokens are `--ak-color-canvas`, `-canvas-subtle`, `-surface`, `-fg`, `-
 Themes written for 0.1 against `--color-*-val` variables still work in this release and stop working in the next minor.
 
 ---
+
+## Headless behaviour (`agents-kit-svelte/headless`)
+
+The hard accessibility behaviours, as Svelte 5 classes you construct once and spread onto your own markup. No runtime dependencies; built on the platform: `<dialog>` for modals, the `popover` attribute and top layer for floating surfaces, CSS anchor positioning with a built-in fallback. Requires Svelte 5.29 or later.
+
+```svelte
+<script lang="ts">
+	import { Menu } from 'agents-kit-svelte/headless';
+	const id = $props.id();
+	const menu = new Menu({ id });
+</script>
+
+<button {...menu.trigger}>Options</button>
+<div {...menu.content}>
+	<div {...menu.item({ value: 'copy', onSelect: copy })}>Copy</div>
+	<div {...menu.item({ value: 'delete', onSelect: remove })}>Delete</div>
+</div>
+```
+
+One document-wide layer stack owns which surface is on top, so Escape and outside presses close the topmost layer only (a menu inside a dialog closes first), focus returns to the trigger, and the page scroll locks under modals. Parts carry attributes and one attachment, never event handlers, so two parts compose on one element (`<button {...menu.trigger} {...tip.trigger}>`) and your own `onclick` is never overridden. Style with data attributes: `data-state`, `data-side`, `data-highlighted`, `data-selected`, `data-disabled`, and the `--ak-available-height` / `--ak-anchor-width` variables. The design and its reasoning are in [docs/headless/DESIGN.md](docs/headless/DESIGN.md).
 
 ## Connecting a real agent
 
