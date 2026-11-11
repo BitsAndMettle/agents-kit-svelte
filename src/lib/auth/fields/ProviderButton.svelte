@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Component, Snippet } from 'svelte';
+	import type { Snippet } from 'svelte';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { LoaderCircle } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
@@ -17,6 +17,8 @@
 		formatLabel?: (provider: AuthProvider) => string;
 		/** Shows a spinner and ignores presses (the button keeps its name). Overrides the handler's own pending state. */
 		loading?: boolean;
+		/** Your logo as a snippet; wins over `provider.icon`. Decorative. */
+		icon?: Snippet;
 		/** Marks this provider as the one the person used last. */
 		lastUsed?: boolean;
 		/** Text of the "last used" badge. */
@@ -35,6 +37,7 @@
 		onProvider,
 		formatLabel = (p: AuthProvider) => `Continue with ${p.label}`,
 		loading,
+		icon,
 		lastUsed = false,
 		lastUsedLabel = 'Last used',
 		disabled,
@@ -49,7 +52,7 @@
 	const isLoading = $derived(loading ?? running);
 	const isDisabled = $derived(Boolean(disabled ?? provider.disabled));
 	const attrs = $derived(actionAttrs({ disabled: isDisabled, loading: isLoading, href: provider.href }));
-	const Icon = $derived(provider.icon as Component | undefined);
+	const Icon = $derived(provider.icon);
 
 	async function press(event: MouseEvent): Promise<void> {
 		if (isBlocked({ disabled: isDisabled, loading: isLoading })) {
@@ -71,7 +74,9 @@
 
 {#snippet content()}
 	<span class={cn('inline-flex min-w-0 items-center justify-center gap-[inherit]', isLoading && 'opacity-0')}>
-		{#if Icon}
+		{#if icon}
+			<span aria-hidden="true" class="inline-flex shrink-0 items-center [&_svg]:size-4">{@render icon()}</span>
+		{:else if Icon}
 			<span aria-hidden="true" class="inline-flex shrink-0 items-center [&_svg]:size-4"><Icon /></span>
 		{/if}
 		<span class="truncate">{formatLabel(provider)}</span>

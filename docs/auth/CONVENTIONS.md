@@ -9,7 +9,8 @@ Everything in `docs/primitives/CONVENTIONS.md` applies too. Auth components are 
 - Every component that collects input renders a real `<form method="post">`. `action` passes through, so with no JavaScript (or no `onSubmit`) the form posts natively, which is how a server form action works.
 - `...rest` and `ref` go on the `<form>`, so attributes and attachments reach it: in SvelteKit, `{@attach fromAction(enhance)}` (from `svelte/attachments` and `$app/forms`) adds progressive enhancement. `class` goes on the outer card.
 - `onSubmit(values, { data, event })` receives typed values. With it, the native submit is cancelled. Return or resolve to `AuthResult` (`{ error?, errors? }`) to show errors; return nothing on success. While a returned promise is pending, the submit button shows `loading` and further submits are ignored. A rejection shows `labels.genericError`, never the thrown message.
-- `pending` (controlled) overrides the handler's own pending state, for callers who manage it (SvelteKit `enhance`).
+- `pending` (controlled) overrides the handler's own pending state, for callers who manage it (SvelteKit `enhance`). While it is true, a submit is stopped before later listeners see it, so `enhance` never posts twice. A plain native post with neither a handler nor `pending` is not guarded.
+- A state that follows a successful submit ("we sent a link") hangs off `AuthSubmit`'s `onSuccess` option, plus a prop (`sent`, `done`) for native posts that come back. After `clear()`, a submit still in flight is forgotten when it settles.
 - `error` (form-level) and `errors` (per field, keyed by field name) props show server errors. A handler result wins until the next submit. Editing a field clears that field's error.
 - All of the above is `AuthSubmit` in `src/lib/auth/shared/submit.svelte.ts`. Use it and never re-implement it. Bind its `onsubmit` and `oninput` on the form. Show `submit.error` in an `Alert` with `tone="danger"`, `live`, and `data-auth-error` plus `tabindex="-1"` on its root, so focus can land on it. Pass `submit.fieldError(name)` to each `Field`'s `error`.
 - Validation is native: `required`, `type="email"`, `minlength`, `pattern`. Browsers block the submit and focus the field. No JavaScript validation layer.
@@ -39,11 +40,11 @@ Composite components have many strings, so they take one `labels` prop. It is a 
 
 ## Shared types
 
-`AuthProvider` (`id`, `label`, `icon`, `href`, `disabled`), `AuthUser` (`name`, `email`, `avatarSrc`), `AuthSession` (`id`, `label`, `kind`, `location`, `lastActive`, `current`), `AuthResult` and `AuthSubmitHandler` live in `src/lib/auth/shared/types.ts`. The kit ships **no brand logos**: providers take your `icon` (a snippet or a component).
+`AuthProvider` (`id`, `label`, `icon` as a component so provider lists can be plain data, `href`, `disabled`), `AuthUser` (`name`, `email`, `avatarSrc`), `AuthSession` (`id`, `label`, `kind`, `location`, `lastActive`, `current`), `AuthResult` and `AuthSubmitHandler` live in `src/lib/auth/shared/types.ts`. The kit ships **no brand logos**: providers take your `icon` component; `ProviderButton` also takes an `icon` snippet, and cards that list providers take a `providerIcon` snippet (`Snippet<[AuthProvider]>`) that wins over the component.
 
 ## Waits
 
-Resend and retry waits are set by the server. Pass when they end (`resendAvailableAt`). `Cooldown` from `src/lib/auth/shared/cooldown.svelte.ts` counts down and disables the button, whose text comes from `labels.resendIn(seconds)`.
+Resend and retry waits are set by the server. Pass when they end (`resendAvailableAt`). Compute it in the browser from the server's wait in seconds (`Date.now() + retryAfter * 1000`), not from a server timestamp, so a skewed client clock cannot shorten or stretch it. `Cooldown` from `src/lib/auth/shared/cooldown.svelte.ts` counts down; the button stays focusable with `aria-disabled` (never `disabled`, which would drop keyboard focus to the page) and its text comes from `labels.resendIn(seconds)`.
 
 ## Callback names
 
