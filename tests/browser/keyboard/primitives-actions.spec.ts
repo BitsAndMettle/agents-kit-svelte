@@ -126,3 +126,27 @@ test('ToggleGroup: multiple mode keeps several pressed, and the group is one tab
 	await press(page, 'Tab');
 	await expect(marks.getByRole('button').filter({ has: page.locator(':focus') })).toHaveCount(0);
 });
+
+test('Button: a loading button keeps its accessible name', async ({ page }) => {
+	const section = await openSection(page, 'button');
+	await section.getByTestId('send').focus();
+	await press(page, 'Enter');
+	const send = section.getByRole('button', { name: 'Send', exact: true });
+	await expect(send).toHaveAttribute('aria-busy', 'true');
+	await expect(send).toBeVisible();
+});
+
+test('ToggleGroup: name posts each pressed value, and reset restores the default', async ({ page }) => {
+	const section = await openSection(page, 'toggle-group');
+	const form = section.getByTestId('toggle-form');
+	const posted = form.getByTestId('posted');
+	await form.getByRole('button', { name: 'Submit' }).click();
+	await expect(posted).toHaveText('notify=email');
+	await form.getByRole('button', { name: 'Push' }).click();
+	await form.getByRole('button', { name: 'Email' }).click();
+	await form.getByRole('button', { name: 'Submit' }).click();
+	await expect(posted).toHaveText('notify=push');
+	await form.getByRole('button', { name: 'Reset' }).click();
+	await expect(form.getByRole('button', { name: 'Email' })).toHaveAttribute('aria-pressed', 'true');
+	await expect(form.getByRole('button', { name: 'Push' })).toHaveAttribute('aria-pressed', 'false');
+});

@@ -1,9 +1,14 @@
-<script lang="ts" module>
+<script lang="ts">
 	import type { Snippet } from 'svelte';
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import type { ButtonSize, ButtonVariant } from '../../ui/styles';
+	import { LoaderCircle } from '@lucide/svelte';
+	import type { HTMLAnchorAttributes } from 'svelte/elements';
+	import { cn } from '../../ui/cn';
+	import { actionClass } from './shared';
+	import { actionAttrs, isBlocked } from './state';
 
-	interface Props extends Omit<HTMLButtonAttributes, 'class' | 'children' | 'type' | 'disabled'> {
+	export interface Props extends Omit<HTMLButtonAttributes, 'class' | 'children' | 'type' | 'disabled'> {
 		variant?: ButtonVariant;
 		/** `xs`, `sm`, `md` or `lg`. */
 		size?: Extract<ButtonSize, 'xs' | 'sm' | 'md' | 'lg'>;
@@ -23,22 +28,14 @@
 		/** Content after the label (an icon). */
 		trailing?: Snippet;
 		children?: Snippet;
+		/** The `<button>` or `<a>` element. Bindable. */
+		ref?: HTMLElement | null;
 		class?: string;
 	}
 
-	export type ButtonProps = Props;
-</script>
-
-<script lang="ts">
-	import { LoaderCircle } from '@lucide/svelte';
-	import type { HTMLAnchorAttributes } from 'svelte/elements';
-	import { cn } from '../../ui/cn';
-	import { actionClass } from './shared';
-	import { actionAttrs, isBlocked } from './state';
-
 	let {
 		variant = 'secondary',
-		size = 'sm',
+		size = 'md',
 		pill = false,
 		loading = false,
 		disabled = false,
@@ -50,6 +47,7 @@
 		leading,
 		trailing,
 		children,
+		ref = $bindable(null),
 		onclick,
 		class: className = '',
 		...rest
@@ -69,7 +67,7 @@
 </script>
 
 {#snippet content()}
-	<span class={cn('inline-flex items-center justify-center gap-[inherit]', loading && 'invisible')}>
+	<span class={cn('inline-flex items-center justify-center gap-[inherit]', loading && 'opacity-0')}>
 		{@render leading?.()}
 		{@render children?.()}
 		{@render trailing?.()}
@@ -82,11 +80,11 @@
 {/snippet}
 
 {#if href !== undefined}
-	<a {...rest as HTMLAnchorAttributes} {...attrs} {target} {rel} {download} onclick={guard} class={cn(actionClass(variant, size, pill), disabled && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
+	<a {...rest as HTMLAnchorAttributes} bind:this={ref} {...attrs} {target} {rel} {download} onclick={guard} class={cn(actionClass(variant, size, pill), disabled && 'cursor-not-allowed opacity-50', loading && 'cursor-progress', className)}>
 		{@render content()}
 	</a>
 {:else}
-	<button {...rest} {...attrs} {type} onclick={guard} class={cn(actionClass(variant, size, pill), loading && 'cursor-progress', className)}>
+	<button {...rest} bind:this={ref} {...attrs} {type} onclick={guard} class={cn(actionClass(variant, size, pill), loading && 'cursor-progress', className)}>
 		{@render content()}
 	</button>
 {/if}
