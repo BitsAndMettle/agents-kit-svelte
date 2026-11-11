@@ -106,6 +106,7 @@ mount(App, { target: document.getElementById('app')! });
 	import { InsightCards } from 'agents-kit-svelte/data';
 	import { BorderBeam } from 'agents-kit-svelte/effects';
 	import { buttonClass } from 'agents-kit-svelte/primitives';
+	import { SignInCard } from 'agents-kit-svelte/auth';
 	import { AgentSession, parseUnifiedDiff } from 'agents-kit-svelte/core';
 	import { SAMPLE_ISSUE, SAMPLE_SKILLS, SAMPLE_SUB_AGENTS } from 'agents-kit-svelte/fixtures';
 
@@ -130,6 +131,7 @@ mount(App, { target: document.getElementById('app')! });
 	<AgentOrchestrator orchestratorName="Release run" subAgents={SAMPLE_SUB_AGENTS} />
 	<IntelligentUIRenderer nodes={[]} />
 	<InsightCards />
+	<SignInCard onSubmit={() => undefined} />
 	<BorderBeam><button class={buttonClass('primary')}>{session.state.status} {diff.additions}</button></BorderBeam>
 </main>
 `
