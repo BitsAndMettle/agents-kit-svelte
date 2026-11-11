@@ -242,6 +242,7 @@ export const defaultUIRegistry: UIRegistry = {
 				onDismiss: () => emit('dismiss')
 			};
 		}
+	},
 	'fleet-status': {
 		component: FleetStatus,
 		required: ['machines'],
@@ -259,6 +260,8 @@ export const defaultUIRegistry: UIRegistry = {
 			onOpenTarget: (target: { id?: string; label: string }) => emit('open-target', target.id ?? target.label),
 			onOpenRun: (run: { id: string }) => emit('open-run', run.id),
 			onUndo: (target: { id?: string; label: string }) => emit('undo', target.id ?? target.label)
+		})
+	},
 	'device-approval': {
 		component: DeviceApprovalCard,
 		required: ['device', 'code', 'requestedAt'],

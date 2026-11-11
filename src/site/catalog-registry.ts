@@ -675,6 +675,9 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   reason="merging is not on the operator's list"
   actor="Operator"
   compact
+/>`
+	},
+	{
 		slug: 'device-approval',
 		name: 'DeviceApprovalCard',
 		category: 'beUI Agents',

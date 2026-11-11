@@ -533,8 +533,14 @@ export type DynamicUINodeType =
 	| 'github-pr-graph'
 	| 'github-checks-waterfall'
 	| 'agent-work-trace'
+	| 'metric-tiles'
+	| 'presence-banner'
 	| 'fleet-status'
-	| 'action-receipt';
+	| 'action-receipt'
+	| 'blocked-work-list'
+	| 'feature-proposal'
+	| 'level-dial'
+	| 'risk-toggle'
 	| 'device-approval'
 	| 'cited-answer';
 
@@ -651,6 +657,8 @@ export type PresenceState = 'online' | 'stale' | 'offline' | 'reconnecting';
 export interface PresenceAction {
 	label: string;
 	onAction: () => void;
+}
+
 /** Whether a machine is reachable, shown by `FleetStatus`. */
 export type MachinePresence = 'online' | 'stale' | 'offline';
 

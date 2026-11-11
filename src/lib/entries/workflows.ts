@@ -13,7 +13,7 @@ export { default as AgentTaskQueue } from '../agents-ui/AgentTaskQueue.svelte';
 export { default as AgentThinkingIndicator } from '../agents-ui/AgentThinkingIndicator.svelte';
 export { default as AgentToolPalette } from '../agents-ui/AgentToolPalette.svelte';
 export { default as FleetStatus } from '../agents-ui/FleetStatus.svelte';
-export { fleetSummary, relativeTime, slotSegments, workPreview } from '../agents-ui/fleet';
+export { fleetSummary, slotSegments, workPreview } from '../agents-ui/fleet';
 
 export type * from '../types';
 export * from '../agents-ui/blocked-work';

@@ -642,6 +642,9 @@ export const SAMPLE_BLOCKED_ITEMS: BlockedItem[] = [
 		reason: { kind: 'needs-person', label: 'Only you can land this' },
 		actions: [],
 		note: 'Open the pull request on the host to land it.'
+	}
+];
+
 /** The time `SAMPLE_MACHINES` is read at, for `FleetStatus`. */
 export const SAMPLE_FLEET_NOW = '2026-11-11T12:00:00Z';
 

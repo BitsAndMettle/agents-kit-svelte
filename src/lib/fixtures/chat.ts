@@ -3,10 +3,8 @@
  * Import from `agents-kit-svelte/fixtures`. Components never fall back to it.
  */
 
-import type { ActionReceiptData, WorkStep } from '../types';
-import type { WorkStep } from '../types';
+import type { ActionReceiptData, CitedSource, DeviceApprovalDevice, WorkStep } from '../types';
 import type { AutonomyLevel } from '../agents/level-dial';
-import type { CitedSource, DeviceApprovalDevice, WorkStep } from '../types';
 import type { SidebarResource } from '../agents/AISidebar.svelte';
 import type { SchemaParameterItem, SchemaPropertyItem } from '../ai-elements/SchemaDisplay.svelte';
 import type { PlanMilestone } from '../ai-elements/PlanCard.svelte';
