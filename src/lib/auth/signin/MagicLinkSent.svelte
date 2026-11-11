@@ -140,6 +140,17 @@
 	let resending = $state(false);
 	let outcome = $state<'sent' | 'failed' | null>(null);
 
+	let resendRef = $state<HTMLElement | null>(null);
+	// Button sets its own aria-disabled (for loading) after spreading ours, so a wait is marked here. The button
+	// stays enabled so keyboard focus is not dropped; resend() ignores presses while the wait runs.
+	$effect(() => {
+		const wait = cooldown.active;
+		const busy = resending;
+		if (!resendRef) return;
+		if (wait) resendRef.setAttribute('aria-disabled', 'true');
+		else if (!busy) resendRef.removeAttribute('aria-disabled');
+	});
+
 	async function resend(): Promise<void> {
 		if (resending || cooldown.active) return;
 		outcome = null;
@@ -176,7 +187,7 @@
 		<Button type="submit" variant="primary" size="lg" loading={submit.pending} class="w-full">{text.verify}</Button>
 	{/if}
 	<div class="grid justify-items-center gap-2">
-		<Button variant="secondary" loading={resending} disabled={cooldown.active} onclick={resend}>
+		<Button variant="secondary" loading={resending} bind:ref={resendRef} class={cooldown.active ? 'cursor-not-allowed opacity-50' : ''} onclick={resend}>
 			{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}
 		</Button>
 		<span role="status" class="text-xs font-medium text-fg-main">{outcome === 'sent' ? text.sent : ''}</span>

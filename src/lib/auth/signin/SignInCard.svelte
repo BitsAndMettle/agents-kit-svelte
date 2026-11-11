@@ -59,6 +59,8 @@
 		method?: 'password' | 'magic-link';
 		/** OAuth or SSO buttons, shown above the form. */
 		providers?: AuthProvider[];
+		/** Draws a provider's logo as a snippet (it gets the provider); wins over `provider.icon`. Decorative. */
+		providerIcon?: Snippet<[AuthProvider]>;
 		/** Called with a provider's `id` when its button is pressed. */
 		onProvider?: (id: string) => void | Promise<unknown>;
 		/** The `id` of the provider the person used last: its button gets a badge. */
@@ -101,6 +103,7 @@
 		footer,
 		method = 'password',
 		providers,
+		providerIcon,
 		onProvider,
 		lastUsedProvider,
 		onPasskey,
@@ -159,7 +162,13 @@
 	{#if showAlternatives}
 		<div class="grid min-w-0 grid-cols-1 gap-2">
 			{#each providers ?? [] as provider (provider.id)}
-				<ProviderButton {provider} {onProvider} lastUsed={provider.id === lastUsedProvider} />
+				{#if providerIcon}
+					<ProviderButton {provider} {onProvider} lastUsed={provider.id === lastUsedProvider}>
+						{#snippet icon()}{@render providerIcon(provider)}{/snippet}
+					</ProviderButton>
+				{:else}
+					<ProviderButton {provider} {onProvider} lastUsed={provider.id === lastUsedProvider} />
+				{/if}
 			{/each}
 			{#if onPasskey}
 				<PasskeyButton {onPasskey} />

@@ -10,7 +10,7 @@
 
 	const providers = [
 		{ id: 'github', label: 'GitHub' },
-		{ id: 'sso', label: 'single sign-on', icon: Building2 }
+		{ id: 'sso', label: 'single sign-on' }
 	];
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -49,7 +49,9 @@
 		showRemember
 		signUpHref="https://example.com/sign-up"
 		onSubmit={signIn}
-	/>
+	>
+		{#snippet providerIcon(provider)}{#if provider.id === 'sso'}<Building2 />{/if}{/snippet}
+	</SignInCard>
 	<p class="m-0 text-center text-[13px] text-fg-light" aria-live="polite" data-testid="signin-result">{result}</p>
 	<p class="m-0 text-center text-xs text-fg-light">Submit calls: <span data-testid="signin-calls">{calls}</span></p>
 	<SignInCard

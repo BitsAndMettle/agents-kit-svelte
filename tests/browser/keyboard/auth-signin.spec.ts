@@ -7,6 +7,8 @@ test.describe('SignInCard', () => {
 		await expect(section.getByRole('heading', { name: 'Sign in', level: 3 }).first()).toBeVisible();
 		await expect(section.getByRole('button', { name: /Continue with GitHub/ }).first()).toContainText('Last used');
 		await expect(section.getByRole('button', { name: 'Continue with single sign-on' })).toBeVisible();
+		// The providerIcon snippet draws the logo, hidden from assistive technology.
+		await expect(section.getByRole('button', { name: 'Continue with single sign-on' }).locator('svg')).toHaveCount(1);
 		await expect(section.getByRole('button', { name: 'Sign in with a passkey' })).toBeVisible();
 		await expect(section.getByText('or', { exact: true }).first()).toBeVisible();
 		await expect(section.getByRole('textbox', { name: /Email/ }).first()).toHaveAttribute('autocomplete', 'username webauthn');
@@ -72,8 +74,7 @@ test.describe('SignInCard', () => {
 		await expect(password).toBeFocused();
 		await expect(password).toHaveAttribute('aria-invalid', 'true');
 		await expect(password).toHaveAccessibleDescription(/That password is not right\./);
-		await press(page, 'End');
-		await page.keyboard.type('x');
+		await password.press('x');
 		await expect(form.getByText('That password is not right.')).toHaveCount(0);
 		await expect(password).not.toHaveAttribute('aria-invalid', 'true');
 	});
@@ -223,10 +224,10 @@ test.describe('MagicLinkSent', () => {
 		await resend.focus();
 		await press(page, 'Enter');
 		await expect(resend).toHaveAttribute('aria-busy', 'true');
-		await expect(section.getByRole('button', { name: /Resend in \d+s/ })).toBeDisabled();
+		await expect(section.getByRole('button', { name: /Resend in \d+s/ })).toHaveAttribute('aria-disabled', 'true');
 		await expect(section.getByRole('status').filter({ hasText: 'Sent again' })).toBeVisible();
 		await expect(section.getByTestId('magic-sends')).toHaveText('1');
-		await expect(section.getByRole('button', { name: 'Resend email' })).toBeEnabled({ timeout: 9000 });
+		await expect(section.getByRole('button', { name: 'Resend email' })).not.toHaveAttribute('aria-disabled', 'true', { timeout: 9000 });
 	});
 
 	test('with a code length the card becomes a form: a wrong code is shown and focused, editing clears it, a right one passes', async ({ page }) => {
