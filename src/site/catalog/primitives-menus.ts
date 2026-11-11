@@ -9,7 +9,7 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/menus/DropdownMenu.svelte',
 		upstreamSource: 'Agents Kit Svelte · Primitives',
 		description:
-			'A menu button whose rows are data: items with icons and shortcut hints, checkboxes, radio groups, headed groups, separators and nested submenus. Keyboard, typeahead, Escape and focus return come from the headless Menu.',
+			'A menu button whose rows are data: items with icons and shortcut hints, checkboxes, radio groups, headed groups, separators and nested submenus. Keyboard, typeahead, Escape and focus return come from the headless Menu. An optional header snippet shows non-interactive content (such as who is signed in) above the rows.',
 		usageSnippet: `<script lang="ts">
   import { DropdownMenu, type MenuEntry } from 'agents-kit-svelte/primitives';
 
