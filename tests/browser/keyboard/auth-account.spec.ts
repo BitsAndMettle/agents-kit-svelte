@@ -47,6 +47,14 @@ test.describe('AccountMenu', () => {
 		await expect(menu).toHaveAccessibleDescription(/Ada Lovelace\s+ada@example\.com/);
 	});
 
+	test('a person without name or email gets no empty header or description', async ({ page }) => {
+		const section = await openSection(page, 'account-menu');
+		await section.getByTestId('anonymous-menu').click();
+		const menu = page.getByRole('menu', { name: 'Account menu' });
+		await expect(menu).toBeVisible();
+		await expect(menu).not.toHaveAttribute('aria-describedby', /.*/);
+	});
+
 	test('defaultOpen mounts the menu open', async ({ page }) => {
 		const section = await openSection(page, 'account-menu');
 		await expect(page.getByRole('menu', { name: 'Account menu for Open Olive' })).toHaveCount(0);
@@ -167,7 +175,7 @@ test.describe('VerifyEmailBanner', () => {
 		await expect(section.getByRole('status').filter({ hasText: 'Sent' })).toBeVisible();
 		await expect(section.getByTestId('verify-sends')).toHaveText('1');
 		// The cooldown keeps the button focusable: aria-disabled, never disabled.
-		const waiting = section.getByRole('button', { name: /Resend in \d+s/ });
+		const waiting = section.getByRole('button', { name: /^Resend in \d{1,2}s$/ });
 		await expect(waiting).toHaveAttribute('aria-disabled', 'true');
 		await expect(waiting).not.toHaveAttribute('disabled', /.*/);
 		await expect(waiting).toBeFocused();
@@ -176,12 +184,20 @@ test.describe('VerifyEmailBanner', () => {
 		await expect(resend).toBeEnabled({ timeout: 9000 });
 	});
 
-	test('without onResend nothing is claimed as sent', async ({ page }) => {
+	test('without onResend there is no Resend button and nothing is claimed as sent', async ({ page }) => {
 		const section = await openSection(page, 'verify-email-banner');
 		const banner = section.getByTestId('banner-plain');
-		await banner.getByRole('button', { name: 'Resend verification email' }).click();
-		await expect(banner.getByRole('status')).toHaveText('');
+		await expect(banner.getByRole('button', { name: 'Resend verification email' })).toHaveCount(0);
 		await expect(banner).not.toContainText('Sent');
+	});
+
+	test('the server render already marks a waiting Resend aria-disabled', async ({ browser, baseURL }) => {
+		const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
+		const page = await context.newPage();
+		await page.goto('/');
+		const banner = page.getByTestId('banner-waiting');
+		await expect(banner.getByRole('button', { name: /Resend in \d+s/ })).toHaveAttribute('aria-disabled', 'true');
+		await context.close();
 	});
 
 	test('a rejected resend shows the failure message', async ({ page }) => {

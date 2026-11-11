@@ -11,7 +11,7 @@
 
 <script lang="ts">
 	import type { HTMLButtonAttributes } from 'svelte/elements';
-	import { LogOut } from '@lucide/svelte';
+	import { LoaderCircle, LogOut } from '@lucide/svelte';
 	import { isThenable } from './promise';
 	import { cn } from '../../ui/cn';
 	import { Avatar } from '../../primitives/display';
@@ -66,14 +66,14 @@
 		...labels
 	});
 	const TRIGGER =
-		'inline-flex min-h-8 items-center gap-2 rounded-full p-0.5 text-[13px] font-medium text-fg-main transition-colors hover:bg-chat-user focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary/70';
+		'relative inline-flex min-h-8 items-center gap-2 rounded-full p-0.5 text-[13px] font-medium text-fg-main transition-colors hover:bg-chat-user focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary/70 aria-busy:cursor-progress';
 	const display = $derived(user.name || user.email || '');
+	let signingOut = $state(false);
 	const entries: MenuEntry[] = $derived([
 		...items,
 		...(items.length > 0 ? ([{ kind: 'separator' }] satisfies MenuEntry[]) : []),
-		{ value: 'account-menu-sign-out', label: text.signOut, icon: LogOut, onSelect: () => void signOut() }
+		{ value: 'account-menu-sign-out', label: text.signOut, icon: LogOut, disabled: signingOut, onSelect: () => void signOut() }
 	]);
-	let signingOut = $state(false);
 
 	async function signOut(): Promise<void> {
 		if (signingOut) return;
@@ -91,19 +91,21 @@
 	}
 </script>
 
-<DropdownMenu items={entries} bind:open {defaultOpen} {onOpenChange} {placement} bind:ref>
+{#snippet menuHeader()}
+	<div class="min-w-0 px-2 py-1.5">
+		{#if user.name}<p class="m-0 truncate text-[13px] font-semibold text-fg-main">{user.name}</p>{/if}
+		{#if user.email}<p class={cn('m-0 truncate text-xs text-fg-light', !user.name && 'text-[13px] font-semibold text-fg-main')}>{user.email}</p>{/if}
+	</div>
+	<div aria-hidden="true" class="my-1 h-px bg-canvas-border"></div>
+{/snippet}
+
+<DropdownMenu items={entries} header={user.name || user.email ? menuHeader : undefined} bind:open {defaultOpen} {onOpenChange} {placement} bind:ref>
 	{#snippet trigger(part)}
 		<button {...rest} {...part} aria-busy={signingOut || undefined} class={cn(TRIGGER, showName && 'pr-3', className)}>
-			<Avatar decorative src={user.avatarSrc} name={display} size="md" />
+			<span class={cn('inline-flex', signingOut && 'opacity-50')}><Avatar decorative src={user.avatarSrc} name={display} size="md" /></span>
+			{#if signingOut}<LoaderCircle aria-hidden="true" class="absolute left-1.5 size-5 animate-spin motion-reduce:animate-none text-fg-main" />{/if}
 			{#if showName && display}<span aria-hidden="true" class="max-w-40 truncate">{display}</span>{/if}
 			<span class="sr-only">{display ? text.menuLabel(display) : text.menuLabelAnonymous}</span>
 		</button>
-	{/snippet}
-	{#snippet header()}
-		<div class="min-w-0 px-2 py-1.5">
-			{#if user.name}<p class="m-0 truncate text-[13px] font-semibold text-fg-main">{user.name}</p>{/if}
-			{#if user.email}<p class={cn('m-0 truncate text-xs text-fg-light', !user.name && 'text-[13px] font-semibold text-fg-main')}>{user.email}</p>{/if}
-		</div>
-		<div aria-hidden="true" class="my-1 h-px bg-canvas-border"></div>
 	{/snippet}
 </DropdownMenu>
