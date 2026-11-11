@@ -5,7 +5,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { Dialog, ListNav, Popover, type ChangeReason } from '$lib/entries/headless';
-	import { isRestoringFocus } from '$lib/headless/runtime/layers.svelte';
+	import { isRestoringFocus, Layer } from '$lib/headless/runtime/layers.svelte';
 	import { __setPositionStrategy } from '$lib/headless/runtime/position';
 	import { buttonClass, INPUT_CLASS, SURFACE } from '$lib/ui/styles';
 
@@ -89,6 +89,26 @@
 	]);
 	let lastTool = $state('none');
 	const toolbar = new ListNav({ id: `${id}-toolbar`, focus: 'roving', orientation: 'horizontal' });
+
+	// Roving groups whose preferred tab stop is not a usable item.
+	const goneStop = new ListNav({ id: `${id}-gone`, focus: 'roving', tabStop: () => 'gone' });
+	const disabledStop = new ListNav({ id: `${id}-disabled-stop`, focus: 'roving', tabStop: () => 'b' });
+
+	// A minimal pattern built on the internal Layer, closing on Tab the way a menu does:
+	// through layer.close('focus-out'), which never pulls focus back to the trigger.
+	let tabCloseOpen = $state(false);
+	const tabClose = new Layer({
+		id: `${id}-tabclose`,
+		kind: 'popover',
+		dismiss: { escape: true, outside: true, focusOut: false },
+		desired: () => tabCloseOpen,
+		notify: (open, reason) => {
+			tabCloseOpen = open;
+			record('tabclose')(open, reason);
+		},
+		initialFocus: () => 'first',
+		placement: { side: 'bottom', align: 'start' }
+	});
 	const more = new Popover({ id: `${id}-more`, onOpenChange: record('more') });
 
 	const fruits = ['Apple', 'Apricot', 'Banana', 'Blueberry', 'Cherry', 'Damson', 'Elderberry'];
@@ -309,6 +329,55 @@
 			{/each}
 		</div>
 		<p data-testid="picked">{picked}</p>
+	</section>
+
+	<section class="space-y-2">
+		<h2 class={SURFACE.title}>Tab stops that point nowhere</h2>
+		<div role="radiogroup" aria-label="Gone stop" {...goneStop.root} class="flex gap-1">
+			{#each ['x', 'y'] as v (v)}
+				<button type="button" {...goneStop.item({ value: v })} class={buttonClass('secondary', 'sm')}>Gone {v}</button>
+			{/each}
+		</div>
+		<div role="radiogroup" aria-label="Disabled stop" {...disabledStop.root} class="flex gap-1">
+			{#each [{ v: 'a', d: false }, { v: 'b', d: true }, { v: 'c', d: false }] as o (o.v)}
+				<button type="button" {...disabledStop.item({ value: o.v, disabled: o.d })} class={buttonClass('secondary', 'sm')}>
+					Disabled-stop {o.v}
+				</button>
+			{/each}
+		</div>
+	</section>
+
+	<section class="space-y-2">
+		<h2 class={SURFACE.title}>Closes on Tab (Layer.close 'focus-out')</h2>
+		<div class="flex gap-2">
+			<button type="button" class={buttonClass('ghost', 'sm')}>Before tab-close</button>
+			<button
+				type="button"
+				data-testid="tabclose-trigger"
+				aria-expanded={tabCloseOpen}
+				{@attach tabClose.attachTrigger}
+				onclick={() => (tabCloseOpen = !tabCloseOpen)}
+				class={buttonClass('secondary', 'sm')}
+			>
+				Open tab-close
+			</button>
+			<div
+				id="{id}-tabclose-content"
+				popover="manual"
+				role="dialog"
+				aria-label="Tab-close"
+				tabindex="-1"
+				{@attach tabClose.attachContent}
+				onkeydown={(e) => {
+					if (e.key === 'Tab') tabClose.close('focus-out');
+				}}
+				class="rounded-card border border-card-border bg-card-bg p-2 text-xs text-fg-main"
+			>
+				<button type="button" class={buttonClass('secondary', 'xs')}>Tab-close first</button>
+				<button type="button" class={buttonClass('secondary', 'xs')}>Tab-close last</button>
+			</div>
+			<button type="button" class={buttonClass('ghost', 'sm')}>After tab-close</button>
+		</div>
 	</section>
 
 	<ol data-testid="log" class="text-xs text-fg-light">

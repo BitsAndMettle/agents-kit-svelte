@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Locator, type Page } from '@playwright/test';
 import { test } from '@playwright/test';
 import { expectShown, logEntries, settled, type Strategy } from './helpers';
@@ -199,7 +200,7 @@ test.describe('Combobox', () => {
 		await page.keyboard.press('ArrowDown');
 		await expect.poll(active(input)).toBe('Cherry');
 		await page.keyboard.type('x'); // nothing matches
-		await expect(page.getByTestId('combo-empty')).toBeVisible();
+		await expect(page.getByTestId('combo-empty')).toHaveText('No matches');
 		await expect.poll(active(input)).toBe(null);
 		await page.keyboard.press('Enter'); // no target: nothing chosen
 		await expect(page.getByTestId('combo-value')).toHaveText('none');
@@ -284,6 +285,37 @@ test.describe('Combobox', () => {
 		await expectShown(comboList(page), false);
 		await expect(page.getByRole('button', { name: 'After combobox' })).toBeFocused();
 		expect((await logEntries(page)).at(-1)).toBe('combo:closed:focus-out');
+
+		await input.click();
+		await page.keyboard.type('e');
+		await expectShown(comboList(page), true);
+		await page.keyboard.press('Shift+Tab');
+		await expectShown(comboList(page), false);
+		await expect(selectTrigger(page)).toBeFocused();
+		expect((await logEntries(page)).at(-1)).toBe('combo:closed:focus-out');
+	});
+
+	test('IME: Enter that commits a composition never chooses an option (Safari order too)', async ({ page }) => {
+		const input = comboInput(page);
+		await input.click();
+		await page.keyboard.type('ch');
+		await expect.poll(active(input)).toBe('Cherry');
+		const enter = (keyCode: number, withCompositionEnd: boolean) =>
+			input.evaluate(
+				(el, [code, end]) => {
+					if (end) el.dispatchEvent(new CompositionEvent('compositionend', { data: 'ch' }));
+					const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: false });
+					Object.defineProperty(event, 'keyCode', { value: code });
+					el.dispatchEvent(event);
+				},
+				[keyCode, withCompositionEnd] as const
+			);
+		await enter(13, true); // Safari: compositionend, then the committing Enter in the same task
+		await enter(229, false); // an IME-handled key reported with isComposing false
+		await expect(page.getByTestId('combo-value')).toHaveText('none');
+		await expectShown(comboList(page), true);
+		await page.keyboard.press('Enter'); // a later, real Enter still chooses
+		await expect(page.getByTestId('combo-value')).toHaveText('cherry');
 	});
 });
 
@@ -314,7 +346,7 @@ test.describe('CommandPalette (inline Combobox in a Dialog)', () => {
 		await opener.click();
 		await expect(input).toBeFocused();
 		await page.keyboard.type('zzz');
-		await expect(page.getByTestId('cmd-empty')).toBeVisible();
+		await expect(page.getByTestId('cmd-empty')).toHaveText('No commands');
 		await expect.poll(active(input)).toBe(null);
 		await page.keyboard.press('Enter');
 		await expectShown(dialog, true);
@@ -394,6 +426,93 @@ test.describe('Listbox (multiple)', () => {
 		await expect(value(page)).toHaveText('feature,perf');
 		await page.keyboard.press('ArrowUp'); // from docs, the last option clicked
 		await expect.poll(active(box)).toBe('bug');
+	});
+});
+
+test.describe('Names before hydration', () => {
+	test('with scripts blocked, every control has its name and axe finds nothing', async ({ page }) => {
+		await page.route('**/*', (route) =>
+			route.request().resourceType() === 'script' ? route.abort() : route.continue()
+		);
+		await page.setViewportSize({ width: 1280, height: 800 });
+		await page.goto('/headless/listbox/');
+		await expect(page.getByRole('combobox', { name: 'Fruit', exact: true })).toBeVisible();
+		await expect(page.getByRole('combobox', { name: 'Search fruit' })).toBeVisible();
+		await expect(page.getByRole('combobox', { name: 'Sizes' })).toBeVisible();
+		await expect(page.getByRole('listbox', { name: 'Labels' })).toBeVisible();
+		await expect(page.getByRole('listbox', { name: 'Priority' })).toBeVisible();
+		const results = await new AxeBuilder({ page })
+			.include('main')
+			.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+			.analyze();
+		expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+	});
+
+	test('hydrated, open lists pass axe too (empty state outside the listbox)', async ({ page }) => {
+		await open(page);
+		await comboInput(page).click();
+		await page.keyboard.type('zzz');
+		await expect(page.getByTestId('combo-empty')).toHaveText('No matches');
+		const results = await new AxeBuilder({ page })
+			.include('main')
+			.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+			.analyze();
+		expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`)).toEqual([]);
+	});
+});
+
+test.describe('Forms and multiple Select', () => {
+	test.beforeEach(async ({ page }) => open(page));
+
+	const sizes = (page: Page) => page.getByRole('combobox', { name: 'Sizes' });
+	const sizesList = (page: Page) => page.locator('[id$="-sizes-list"]');
+	const submit = async (page: Page) => {
+		await page.getByRole('button', { name: 'Submit' }).click();
+		return page.getByTestId('submitted');
+	};
+
+	test('multiple Select: Enter toggles and stays open; Alt+ArrowUp only closes, never deselects', async ({ page }) => {
+		const trigger = sizes(page);
+		await trigger.focus();
+		await page.keyboard.press('ArrowDown');
+		await expectShown(sizesList(page), true);
+		await expect.poll(active(trigger)).toBe('Medium'); // opens on the selected option
+		await expect(page.locator('[id$="-sizes-list"]')).toHaveAttribute('aria-multiselectable', 'true');
+		await page.keyboard.press('ArrowDown');
+		await page.keyboard.press('Enter');
+		await expectShown(sizesList(page), true);
+		await expect(trigger).toHaveText('Medium, Large');
+		await page.keyboard.press('ArrowUp'); // back on Medium, which is selected
+		await page.keyboard.press('Alt+ArrowUp');
+		await expectShown(sizesList(page), false);
+		await expect(trigger).toHaveText('Medium, Large');
+		await expect(trigger).toBeFocused();
+	});
+
+	test('formInputs submit one field per value; a form reset restores the defaults', async ({ page }) => {
+		await expect(await submit(page)).toHaveText('size=m&color=red&priority=p2');
+
+		await sizes(page).click();
+		await page.getByRole('option', { name: 'Small' }).click();
+		await page.keyboard.press('Escape');
+		const color = page.getByRole('combobox', { name: 'Colour' });
+		await color.fill('bl');
+		await page.keyboard.press('Enter');
+		await expect(color).toHaveValue('Blue');
+		await page.getByRole('listbox', { name: 'Priority' }).getByRole('option', { name: 'p1' }).click();
+		await expect(await submit(page)).toHaveText('size=m&size=s&color=blue&priority=p1');
+
+		await page.getByRole('button', { name: 'Reset' }).click();
+		await expect(sizes(page)).toHaveText('Medium');
+		await expect(color).toHaveValue('Red');
+		await expect(page.getByRole('option', { name: 'p2' })).toHaveAttribute('aria-selected', 'true');
+		await expect(await submit(page)).toHaveText('size=m&color=red&priority=p2');
+
+		// Text edited without choosing: the value never changed, but reset restores the text.
+		await color.fill('gr');
+		await page.getByRole('button', { name: 'Reset' }).click();
+		await expect(color).toHaveValue('Red');
+		await expect(await submit(page)).toHaveText('size=m&color=red&priority=p2');
 	});
 });
 

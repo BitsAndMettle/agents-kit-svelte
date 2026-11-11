@@ -98,6 +98,30 @@
 		value: () => picks,
 		onValueChange: (next) => (picks = next)
 	});
+
+	// A form: one of each pattern, uncontrolled, with names and defaults.
+	const sizeLabels: Record<string, string> = { s: 'Small', m: 'Medium', l: 'Large' };
+	const colors = [
+		{ value: 'red', label: 'Red' },
+		{ value: 'green', label: 'Green' },
+		{ value: 'blue', label: 'Blue' }
+	];
+	const colorLabel = (value: string | null) => colors.find((c) => c.value === value)?.label ?? '';
+	const sizes = new Select({ id: `${id}-sizes`, multiple: true, name: 'size', defaultValue: ['m'] });
+	let colorQuery = $state('Red');
+	const color = new Combobox({
+		id: `${id}-color`,
+		name: 'color',
+		defaultValue: 'red',
+		onValueChange: (next) => (colorQuery = colorLabel(next))
+	});
+	const colorMatches = $derived(
+		colorQuery === colorLabel(color.value)
+			? colors
+			: colors.filter((c) => c.label.toLowerCase().includes(colorQuery.trim().toLowerCase()))
+	);
+	const priority = new Listbox({ id: `${id}-priority`, name: 'priority', defaultValue: 'p2' });
+	let submitted = $state('');
 </script>
 
 <svelte:head>
@@ -130,10 +154,10 @@
 				<div {...combo.option({ value: f.value, disabled: f.disabled, textValue: f.label })} class={OPTION}>
 					{f.label}
 				</div>
-			{:else}
-				<div role="presentation" class="px-2 py-1.5 text-sm" data-testid="combo-empty">No matches</div>
 			{/each}
 		</div>
+		<!-- Outside the listbox: a listbox may only own options and groups. -->
+		<p role="status" class="text-sm" data-testid="combo-empty">{matches.length === 0 ? 'No matches' : ''}</p>
 		<p data-testid="combo-value">{picked ?? 'none'}</p>
 		<button type="button" class={buttonClass('ghost', 'sm')}>After combobox</button>
 	</section>
@@ -150,10 +174,9 @@
 			<div {...cmd.list} class="mt-2">
 				{#each hits as c (c.value)}
 					<div {...cmd.option({ value: c.value })} class={OPTION}>{c.label}</div>
-				{:else}
-					<div role="presentation" class="px-2 py-1.5 text-sm" data-testid="cmd-empty">No commands</div>
 				{/each}
 			</div>
+			<p role="status" class="px-2 text-sm" data-testid="cmd-empty">{hits.length === 0 ? 'No commands' : ''}</p>
 		</dialog>
 	</section>
 
@@ -166,6 +189,51 @@
 			{/each}
 		</div>
 		<p data-testid="tags-value">{picks.join(',') || 'none'}</p>
+	</section>
+
+	<section class="space-y-2">
+		<h2 class={SURFACE.title}>Form</h2>
+		<form
+			class="space-y-2"
+			onsubmit={(event) => {
+				event.preventDefault();
+				submitted = [...new FormData(event.currentTarget)].map(([k, v]) => `${k}=${v}`).join('&');
+			}}
+		>
+			<span {...sizes.label} class="block text-xs">Sizes</span>
+			<button {...sizes.trigger} class={buttonClass('secondary', 'md', 'w-56 justify-between')}>
+				{sizes.value.map((v) => sizeLabels[v]).join(', ') || 'Pick sizes'}
+			</button>
+			<div {...sizes.list} class="{LIST} w-(--ak-anchor-width)">
+				{#each Object.entries(sizeLabels) as [value, label] (value)}
+					<div {...sizes.option({ value })} class={OPTION}>{label}</div>
+				{/each}
+			</div>
+			{#each sizes.formInputs as input (input.value)}<input {...input} />{/each}
+
+			<label {...color.label} class="block text-xs">Colour</label>
+			<input {...color.input} bind:value={colorQuery} class={INPUT_CLASS} style="width: 18rem" />
+			<div {...color.list} class="{LIST} w-(--ak-anchor-width)">
+				{#each colorMatches as c (c.value)}
+					<div {...color.option({ value: c.value })} class={OPTION}>{c.label}</div>
+				{/each}
+			</div>
+			{#each color.formInputs as input (input.value)}<input {...input} />{/each}
+
+			<span {...priority.label} class="block text-xs">Priority</span>
+			<div {...priority.list} class="w-56 rounded-card border border-card-border p-1">
+				{#each ['p1', 'p2', 'p3'] as p (p)}
+					<div {...priority.option({ value: p })} class={OPTION}>{p}</div>
+				{/each}
+			</div>
+			{#each priority.formInputs as input (input.value)}<input {...input} />{/each}
+
+			<div class="flex gap-2">
+				<button type="submit" class={buttonClass('secondary', 'sm')}>Submit</button>
+				<button type="reset" class={buttonClass('ghost', 'sm')}>Reset</button>
+			</div>
+		</form>
+		<p data-testid="submitted">{submitted}</p>
 	</section>
 
 	<ol data-testid="log" class="text-xs text-fg-light">

@@ -168,6 +168,47 @@ test.describe('red-team regressions', () => {
 		await expect(marker).toHaveText('person');
 	});
 
+	test('R2-1. a tab stop naming a missing or disabled item falls back to the first enabled item', async ({ page }) => {
+		await openFixture(page);
+		for (const [group, first] of [
+			['Gone stop', 'Gone x'],
+			['Disabled stop', 'Disabled-stop a']
+		]) {
+			const radios = page.getByRole('radiogroup', { name: group });
+			await expect(radios.locator('[tabindex="0"]')).toHaveCount(1);
+			await expect(radios.getByRole('button', { name: first })).toHaveAttribute('tabindex', '0');
+		}
+		await page.getByRole('radiogroup', { name: 'Gone stop' }).getByRole('button', { name: 'Gone y' }).focus();
+		await page.keyboard.press('Tab');
+		await expect(page.getByRole('button', { name: 'Disabled-stop a' })).toBeFocused();
+	});
+
+	test("R2-2. Layer.close('focus-out') leaves focus where Shift+Tab / Tab sent it", async ({ page }) => {
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		await openFixture(page);
+		const popover = page.locator('[id$="-tabclose-content"]');
+		const open = async () => {
+			await trigger(page, 'tabclose').click();
+			await expectShown(popover, true);
+			await expect(page.getByRole('button', { name: 'Tab-close first' })).toBeFocused();
+		};
+
+		await open();
+		await page.keyboard.press('Shift+Tab');
+		await expectShown(popover, false);
+		// The browser's previous element from the first item is the trigger; focus must not be
+		// pulled to the trigger first and then moved past it to "Before tab-close".
+		await expect(trigger(page, 'tabclose')).toBeFocused();
+		await expect(page.getByRole('button', { name: 'Before tab-close' })).not.toBeFocused();
+
+		// Any Tab closes it (menu semantics); focus continues past the hidden surface.
+		await open();
+		await page.keyboard.press('Tab');
+		await expectShown(popover, false);
+		await expect(page.getByRole('button', { name: 'After tab-close' })).toBeFocused();
+		expect(await logEntries(page)).toContain('tabclose:closed:focus-out');
+	});
+
 	test('8c. removing the focused roving item moves focus to the new tab stop', async ({ page }) => {
 		await openFixture(page);
 		const toolbar = page.getByRole('toolbar', { name: 'Formatting' });

@@ -175,6 +175,29 @@ export class Layer {
 		this.phase = phase;
 		this.contentEl?.setAttribute('data-state', phase === 'open' ? 'open' : 'closed');
 	}
+
+	/**
+	 * Close this layer (and every layer above it) NOW, for `reason`, and let the stack tell
+	 * the pattern through `notify(false, reason)`. Patterns call this instead of writing
+	 * their desired state whenever the reason matters for focus: writing desired state goes
+	 * through the reconcile effect as reason 'api', which returns focus to the trigger.
+	 *
+	 * Focus return by reason: 'focus-out' NEVER returns focus (the person moved it: Tab,
+	 * Shift+Tab, blur); 'outside' returns it only if it is still inside the closing layer;
+	 * every other reason returns it when it is inside the layer or on <body>.
+	 * `{ restoreFocus: false }` suppresses focus return for any reason.
+	 * Idempotent; a no-op before mount and while already closing or closed.
+	 */
+	close(reason: ChangeReason, options: CloseOptions = {}): void {
+		if (!this.contentEl) return;
+		layerStack().close(this, reason, options);
+	}
+}
+
+/** Options for `Layer.close`. */
+export interface CloseOptions {
+	/** false: never move focus after this close. Default: decided by the reason. */
+	restoreFocus?: boolean;
 }
 
 interface ApplyOptions {
@@ -296,10 +319,16 @@ export class LayerStack {
 		if (!reopening || !el.contains(document.activeElement)) this.#focusInitial(layer, el);
 	}
 
-	/** Close `layer` and every layer above it. Idempotent. */
-	close(layer: Layer, reason: ChangeReason): void {
+	/**
+	 * Close `layer` and every layer above it. Idempotent. Focus return follows the reason
+	 * (see `Layer.close`): 'focus-out' never restores, 'outside' does not treat <body> as lost.
+	 */
+	close(layer: Layer, reason: ChangeReason, options: CloseOptions = {}): void {
 		if (layer.phase !== 'open') return;
-		this.#apply(closeLayer(this.#chain, layer.id), (id) => (id === layer.id ? reason : 'parent'));
+		this.#apply(closeLayer(this.#chain, layer.id), (id) => (id === layer.id ? reason : 'parent'), {
+			restoreFocus: options.restoreFocus ?? reason !== 'focus-out',
+			bodyIsLost: reason !== 'outside'
+		});
 	}
 
 	/** Content unmounted: close it (and everything above) without waiting. */

@@ -92,6 +92,8 @@ export class ListNav {
 	#highlighted: string | null = $state(null);
 	/** First navigable item, measured on the client; the roving tab stop of last resort. */
 	#firstItem: string | null = $state(null);
+	/** Rendered, navigable item values as of the last revalidation; null until measured. */
+	#rendered: ReadonlySet<string> | null = $state.raw(null);
 
 	readonly #id: string;
 	readonly #options: ListNavOptions;
@@ -167,7 +169,7 @@ export class ListNav {
 			this.#itemAttach.set(value, cached);
 		}
 		this.#firstSeen ??= value;
-		const stop = this.#highlighted ?? this.#options.tabStop?.() ?? this.#firstItem ?? this.#firstSeen;
+		const stop = this.#tabStop();
 		return part(cached.key, cached.attach, {
 			id: subId(this.#id, 'item', value),
 			'data-ak-nav': this.#id,
@@ -297,6 +299,22 @@ export class ListNav {
 		return [...this.#rootEl.querySelectorAll<HTMLElement>(selector)].filter((el) => this.#values.has(el));
 	}
 
+	/**
+	 * The roving tab stop. Before the first measurement (server render, hydration) it trusts
+	 * highlighted / tabStop() / the first rendered item. Once measured it uses highlighted or
+	 * tabStop() ONLY when that value is a rendered, navigable item (a RadioGroup whose value
+	 * is gone, a removed selected tab, a disabled checked radio must not leave the group
+	 * without a tab stop), else the first navigable item.
+	 */
+	#tabStop(): string | null {
+		const rendered = this.#rendered;
+		if (!rendered) return this.#highlighted ?? this.#options.tabStop?.() ?? this.#firstSeen;
+		if (this.#highlighted !== null && rendered.has(this.#highlighted)) return this.#highlighted;
+		const preferred = this.#options.tabStop?.() ?? null;
+		if (preferred !== null && rendered.has(preferred)) return preferred;
+		return this.#firstItem;
+	}
+
 	#navigable(value: string): boolean {
 		return read(this.#options.disabledFocusable ?? false) || !this.#latest.get(value)?.disabled;
 	}
@@ -306,6 +324,7 @@ export class ListNav {
 			.map((el) => this.#values.get(el) ?? '')
 			.filter((v) => this.#navigable(v));
 		this.#firstItem = navigable[0] ?? null;
+		this.#rendered = new Set(navigable);
 		const current = this.#highlighted;
 		const auto = read(this.#options.autoHighlight ?? false);
 		if (current !== null && !navigable.includes(current)) {
@@ -316,7 +335,7 @@ export class ListNav {
 		// The focused item was removed and focus fell to <body>: move it to the new tab stop.
 		const active = document.activeElement;
 		if (this.#roving && this.#focusWithin && (!active || active === document.body)) {
-			const stop = this.#highlighted ?? this.#options.tabStop?.() ?? this.#firstItem;
+			const stop = this.#tabStop();
 			const el = stop === null ? null : this.#items().find((item) => this.#values.get(item) === stop);
 			el?.focus({ preventScroll: true });
 		}

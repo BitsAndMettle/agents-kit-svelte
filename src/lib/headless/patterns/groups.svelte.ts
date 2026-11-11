@@ -21,10 +21,13 @@ import { cleanups, listen, part, read, subId, type MaybeGetter, type Part, type 
 class Value<V> {
 	#own: V = $state() as V;
 	readonly #state: ValueState<V>;
+	/** The value at construction: what a form reset restores. */
+	readonly initial: V;
 
 	constructor(state: ValueState<V>, fallback: V) {
 		this.#state = state;
 		this.#own = state.defaultValue ?? fallback;
+		this.initial = state.value ? state.value() : this.#own;
 	}
 
 	get current(): V {
@@ -116,13 +119,30 @@ export class Tabs {
 		});
 		this.#attachList = (el) =>
 			untrack(() => {
-				// No value given: select the first enabled tab once the tabs are in.
-				queueMicrotask(() => {
-					if (this.value !== '') return;
-					const first = el.querySelector<HTMLElement>('[role="tab"][data-ak-value]:not([aria-disabled="true"])');
-					if (first?.dataset.akValue !== undefined) this.#value.write(first.dataset.akValue);
+				// The selected tab must be a rendered tab: with no value, or once the selected tab
+				// leaves the list ({#each}/{#if}), select the first enabled tab so a panel shows.
+				// Checked a microtask later, so a re-render that swaps tabs settles first.
+				let queued = false;
+				const ensure = () => {
+					if (queued) return;
+					queued = true;
+					queueMicrotask(() => {
+						queued = false;
+						if (!el.isConnected) return;
+						const tabs = [...el.querySelectorAll<HTMLElement>('[role="tab"][data-ak-value]')];
+						if (tabs.some((tab) => tab.dataset.akValue === this.value)) return;
+						const first = tabs.find((tab) => tab.getAttribute('aria-disabled') !== 'true');
+						if (first?.dataset.akValue !== undefined) this.#value.write(first.dataset.akValue);
+					});
+				};
+				const observer = new MutationObserver(ensure);
+				observer.observe(el, { childList: true, subtree: true });
+				$effect(() => {
+					void this.value;
+					ensure();
 				});
 				return cleanups(
+					() => observer.disconnect(),
 					keyMoves(el, this.#nav, (value) => {
 						if (read(this.#options.activation ?? 'automatic') === 'automatic') this.#value.write(value);
 					}),
@@ -212,6 +232,8 @@ export class Accordion<Multiple extends boolean = false> {
 	readonly #value: Value<AccordionValue<Multiple>>;
 	readonly #nav: ListNav;
 	readonly #panelKeys = new Map<string, { key: symbol; attach: Attachment<HTMLElement> }>();
+	/** Disabled items, as last rendered by `trigger()`; find-in-page must not open them. */
+	readonly #disabled = new Set<string>();
 
 	constructor(options: AccordionOptions<Multiple>) {
 		this.#id = options.id;
@@ -267,6 +289,8 @@ export class Accordion<Multiple extends boolean = false> {
 	trigger(options: { value: string; disabled?: boolean }): Part<HTMLButtonElement> {
 		const open = this.isOpen(options.value);
 		const locked = open && this.#options.multiple !== true && !read(this.#options.collapsible ?? true);
+		if (options.disabled) this.#disabled.add(options.value);
+		else this.#disabled.delete(options.value);
 		return {
 			...this.#nav.item(options),
 			id: subId(this.#id, 'trigger', options.value),
@@ -279,12 +303,25 @@ export class Accordion<Multiple extends boolean = false> {
 		} as Part<HTMLButtonElement>;
 	}
 
-	/** role="region", id, aria-labelledby; `hidden="until-found"` when closed. */
+	/**
+	 * role="region", id, aria-labelledby; `hidden="until-found"` when closed. Find-in-page
+	 * reveals a closed panel: the browser removes `hidden` and fires `beforematch`, which
+	 * expands the item. If the item stays closed (disabled, or a controlled owner that does
+	 * not take the new value) the panel is hidden again, so it never shows while its header
+	 * says aria-expanded="false".
+	 */
 	panel(value: string): Part {
 		const open = this.isOpen(value);
 		let cached = this.#panelKeys.get(value);
 		if (!cached) {
-			const attach: Attachment<HTMLElement> = (el) => untrack(() => listen(el, 'beforematch', () => this.expand(value)));
+			const attach: Attachment<HTMLElement> = (el) =>
+				untrack(() =>
+					listen(el, 'beforematch', () => {
+						if (!this.#disabled.has(value)) this.expand(value);
+						// Svelte still believes the attribute is set, so it would never restore it.
+						if (!this.isOpen(value)) el.setAttribute('hidden', 'until-found');
+					})
+				);
 			cached = { key: createAttachmentKey(), attach };
 			this.#panelKeys.set(value, cached);
 		}
@@ -316,6 +353,10 @@ export type RadioGroupOptions = ValueState<string | null> & {
 	/** Default 'both' (APG radio group: every arrow key moves). */
 	orientation?: MaybeGetter<Orientation>;
 	disabled?: MaybeGetter<boolean>;
+	/**
+	 * aria-required on the group; with `name`, the `formInput` proxy is `required` too, so a
+	 * <form> will not submit while nothing is checked.
+	 */
 	required?: MaybeGetter<boolean>;
 	/** Gives `formInput` a name so the value posts with a <form>. */
 	name?: MaybeGetter<string>;
@@ -326,6 +367,9 @@ export type RadioGroupOptions = ValueState<string | null> & {
  * Tab enters on the checked radio (or the first one when none is checked, without checking
  * it). Put the items on non-button elements (`<div {...group.item(…)}>`), so Enter does
  * nothing, as with native radios.
+ *
+ * Inside a <form>: a form `reset` restores the value the group was created with, and
+ * `formInput` (spread on an `<input>`) posts the value and enforces `required`.
  */
 export class RadioGroup {
 	readonly #id: string;
@@ -335,6 +379,7 @@ export class RadioGroup {
 	readonly #rootKey = createAttachmentKey();
 	readonly #inputKey = createAttachmentKey();
 	readonly #attachRoot: Attachment<HTMLElement>;
+	readonly #attachInput: Attachment<HTMLInputElement>;
 
 	constructor(options: RadioGroupOptions) {
 		this.#id = options.id;
@@ -353,7 +398,43 @@ export class RadioGroup {
 			}
 		});
 		this.#attachRoot = (el) =>
-			untrack(() => cleanups(keyMoves(el, this.#nav, (value) => this.#select(value)), resetOnLeave(el, this.#nav)));
+			untrack(() => {
+				const form = el.closest('form');
+				return cleanups(
+					keyMoves(el, this.#nav, (value) => this.#select(value)),
+					resetOnLeave(el, this.#nav),
+					form ? listen(form, 'reset', () => this.#value.write(this.#value.initial)) : undefined
+				);
+			});
+		this.#attachInput = (el) =>
+			untrack(() => {
+				// The proxy stays rendered and focusable so the browser can show its validation
+				// message, but it is never seen. It is a kit-owned element, so this inline style
+				// does not fight a consumer's.
+				const hide: Record<string, string> = {
+					position: 'absolute',
+					opacity: '0',
+					'pointer-events': 'none',
+					margin: '0',
+					width: '1px',
+					height: '1px'
+				};
+				for (const [property, value] of Object.entries(hide)) el.style.setProperty(property, value);
+				// A form reset restores the radio to its default checkedness AFTER the reset event,
+				// behind Svelte's back (its cached `checked` did not change): re-sync once it is done.
+				const form = el.form;
+				let timer: ReturnType<typeof setTimeout> | undefined;
+				const offReset = form
+					? listen(form, 'reset', () => {
+							timer = setTimeout(() => (el.checked = this.value !== null));
+						})
+					: undefined;
+				return () => {
+					clearTimeout(timer);
+					offReset?.();
+					for (const property of Object.keys(hide)) el.style.removeProperty(property);
+				};
+			});
 	}
 
 	/** Checked value, or null. Setting it reports through `onValueChange`. */
@@ -391,13 +472,24 @@ export class RadioGroup {
 		} as Part;
 	}
 
-	/** `<input type="hidden">` attributes carrying `name` and the value; null without `name`. */
+	/**
+	 * Form proxy for an `<input>`; null without `name`. A native radio, checked while the
+	 * group has a value: it posts `name=value` exactly as a native radio group does, and with
+	 * `required` the form will not submit while nothing is checked (the browser shows its own
+	 * message). Visually hidden once hydrated, aria-hidden, out of the tab order; also give
+	 * it your visually-hidden class (`sr-only`) so the server-rendered radio never flashes.
+	 */
 	get formInput(): Part<HTMLInputElement> | null {
 		if (this.#options.name === undefined) return null;
-		return part(this.#inputKey, () => {}, {
-			type: 'hidden',
+		return part(this.#inputKey, this.#attachInput, {
+			type: 'radio',
 			name: read(this.#options.name),
-			value: this.value ?? ''
+			value: this.value ?? '',
+			checked: this.value !== null,
+			required: read(this.#options.required ?? false),
+			disabled: this.#disabled,
+			tabindex: -1,
+			'aria-hidden': 'true'
 		} as Part<HTMLInputElement>);
 	}
 
@@ -418,13 +510,20 @@ export type ToggleGroupOptions<Multiple extends boolean = false> = ValueState<To
 	orientation?: MaybeGetter<'horizontal' | 'vertical'>;
 	/** Arrow keys wrap. Default true. */
 	loop?: MaybeGetter<boolean>;
-	/** 'toolbar' also writes aria-orientation. Default 'group'. */
+	/**
+	 * 'toolbar' also writes aria-orientation. Default 'group'. A toolbar ToggleGroup is
+	 * toggles only: arrow keys move between its toggle buttons and nothing else, so any other
+	 * control placed inside is a separate tab stop. For a toolbar of mixed controls (buttons,
+	 * toggles, a select), build it on `ListNav` (`role="toolbar"` + `nav.root`/`nav.item`)
+	 * and give its toggles `aria-pressed` yourself.
+	 */
 	role?: 'group' | 'toolbar';
 };
 
 /**
  * ToggleGroup: buttons with `aria-pressed`, one tab stop, arrow keys move focus without
  * pressing. Single mode allows none pressed (pressing the pressed button releases it).
+ * Toggles only, also with `role: 'toolbar'`: for a toolbar of mixed controls use ListNav.
  */
 export class ToggleGroup<Multiple extends boolean = false> {
 	readonly #id: string;

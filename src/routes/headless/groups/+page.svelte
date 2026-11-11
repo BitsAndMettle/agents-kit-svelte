@@ -48,6 +48,8 @@
 	];
 	let autoValue = $state('runs');
 	const autoTabs = new Tabs({ id: `${id}-auto`, value: () => autoValue, onValueChange: (v) => (autoValue = v) });
+	let showLogs = $state(true);
+	const autoItems = $derived(showLogs ? tabItems : tabItems.filter((tab) => tab.value !== 'logs'));
 	const manualTabs = new Tabs({ id: `${id}-manual`, activation: 'manual', orientation: 'vertical' });
 	const rtlTabs = new Tabs({ id: `${id}-rtl`, defaultValue: 'runs' });
 
@@ -66,9 +68,32 @@
 	});
 	const multi = new Accordion({ id: `${id}-multi`, multiple: true, defaultValue: [] });
 
+	// A controlled accordion whose owner refuses one item, and a disabled item.
+	const guardedItems = [
+		{ value: 'open', title: 'Open item', body: 'Anyone may open this.' },
+		{ value: 'vault', title: 'Vault', body: 'The owner refuses: zebrafish.' },
+		{ value: 'off', title: 'Disabled item', body: 'Disabled: kingfisher.', disabled: true }
+	];
+	let guardedValue = $state<string | null>(null);
+	const guarded = new Accordion({
+		id: `${id}-guarded`,
+		value: () => guardedValue,
+		onValueChange: (v) => {
+			if (v !== 'vault') guardedValue = v;
+		}
+	});
+
 	// Radio group (one disabled option) with a form input.
 	let size = $state<string | null>(null);
-	const sizes = new RadioGroup({ id: `${id}-size`, name: 'size', value: () => size, onValueChange: (v) => (size = v) });
+	const sizes = new RadioGroup({
+		id: `${id}-size`,
+		name: 'size',
+		required: true,
+		value: () => size,
+		onValueChange: (v) => (size = v)
+	});
+	const plan = new RadioGroup({ id: `${id}-plan`, name: 'plan', defaultValue: 'free' });
+	let posted = $state('nothing');
 	const sizeItems = [
 		{ value: 'small', label: 'Small' },
 		{ value: 'medium', label: 'Medium' },
@@ -121,14 +146,17 @@
 	<section class="space-y-2">
 		<h2 class={SURFACE.title}>Tabs (automatic)</h2>
 		<div {...autoTabs.list} aria-label="Automatic tabs" class="flex gap-1">
-			{#each tabItems as tab (tab.value)}
+			{#each autoItems as tab (tab.value)}
 				<button {...autoTabs.tab(tab)} class={buttonClass('ghost', 'sm', 'data-[state=active]:bg-canvas-secondary')}>{tab.label}</button>
 			{/each}
 		</div>
-		{#each tabItems as tab (tab.value)}
+		{#each autoItems as tab (tab.value)}
 			<div {...autoTabs.panel(tab.value)} class="p-2 text-sm">{tab.label} panel (automatic)</div>
 		{/each}
 		<p data-testid="auto-value">{autoValue}</p>
+		<button type="button" class={buttonClass('ghost', 'xs')} onclick={() => (showLogs = !showLogs)}>
+			{showLogs ? 'Remove' : 'Restore'} the Logs tab
+		</button>
 	</section>
 
 	<section class="space-y-2">
@@ -185,8 +213,28 @@
 	</section>
 
 	<section class="space-y-2">
+		<h2 class={SURFACE.title}>Accordion (controlled, refuses one)</h2>
+		<div {...guarded.root} class="divide-y divide-card-border rounded-card border border-card-border">
+			{#each guardedItems as item (item.value)}
+				<h3>
+					<button {...guarded.trigger(item)} class="w-full px-3 py-2 text-left text-sm font-medium">{item.title}</button>
+				</h3>
+				<div {...guarded.panel(item.value)}><p class="px-3 pb-3 text-sm">{item.body}</p></div>
+			{/each}
+		</div>
+		<p data-testid="guarded-value">{guardedValue ?? 'none'}</p>
+	</section>
+
+	<section class="space-y-2">
 		<h2 class={SURFACE.title}>Radio group</h2>
-		<form data-testid="size-form">
+		<form
+			data-testid="size-form"
+			class="relative space-y-2"
+			onsubmit={(event) => {
+				event.preventDefault();
+				posted = [...new FormData(event.currentTarget)].map(([k, v]) => `${k}=${v}`).join('&') || 'empty';
+			}}
+		>
 			<div {...sizes.root} aria-label="Size" class="flex gap-2">
 				{#each sizeItems as item (item.value)}
 					<div {...sizes.item(item)} class="rounded-control border border-card-border px-2 py-1 text-sm data-[state=checked]:bg-canvas-secondary">
@@ -194,9 +242,23 @@
 					</div>
 				{/each}
 			</div>
-			{#if sizes.formInput}<input {...sizes.formInput} />{/if}
+			{#if sizes.formInput}<input {...sizes.formInput} class="sr-only" />{/if}
+			<div {...plan.root} aria-label="Plan" class="flex gap-2">
+				{#each ['free', 'pro'] as value (value)}
+					<div {...plan.item({ value })} class="rounded-control border border-card-border px-2 py-1 text-sm data-[state=checked]:bg-canvas-secondary">
+						{value}
+					</div>
+				{/each}
+			</div>
+			{#if plan.formInput}<input {...plan.formInput} class="sr-only" />{/if}
+			<div class="flex gap-2">
+				<button type="submit" class={buttonClass('secondary', 'xs')}>Submit sizes</button>
+				<button type="reset" class={buttonClass('ghost', 'xs')}>Reset sizes</button>
+			</div>
 		</form>
 		<p data-testid="size-value">{size ?? 'none'}</p>
+		<p data-testid="plan-value">{plan.value ?? 'none'}</p>
+		<p data-testid="posted">{posted}</p>
 	</section>
 
 	<section class="space-y-2">

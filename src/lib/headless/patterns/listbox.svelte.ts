@@ -14,7 +14,10 @@
  *   Listbox    standalone list that holds focus itself (tabindex=0)
  *
  * Shared parts:
- *   label         id for aria-labelledby (Combobox: a <label for> the input)
+ *   label         the id every aria-labelledby points at, written from the first (server)
+ *                 render, so render it (Combobox: a <label for> the input) or pass
+ *                 `labelledBy` (another id, or false and an aria-label of your own)
+ *   formInputs    with `name`: hidden inputs, one per selected value
  *   list          role="listbox", aria-multiselectable, aria-labelledby; in popup modes
  *                 also popover="manual" + the internal Layer (anchored, matchWidth)
  *   option(o)     role="option", aria-selected, value-encoded id, data-highlighted,
@@ -49,6 +52,17 @@ interface CommonOptions<Multiple extends boolean> {
 	multiple?: Multiple;
 	/** Arrow keys wrap from the last option to the first. Default false (APG listbox). */
 	loop?: MaybeGetter<boolean>;
+	/**
+	 * How the control is named. Default: the `label` part's id, written from the server on
+	 * so the name exists before hydration; render the `label` part. A string names another
+	 * element's id; `false` writes no aria-labelledby (put an `aria-label` on the element).
+	 */
+	labelledBy?: string | false;
+	/**
+	 * Form field name. With it, `formInputs` gives one hidden input per selected value, and
+	 * resetting the owning form restores the value the pattern started with.
+	 */
+	name?: string;
 }
 
 interface PopupOptions {
@@ -71,6 +85,9 @@ export interface OptionGroup {
 	readonly label: Part;
 }
 
+/** One hidden form field: spread it on an `<input>`; key an {#each} by its `value`. */
+export type FormInput = Part<HTMLInputElement> & { type: 'hidden'; name: string; value: string };
+
 const LIST_PLACEMENT: Placement = { side: 'bottom', align: 'start', matchWidth: true };
 
 // ---------------------------------------------------------------------------------- Select
@@ -90,6 +107,8 @@ export class Select<Multiple extends boolean = false> {
 	constructor(options: SelectOptions<Multiple>) {
 		this.#core = new ListboxCore({
 			id: options.id,
+			labelledBy: options.labelledBy,
+			name: options.name,
 			owner: 'button',
 			multiple: options.multiple ?? false,
 			loop: options.loop,
@@ -123,7 +142,8 @@ export class Select<Multiple extends boolean = false> {
 	 * Space open on the selected option (else the first), ArrowUp opens on it (else the
 	 * last), Home/End open on the first/last; typing selects the next match without
 	 * opening (single) or opens on it (multiple). Open: arrows, Home/End, PageUp/PageDown,
-	 * typeahead; Enter/Space choose; Alt+ArrowUp chooses and closes; Escape closes; Tab
+	 * typeahead; Enter/Space choose; Alt+ArrowUp chooses and closes (with `multiple` it
+	 * only closes); Escape closes; Tab
 	 * closes and moves on.
 	 */
 	get trigger(): Part<HTMLButtonElement> {
@@ -134,6 +154,13 @@ export class Select<Multiple extends boolean = false> {
 	}
 	get list(): Part {
 		return this.#core.list;
+	}
+	/**
+	 * With `name`: one hidden input per selected value (none while nothing is selected).
+	 * Render them inside the form: `{#each x.formInputs as input (input.value)}<input {...input} />{/each}`.
+	 */
+	get formInputs(): FormInput[] {
+		return this.#core.formInputs;
 	}
 	option(options: OptionOptions): Part {
 		return this.#core.option(options);
@@ -170,6 +197,8 @@ export class Combobox<Multiple extends boolean = false> {
 	constructor(options: ComboboxOptions<Multiple>) {
 		this.#core = new ListboxCore({
 			id: options.id,
+			labelledBy: options.labelledBy,
+			name: options.name,
 			owner: 'input',
 			multiple: options.multiple ?? false,
 			loop: options.loop,
@@ -218,6 +247,13 @@ export class Combobox<Multiple extends boolean = false> {
 	get list(): Part {
 		return this.#core.list;
 	}
+	/**
+	 * With `name`: one hidden input per selected value (none while nothing is selected).
+	 * Render them inside the form: `{#each x.formInputs as input (input.value)}<input {...input} />{/each}`.
+	 */
+	get formInputs(): FormInput[] {
+		return this.#core.formInputs;
+	}
 	option(options: OptionOptions): Part {
 		return this.#core.option(options);
 	}
@@ -248,6 +284,8 @@ export class Listbox<Multiple extends boolean = false> {
 	constructor(options: ListboxOptions<Multiple>) {
 		this.#core = new ListboxCore({
 			id: options.id,
+			labelledBy: options.labelledBy,
+			name: options.name,
 			owner: 'list',
 			multiple: options.multiple ?? false,
 			loop: options.loop,
@@ -273,6 +311,13 @@ export class Listbox<Multiple extends boolean = false> {
 	get list(): Part {
 		return this.#core.list;
 	}
+	/**
+	 * With `name`: one hidden input per selected value (none while nothing is selected).
+	 * Render them inside the form: `{#each x.formInputs as input (input.value)}<input {...input} />{/each}`.
+	 */
+	get formInputs(): FormInput[] {
+		return this.#core.formInputs;
+	}
 	option(options: OptionOptions): Part {
 		return this.#core.option(options);
 	}
@@ -285,6 +330,8 @@ export class Listbox<Multiple extends boolean = false> {
 
 interface CoreConfig {
 	id: string;
+	labelledBy?: string | false;
+	name?: string;
 	/** Which element keeps focus and receives keys. */
 	owner: 'button' | 'input' | 'list';
 	multiple: boolean;
@@ -311,32 +358,38 @@ class ListboxCore {
 	readonly #id: string;
 	#ownValue: string[] = $state([]);
 	#ownOpen = $state(false);
-	#hasLabel = $state(false);
 	/** Last value chosen by the person: the far end of Shift ranges. */
 	#rangeAnchor: string | null = null;
 	#listEl: HTMLElement | null = null;
 	/** Option element id → value, so DOM order can be read back as values. */
 	readonly #byElementId = new Map<string, string>();
 	readonly #latest = new Map<string, OptionOptions>();
-	/** Set while the core itself clears the input, so that `input` event does not open. */
+	/** Set while the core itself dispatches `input` (clear, form reset), so it does not open. */
 	#clearing = false;
 	/** Enter/Space already handled on keydown: swallow the button's own click for it. */
 	#keyActivated = false;
+	/**
+	 * A composition just ended in this task. Safari sends the Enter that commits an IME
+	 * candidate AFTER compositionend, with isComposing false (keyCode 229).
+	 */
+	#composed = false;
+	/** What a form reset restores: the value the pattern started with. */
+	readonly #resetValue: string[];
 
 	readonly #keys = {
 		owner: createAttachmentKey(),
-		list: createAttachmentKey(),
-		label: createAttachmentKey()
+		list: createAttachmentKey()
 	};
 	readonly #attachOwner: Attachment<HTMLElement>;
 	readonly #attachList: Attachment<HTMLElement>;
-	readonly #attachLabel: Attachment<HTMLElement>;
 
 	constructor(config: CoreConfig) {
 		this.#config = config;
 		this.#id = config.id;
 		const initial = config.value.value === undefined ? config.value.defaultValue : undefined;
 		this.#ownValue = toArray(initial ?? null);
+		const controlled = config.value.value;
+		this.#resetValue = controlled ? untrack(() => toArray(controlled())) : [...this.#ownValue];
 		this.#ownOpen = config.popup?.open.defaultOpen ?? false;
 
 		this.nav = new ListNav({
@@ -369,7 +422,10 @@ class ListboxCore {
 
 		this.#attachOwner = (el) =>
 			untrack(() => {
-				const offs: (() => void)[] = [listen(el, 'keydown', (event) => this.#onOwnerKey(event, el))];
+				const offs: (void | (() => void))[] = [
+					listen(el, 'keydown', (event) => this.#onOwnerKey(event, el)),
+					this.#listenFormReset(el)
+				];
 				if (this.layer) {
 					offs.push(
 						this.layer.attachTrigger(el),
@@ -403,6 +459,10 @@ class ListboxCore {
 				if (config.owner === 'input') {
 					offs.push(
 						listen(el, 'input', () => this.#onInput()),
+						listen(el, 'compositionend', () => {
+							this.#composed = true;
+							setTimeout(() => (this.#composed = false));
+						}),
 						listen(el, 'focus', () => {
 							if (read(config.openOnFocus ?? false)) this.writeOpen(true, 'trigger');
 						})
@@ -418,6 +478,7 @@ class ListboxCore {
 				if (config.owner === 'list') {
 					offs.push(
 						listen(el, 'keydown', (event) => this.#onOwnerKey(event, el)),
+						this.#listenFormReset(el),
 						listen(el, 'focus', () => this.#onListFocus()),
 						// Option mousedown is prevented (no focus theft in popup modes); here the
 						// list IS the focus owner, so take focus explicitly.
@@ -442,11 +503,25 @@ class ListboxCore {
 					if (this.#listEl === el) this.#listEl = null;
 				});
 			});
+	}
 
-		this.#attachLabel = () => {
-			this.#hasLabel = true;
-			return () => (this.#hasLabel = false);
-		};
+	/**
+	 * With `name`: the owning form's reset restores the starting value. The `reset` event
+	 * fires BEFORE the form resets its controls, so this waits a task: by then a Combobox
+	 * input holds its reset text, which a silent `input` event hands to `bind:value`, and
+	 * the value is re-notified even when unchanged so the caller rewrites that text.
+	 */
+	#listenFormReset(el: HTMLElement): (() => void) | undefined {
+		if (this.#config.name === undefined) return undefined;
+		const form = (el as HTMLInputElement | HTMLButtonElement).form ?? el.closest('form');
+		if (!form) return undefined;
+		return listen(form, 'reset', (event) => {
+			setTimeout(() => {
+				if (event.defaultPrevented) return;
+				if (this.#config.owner === 'input') this.#silentInput(el as HTMLInputElement);
+				this.#setSelected([...this.#resetValue], true);
+			});
+		});
 	}
 
 	// ------------------------------------------------------------------ state
@@ -464,8 +539,9 @@ class ListboxCore {
 		this.#setSelected(toArray(value));
 	}
 
-	#setSelected(next: string[]): void {
-		if (sameValues(next, this.#selected())) return;
+	/** `notify`: call onValueChange even when the value is unchanged (form reset). */
+	#setSelected(next: string[], notify = false): void {
+		if (!notify && sameValues(next, this.#selected())) return;
 		const out = this.#config.multiple ? next : (next[0] ?? null);
 		const state = this.#config.value;
 		if (state.value) {
@@ -526,7 +602,8 @@ class ListboxCore {
 	// ------------------------------------------------------------------ keys
 
 	#onOwnerKey(event: KeyboardEvent, el: HTMLElement): void {
-		if (event.defaultPrevented || event.isComposing) return;
+		// keyCode 229: a key the IME is handling (Safari reports isComposing false for it).
+		if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || this.#composed) return;
 		if (this.#config.owner === 'button') this.#buttonKey(event);
 		else if (this.#config.owner === 'input') this.#inputKey(event, el as HTMLInputElement);
 		else this.#listKey(event);
@@ -574,6 +651,9 @@ class ListboxCore {
 
 		if (altKey && key === 'ArrowUp') {
 			event.preventDefault();
+			// Single: commit the highlighted option, then close (APG). Multiple: choosing
+			// would toggle, possibly deselecting, so Alt+ArrowUp only closes.
+			if (this.#config.multiple) return this.writeOpen(false, 'trigger');
 			const value = this.nav.highlighted;
 			if (value !== null && !this.#latest.get(value)?.disabled) this.#activate(value, event);
 			this.writeOpen(false, 'select');
@@ -674,15 +754,19 @@ class ListboxCore {
 	}
 
 	#clearInput(input: HTMLInputElement): void {
+		input.value = '';
+		this.#silentInput(input);
+		if (!this.#config.multiple) this.#setSelected([]);
+	}
+
+	/** Let `bind:value` see text the core (or a form reset) changed, without opening. */
+	#silentInput(input: HTMLInputElement): void {
 		this.#clearing = true;
 		try {
-			input.value = '';
-			// Let `bind:value` see it.
 			input.dispatchEvent(new Event('input', { bubbles: true }));
 		} finally {
 			this.#clearing = false;
 		}
-		if (!this.#config.multiple) this.#setSelected([]);
 	}
 
 	/** APG: focus lands on the first selected option, else the first option. */
@@ -726,6 +810,12 @@ class ListboxCore {
 		return subId(this.#id, 'label');
 	}
 
+	/** Deterministic from the first render (SSR included), so the name never waits for hydration. */
+	get #labelledBy(): string | undefined {
+		const by = this.#config.labelledBy;
+		return by === false ? undefined : (by ?? this.#labelId);
+	}
+
 	get trigger(): Part<HTMLButtonElement> {
 		// No id: a trigger part never owns one (parts.ts "Ids").
 		return part<HTMLButtonElement>(this.#keys.owner, this.#attachOwner, {
@@ -734,7 +824,7 @@ class ListboxCore {
 			'aria-haspopup': 'listbox',
 			'aria-expanded': this.open,
 			'aria-controls': this.#listId,
-			'aria-labelledby': this.#hasLabel ? this.#labelId : undefined,
+			'aria-labelledby': this.#labelledBy,
 			'aria-activedescendant': this.#activeDescendant(),
 			'data-state': this.layer?.state ?? 'open'
 		});
@@ -748,6 +838,8 @@ class ListboxCore {
 			role: 'combobox',
 			autocomplete: 'off',
 			'aria-autocomplete': 'list',
+			// The default label names the input through `for`; only a custom one needs this.
+			'aria-labelledby': typeof this.#config.labelledBy === 'string' ? this.#config.labelledBy : undefined,
 			'aria-expanded': this.open,
 			'aria-controls': this.#listId,
 			'aria-activedescendant': this.#activeDescendant(),
@@ -757,12 +849,25 @@ class ListboxCore {
 	}
 
 	get label(): Part {
-		return part(this.#keys.label, this.#attachLabel, { id: this.#labelId });
+		return { id: this.#labelId };
 	}
 
 	get inputLabel(): Part<HTMLLabelElement> {
 		const attrs: Part<HTMLLabelElement> & { for: string } = { id: this.#labelId, for: subId(this.#id, 'input') };
-		return part<HTMLLabelElement>(this.#keys.label, this.#attachLabel, attrs);
+		return attrs;
+	}
+
+	get formInputs(): FormInput[] {
+		const name = this.#config.name;
+		if (name === undefined) return [];
+		return this.#selected().map((value) => {
+			const input: FormInput = {
+				type: 'hidden',
+				name,
+				value
+			};
+			return input;
+		});
 	}
 
 	get list(): Part {
@@ -773,7 +878,7 @@ class ListboxCore {
 			id: this.#listId,
 			role: 'listbox',
 			'aria-multiselectable': this.#config.multiple ? 'true' : undefined,
-			'aria-labelledby': this.#hasLabel ? this.#labelId : undefined,
+			'aria-labelledby': this.#labelledBy,
 			popover: layer ? 'manual' : undefined,
 			tabindex: owns ? 0 : undefined,
 			'aria-activedescendant': owns ? this.#activeDescendant() : undefined,

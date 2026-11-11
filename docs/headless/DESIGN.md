@@ -614,13 +614,23 @@ After merging the core fixes: the menu button keeps `id=${id}-trigger`, under th
    - Highlights the person can see (list focus, Ctrl+Shift+Home/End, autoHighlight after a filter) pass `{ scroll: true }`.
 9. **The popup Layer's `initialFocus` getter** re-runs `nav.highlight(current, { scroll: true })` to scroll the highlighted option into view once the list is shown, then returns `'none'`.
 
+Red-team fixes (coordinator-directed):
+
+10. **Names exist before hydration.** `aria-labelledby` is always `${id}-label`, written from the server render, instead of appearing once the label attachment ran. `label` is now a plain attribute part, and callers must render it. New option `labelledBy?: string | false`: a string names another element; `false` writes none, so the caller puts an `aria-label` on the element. The Combobox input is named by `<label for>`, and gets `aria-labelledby` only for a custom string.
+11. **Multiple Select: Alt+ArrowUp only closes** (reason `'trigger'`). Choosing would toggle, and could deselect.
+12. **IME.** The owner ignores keydown with `isComposing` or `keyCode === 229`. It also ignores any key in the same task as a `compositionend` on the input, because Safari sends the committing Enter after `compositionend`.
+13. **Forms.** A new `name` option and a `formInputs` part:
+    - `formInputs` is an ARRAY of hidden-input parts, one per selected value and none when nothing is selected. A single part cannot render several fields. Type `FormInput`.
+    - The owning form's `reset` restores the starting value: `defaultValue`, or the controlled value at construction.
+    - It runs one task after the event, because `reset` fires before the form resets its controls. For a Combobox, a silent `input` event first hands the reset text to `bind:value`, then `onValueChange` is called even when the value is unchanged, so the caller rewrites the text.
+14. **Fixture.** Empty states sit outside the listbox, in a `role="status"` paragraph, because a listbox may only own options and groups. A form section adds an uncontrolled multiple Select, a Combobox and a Listbox, each with a name and a default.
+
 Evidence:
-- 7 unit tests (`tests/headless-listbox.test.ts`); the kit total is 154.
-- 16 Playwright specs in `tests/browser/headless/listbox.spec.ts`, 48/48 over 3 repeats; the whole `tests/browser/headless` directory passed 111/111 over 3 repeats.
-- `corepack pnpm check` reports 0/0.
+- 7 unit tests (`tests/headless-listbox.test.ts`).
+- After the red-team fixes: 21 Playwright specs in `tests/browser/headless/listbox.spec.ts`, 42/42 over 2 repeats. They include axe on the fixture with scripts blocked (SSR markup only) and with an open, empty combobox.
+- `corepack pnpm check` reports 0/0, and `corepack pnpm test` 165/165.
 
 Unproven:
-- A multiple Select (it is not in the fixture).
 - Group parts in a browser.
 - `openOnFocus`.
 - Firefox and Safari.
@@ -643,6 +653,15 @@ Groups:
 11. **Tabs without a value select the first enabled tab once the list mounts** (client only; pass `defaultValue` for SSR). Tabs and panels carry `data-state="active|inactive"`.
 12. **RadioGroup ignores Enter** (only Space and clicks check); items should not be buttons. ToggleGroup gained `role: 'group' | 'toolbar'` (toolbar adds `aria-orientation`), `isPressed()` and `toggle()`.
 
+Red-team fixes (pattern review on `ref/headless`; no runtime file changed):
+
+13. **Tabs keep a rendered selection.** The tablist attachment checks (a MutationObserver on the list plus an effect on the value, settled a microtask later) that the selected value is a rendered tab; if not (none given, or the selected tab left the `{#each}`/`{#if}`), it selects the first enabled tab through `onValueChange`, so its panel shows. `ValueState.onValueChange` carries no reason argument, so none is reported; adding one is a `runtime/parts.ts` change for the core owner.
+14. **Accordion find-in-page cannot desync.** The browser removes `hidden` before firing `beforematch`. The handler expands the item unless it is disabled (disabled values are tracked from `trigger()`), then, if the item is still closed (disabled, or a controlled owner that refused the value), writes `hidden="until-found"` back, because Svelte's cached attribute would never restore it.
+15. **RadioGroup in a form.** A form `reset` restores the value the group was created with (the controlled value at construction, or `defaultValue`). `formInput` changed from `<input type="hidden">` to a native **radio proxy** (checked while there is a value, `value`, `name`, `required`, `disabled`, `tabindex=-1`, `aria-hidden`): it posts exactly as a native radio group, and `required` really blocks submit with the browser's own message (a hidden input is barred from validation). Its attachment hides it visually with inline style (kit-owned element; it must stay rendered for the validation bubble) and re-syncs `checked` after a reset, which the browser applies after the `reset` event behind Svelte's cache. Consumers should also give it `sr-only` so the server-rendered radio never flashes.
+16. **ToggleGroup `role: 'toolbar'` is toggles only** (JSDoc): arrow keys move between its toggle buttons only, any other control inside is a separate tab stop; a toolbar of mixed controls is built on `ListNav`.
+
+Evidence for 13-16: four new specs in `groups.spec.ts` (selected tab removed; refused and disabled find-in-page reveal re-hidden; required blocks submit then posts; reset restores state and form data). `groups.spec.ts` + `tooltip.spec.ts` pass over `--repeat-each=2`.
+
 Evidence:
 - 11 `node --test` unit tests (`headless-tooltip`, `headless-groups`); the kit total is 158.
 - 31 Playwright specs (`tooltip.spec.ts` 16 including positioning under both strategies, `groups.spec.ts` 15), 93/93 over 3 repeats; all of `tests/browser/headless` plus `a11y.spec.ts` passed 261/261.
@@ -654,6 +673,26 @@ Unproven:
 - A real touch long-press (the spec dispatches synthetic touch PointerEvents).
 - ~~After Escape closes a popover, the shared trigger's tooltip reopens on the returned focus.~~ Fixed after the core merge: the Tooltip's focus handler skips focus for which `isRestoringFocus(el)` (layers.svelte.ts) is true. A spec proves Escape-returned focus does not open the tooltip while a Tab arrival does.
 - Firefox and Safari.
+
+**Core fixes from the pattern red-team (coordinator-directed).** These change only runtime files, plus a regression spec and fixture case for each.
+
+1. **The roving tab stop must name a rendered, navigable item.**
+   - ListNav now keeps the set of rendered, navigable values from each revalidation (`#rendered`). `#latest` never forgets values, so it could not decide this.
+   - Once measured, `highlighted` and `tabStop()` count only when they are in that set. Otherwise the stop is the first navigable item.
+   - Before the first measurement (server render and hydration), the old order stays, so the markup matches.
+   - Fixes: a RadioGroup whose value is gone, a removed selected tab, and a disabled checked radio. Any of these left every item at `tabindex=-1`.
+   - Spec R2-1 covers a "gone" stop and a disabled stop.
+2. **New internal `Layer.close(reason, options?: { restoreFocus?: boolean })`**, with the `CloseOptions` type in `runtime/layers.svelte.ts`. It closes the layer and the layers above it now, and the stack reports back through `notify(false, reason)` (`onOpenChange`).
+   - Focus return follows the reason. `'focus-out'` never moves focus. `'outside'` moves it only if it is still inside the closing layer. Other reasons move it when it is inside the layer or on `<body>`.
+   - `restoreFocus: false` suppresses focus return for any reason.
+   - `LayerStack.close` takes the same options.
+   - **Pattern authors:** to close because the person Tabbed or blurred away, call `layer.close('focus-out')`; do not write desired state. Writing desired state closes as `'api'` through the reconcile effect, which returns focus to the trigger. That is how Shift+Tab from an open Menu used to land past the menu button.
+   - Documented on `ChangeReason` and `OpenState` in `parts.ts`.
+   - Spec R2-2 uses a Layer-built, menu-like surface that closes on Tab: Shift+Tab lands on the trigger (the previous element), not on the element before it; Tab lands past the surface.
+
+Evidence:
+- `corepack pnpm check` reports 0/0, and `corepack pnpm test` passes 165/165.
+- `tests/browser/headless` on `PW_PORT=5191` passes. Failures seen mid-run in the groups, menu and requestClose specs were Vite reloads from concurrent edits; on rerun they passed, the requestClose spec 15/15.
 
 ## Open questions and risks
 

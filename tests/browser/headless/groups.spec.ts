@@ -130,6 +130,23 @@ test.describe('tabs', () => {
 		await expect(t('Runs')).toBeFocused();
 		await expect(t('Runs')).toHaveAttribute('aria-selected', 'true');
 	});
+
+	test('when the selected tab leaves the list, the first enabled tab is selected and its panel shows', async ({ page }) => {
+		const t = (name: string) => tab(page, 'Automatic tabs', name);
+		await t('Logs').click();
+		await expect(value(page, 'auto')).toHaveText('logs');
+		await page.getByRole('button', { name: 'Remove the Logs tab' }).click();
+		await expect(t('Logs')).toHaveCount(0);
+		await expect(value(page, 'auto')).toHaveText('runs');
+		await expect(t('Runs')).toHaveAttribute('aria-selected', 'true');
+		await expect(page.getByRole('tabpanel', { name: 'Runs' }).first()).toBeVisible();
+		// Removing an unselected tab changes nothing.
+		await page.getByRole('button', { name: 'Restore the Logs tab' }).click();
+		await t('Settings').click();
+		await page.getByRole('button', { name: 'Remove the Logs tab' }).click();
+		await expect(t('Logs')).toHaveCount(0);
+		await expect(value(page, 'auto')).toHaveText('settings');
+	});
 });
 
 test.describe('accordion', () => {
@@ -221,6 +238,33 @@ test.describe('accordion', () => {
 		await expect(value(page, 'multi')).toHaveText('beta');
 		await expect(await bodyOf(page, 'Section alpha')).toBeHidden();
 	});
+
+	/** What the browser's find bar does: remove `hidden`, then fire `beforematch`. */
+	async function findReveal(panel: Locator): Promise<void> {
+		await panel.evaluate((el) => {
+			el.removeAttribute('hidden');
+			el.dispatchEvent(new Event('beforematch', { bubbles: true }));
+		});
+	}
+
+	test('find-in-page cannot open an item the controlled owner refuses, nor a disabled one', async ({ page }) => {
+		for (const name of ['Vault', 'Disabled item']) {
+			const panel = await panelOf(page, name);
+			await findReveal(panel);
+			await expect(panel).toHaveAttribute('hidden', 'until-found');
+			await expect(panel.locator('p')).toBeHidden();
+			await expect(header(page, name)).toHaveAttribute('aria-expanded', 'false');
+		}
+		await expect(value(page, 'guarded')).toHaveText('none');
+		// An item the owner accepts opens as usual, and the refused one still opens later on accept.
+		const open = await panelOf(page, 'Open item');
+		await findReveal(open);
+		await expect(value(page, 'guarded')).toHaveText('open');
+		await expect(open).not.toHaveAttribute('hidden');
+		await expect(header(page, 'Open item')).toHaveAttribute('aria-expanded', 'true');
+		await header(page, 'Open item').click();
+		await expect(open).toHaveAttribute('hidden', 'until-found');
+	});
 });
 
 test.describe('radio group', () => {
@@ -268,6 +312,36 @@ test.describe('radio group', () => {
 		await expect(value(page, 'size')).toHaveText('large');
 		await radio(page, 'Huge').click({ force: true });
 		await expect(value(page, 'size')).toHaveText('large');
+	});
+
+	test('required really blocks submit; once checked the value posts like a native radio', async ({ page }) => {
+		const form = page.getByTestId('size-form');
+		const submit = page.getByRole('button', { name: 'Submit sizes' });
+		await expect(formValue(page)).toHaveAttribute('aria-hidden', 'true');
+		await expect(formValue(page)).toHaveAttribute('tabindex', '-1');
+		expect(await form.evaluate((f: HTMLFormElement) => f.checkValidity())).toBe(false);
+		await submit.click();
+		await expect(page.getByTestId('posted')).toHaveText('nothing');
+		await radio(page, 'Medium').click();
+		expect(await form.evaluate((f: HTMLFormElement) => f.checkValidity())).toBe(true);
+		await submit.click();
+		await expect(page.getByTestId('posted')).toHaveText('size=medium&plan=free');
+	});
+
+	test('a form reset restores the initial values, state and form input', async ({ page }) => {
+		const plan = (name: string) => page.getByRole('radiogroup', { name: 'Plan' }).getByRole('radio', { name });
+		await radio(page, 'Large').click();
+		await plan('pro').click();
+		await expect(value(page, 'plan')).toHaveText('pro');
+		await page.getByRole('button', { name: 'Reset sizes' }).click();
+		await expect(value(page, 'size')).toHaveText('none');
+		await expect(value(page, 'plan')).toHaveText('free');
+		await expect(plan('free')).toHaveAttribute('aria-checked', 'true');
+		await expect(radio(page, 'Large')).toHaveAttribute('aria-checked', 'false');
+		const inputs = await page.getByTestId('size-form').evaluate((f: HTMLFormElement) =>
+			[...new FormData(f)].map(([k, v]) => `${k}=${v}`).join('&')
+		);
+		expect(inputs).toBe('plan=free');
 	});
 });
 

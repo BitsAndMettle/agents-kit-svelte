@@ -61,7 +61,7 @@ export type ChangeReason =
 	| 'trigger' // the trigger part was activated (click, Enter/Space, ArrowDown on a menu button…)
 	| 'escape' // Escape key or platform close request (Android back)
 	| 'outside' // pointer-down outside the layer
-	| 'focus-out' // focus left a non-modal layer
+	| 'focus-out' // focus left a non-modal layer (Tab, Shift+Tab, blur); such a close never moves focus
 	| 'select' // an item was chosen and the pattern closes on select
 	| 'close-button' // the `close` part
 	| 'parent' // an ancestor layer closed, or a sibling chain was replaced
@@ -72,6 +72,12 @@ export type ChangeReason =
 /**
  * Controlled XOR uncontrolled, in the type. Controlled requires a writer, so it is
  * impossible to wire a getter and forget the setter (the "stuck open" bug).
+ */
+/*
+ * Pattern authors: to close for a reason that matters to focus (above all 'focus-out'),
+ * call the internal `Layer.close(reason)` instead of writing this state; the stack then
+ * reports back through `onOpenChange(false, reason)`. Writing the state yourself closes
+ * as 'api', which returns focus to the trigger.
  */
 export type OpenState =
 	| { open: () => boolean; onOpenChange: (open: boolean, reason: ChangeReason) => void; defaultOpen?: never }
