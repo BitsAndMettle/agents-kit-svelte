@@ -23,5 +23,9 @@
 	<Field label="Loaded code" description="A bound value of seven digits is cut to six.">
 		<OtpInput name="loaded" bind:value={loaded} autoSubmit size="sm" />
 	</Field>
+	<div class="grid gap-1.5">
+		<label for="otp-native" class="text-sm font-medium text-fg-main">Code from your authenticator app</label>
+		<OtpInput id="otp-native" name="native" length={4} size="sm" />
+	</div>
 	<p class="m-0 text-xs text-fg-light" aria-live="polite">{completed ? `Complete: ${completed}` : 'Type a code to see it complete.'}</p>
 </DemoForm>

@@ -10,7 +10,10 @@
 		value?: string;
 		/** Starting value when `value` is not given, and what a form reset restores. */
 		defaultValue?: string;
-		/** The accessible name when no `Field` (and no `aria-label` or `aria-labelledby`) names the input. */
+		/**
+		 * Fallback accessible name when no `Field`, native `<label for>`, `aria-label` or `aria-labelledby` names the input.
+		 * A recorded deviation from the no-label-prop rule: the input has no visible text of its own, so an unnamed one would be unusable.
+		 */
 		codeLabel?: string;
 		/** Number of characters, and of cells drawn. */
 		length?: number;
@@ -81,6 +84,11 @@
 
 	/** A group Field has no `for` label to name the input, so it needs its own name like a standalone one. */
 	const needsName = $derived(!field || field.group);
+	/** A native `<label for>` names the input already, and `aria-label` would override it (WCAG 2.5.3), so the fallback steps aside. */
+	let hasNativeLabel = $state(false);
+	$effect(() => {
+		hasNativeLabel = (ref?.labels?.length ?? 0) > 0;
+	});
 
 	const CELLS: Record<FormControlSize, string> = {
 		sm: 'h-9 w-8 text-base',
@@ -124,7 +132,27 @@
 		}
 	}
 
-	/** Cleans what the input holds now. Not while an IME composition is open: rewriting would break it. */
+	/**
+	 * Cleans the text the input holds. When the code is already full and an insert would push it past
+	 * `length`, the typed characters overwrite the ones after the caret (as a full code expects), so
+	 * nothing is dropped from the end without the person seeing it.
+	 */
+	function cleanEdit(raw: string, caretRaw: number): { next: string; caret: number } {
+		const all = normalizeCode(raw, Number.MAX_SAFE_INTEGER, alphanumeric);
+		const caretAll = normalizeCode(raw.slice(0, caretRaw), Number.MAX_SAFE_INTEGER, alphanumeric).length;
+		const previous = clean;
+		if (all.length > length && previous.length >= length && all.length > previous.length) {
+			const inserted = all.length - previous.length;
+			const at = Math.max(0, caretAll - inserted);
+			const typed = all.slice(at, at + inserted);
+			const next = (previous.slice(0, at) + typed + previous.slice(at + typed.length)).slice(0, length);
+			return { next, caret: Math.min(at + typed.length, length) };
+		}
+		const next = all.slice(0, length);
+		return { next, caret: Math.min(caretAll, next.length) };
+	}
+
+	/** Cleans what the input holds now. Not while an IME composition is open: rewriting would break it (compositionend commits). */
 	function handleInput(event: Event & { currentTarget: HTMLInputElement }): void {
 		if ((event as unknown as InputEvent).isComposing) {
 			(rest.oninput as ((e: Event) => void) | undefined)?.(event);
@@ -132,19 +160,18 @@
 		}
 		const input = event.currentTarget;
 		const raw = input.value;
-		const caret = input.selectionStart ?? raw.length;
-		const clean = normalizeCode(raw, length, alphanumeric);
-		commit(clean, normalizeCode(raw.slice(0, caret), length, alphanumeric).length);
+		const { next, caret } = cleanEdit(raw, input.selectionStart ?? raw.length);
+		commit(next, caret);
 		(rest.oninput as ((e: Event) => void) | undefined)?.(event);
 	}
 
+	/** The composed text was never committed (input events during composition are skipped), so always commit it here, clean or not. */
 	function handleCompositionEnd(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
 		(rest.oncompositionend as ((e: CompositionEvent) => void) | undefined)?.(event);
 		const input = event.currentTarget;
 		const raw = input.value;
-		const caret = input.selectionStart ?? raw.length;
-		if (normalizeCode(raw, length, alphanumeric) === raw) return;
-		commit(normalizeCode(raw, length, alphanumeric), normalizeCode(raw.slice(0, caret), length, alphanumeric).length);
+		const { next, caret } = cleanEdit(raw, input.selectionStart ?? raw.length);
+		commit(next, caret);
 	}
 
 	/** The browser would cut a pasted "123 456" at the length before we could clean it, so we place the text ourselves. */
@@ -224,7 +251,7 @@
 		defaultValue={cleanDefault ?? initialValue}
 		{name}
 		{autocomplete}
-		aria-label={rest['aria-label'] ?? (needsName && rest['aria-labelledby'] === undefined ? codeLabel : undefined)}
+		aria-label={rest['aria-label'] ?? (needsName && rest['aria-labelledby'] === undefined && !hasNativeLabel ? codeLabel : undefined)}
 		type="text"
 		inputmode={alphanumeric ? 'text' : 'numeric'}
 		{pattern}

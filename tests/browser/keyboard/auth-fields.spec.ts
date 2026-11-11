@@ -147,7 +147,7 @@ test.describe('OtpInput', () => {
 	test('is one real input with the one-time-code attributes, named by its Field', async ({ page }) => {
 		const section = await openSection(page, 'otp-input');
 		const code = section.locator('input[name=code]');
-		await expect(section.locator('input')).toHaveCount(4);
+		await expect(section.locator('input')).toHaveCount(5);
 		await expect(code).toHaveAccessibleName(/Verification code/);
 		await expect(code).toHaveAttribute('autocomplete', 'one-time-code');
 		await expect(code).toHaveAttribute('inputmode', 'numeric');
@@ -157,7 +157,7 @@ test.describe('OtpInput', () => {
 		const backup = section.locator('input[name=backup]');
 		await expect(backup).toHaveAttribute('inputmode', 'text');
 		await expect(backup).toHaveAttribute('pattern', '[0-9A-Za-z]{8}');
-		await expect(section.locator('[data-otp-cell]')).toHaveCount(26);
+		await expect(section.locator('[data-otp-cell]')).toHaveCount(30);
 	});
 
 	test('typing fills the cells, highlights the active one, and reports completion once', async ({ page }) => {
@@ -266,6 +266,38 @@ test.describe('OtpInput', () => {
 		await expect(section.locator('[data-otp-cell]').nth(1)).toHaveText('2');
 	});
 
+	test('a real IME composition of plain ASCII is committed at compositionend', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const code = section.locator('input[name=code]');
+		await code.focus();
+		const cdp = await page.context().newCDPSession(page);
+		await cdp.send('Input.imeSetComposition', { text: '123456', selectionStart: 6, selectionEnd: 6 });
+		await cdp.send('Input.insertText', { text: '123456' });
+		await expect(code).toHaveValue('123456');
+		await expect(section.locator('[data-otp-cell]').nth(5)).toHaveText('6');
+		await expect(section.getByText('Complete: 123456')).toBeVisible();
+		const backup = section.locator('input[name=backup]');
+		await backup.focus();
+		await cdp.send('Input.imeSetComposition', { text: 'ab12cd34', selectionStart: 8, selectionEnd: 8 });
+		await cdp.send('Input.insertText', { text: 'ab12cd34' });
+		await expect(sent(section)).toContainText('backup=ab12cd34');
+	});
+
+	test('a digit typed into a full code overwrites the one at the caret, and nothing else is lost', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const code = section.locator('input[name=code]');
+		await code.fill('123456');
+		await code.evaluate((el: HTMLInputElement) => el.setSelectionRange(2, 2));
+		await page.keyboard.type('9');
+		await expect(code).toHaveValue('129456');
+		await expect(section.locator('[data-otp-cell]').nth(5)).toHaveText('6');
+	});
+
+	test('a native label names the input; the fallback name only applies without one', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		await expect(section.locator('input[name=native]')).toHaveAccessibleName('Code from your authenticator app');
+	});
+
 	test('autoSubmit fires once per fill, and an edit while full does not submit again', async ({ page }) => {
 		const section = await openSection(page, 'otp-input');
 		const backup = section.locator('input[name=backup]');
@@ -341,7 +373,7 @@ test.describe('OtpInput', () => {
 		await code.fill('123456');
 		await expect(code).not.toHaveAttribute('aria-invalid');
 		await submit(section);
-		await expect(sent(section)).toHaveText('Sent: code=123456, backup=, saved=123456, loaded=123456');
+		await expect(sent(section)).toHaveText('Sent: code=123456, backup=, saved=123456, loaded=123456, native=');
 	});
 
 	test('autoSubmit submits the form once, when the last character arrives', async ({ page }) => {
@@ -352,7 +384,7 @@ test.describe('OtpInput', () => {
 		await page.keyboard.type('ab12cd3');
 		await expect(sent(section)).toHaveText('');
 		await page.keyboard.type('4');
-		await expect(sent(section)).toHaveText('Sent: code=246810, backup=ab12cd34, saved=123456, loaded=123456');
+		await expect(sent(section)).toHaveText('Sent: code=246810, backup=ab12cd34, saved=123456, loaded=123456, native=');
 	});
 
 	test('reset restores the empty value and clears the cells', async ({ page }) => {
