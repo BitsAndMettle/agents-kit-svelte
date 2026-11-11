@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_BLOCKED_ITEMS, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS } from '$lib/fixtures/workflows';
+	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_BLOCKED_ITEMS, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS, SAMPLE_FLEET_NOW, SAMPLE_MACHINES } from '$lib/fixtures/workflows';
 	import { SAMPLE_CONTEXT_CHUNKS, SAMPLE_DIFF_ROWS, SAMPLE_FILTER_ROWS, SAMPLE_FINE_TUNE_FIELDS, SAMPLE_FLOWCHART_NODES, SAMPLE_INSIGHTS, SAMPLE_RECOMMENDATION_ALTERNATIVES, SAMPLE_RECOMMENDATION_REASONING, SAMPLE_RECORDS, SAMPLE_SEARCH_ITEMS, SAMPLE_SELECTION_ACTIONS, SAMPLE_TOOL_DIFFS, SAMPLE_TOOL_STEPS } from '$lib/fixtures/data';
-	import { SAMPLE_CHAIN_OF_THOUGHT, SAMPLE_ENV_VARIABLES, SAMPLE_PACKAGE_DEPENDENCIES, SAMPLE_PACKAGE_SCRIPTS, SAMPLE_PLAN_MILESTONES, SAMPLE_PREVIEW_LOGS, SAMPLE_PROMPT_SUGGESTIONS, SAMPLE_SCHEMA_PARAMETERS, SAMPLE_SCHEMA_REQUEST_BODY, SAMPLE_SCHEMA_RESPONSE_BODY, SAMPLE_SIDEBAR_RESOURCES, SAMPLE_STACK_SNIPPET, SAMPLE_STACK_TRACE, SAMPLE_VOICE_DEVICES, SAMPLE_VOICE_PERSONAS, SAMPLE_PRESENCE_NOW, SAMPLE_PRESENCE_SINCE, SAMPLE_WORK_STEPS } from '$lib/fixtures/chat';
+	import { SAMPLE_CHAIN_OF_THOUGHT, SAMPLE_ENV_VARIABLES, SAMPLE_PACKAGE_DEPENDENCIES, SAMPLE_PACKAGE_SCRIPTS, SAMPLE_PLAN_MILESTONES, SAMPLE_PREVIEW_LOGS, SAMPLE_PROMPT_SUGGESTIONS, SAMPLE_SCHEMA_PARAMETERS, SAMPLE_SCHEMA_REQUEST_BODY, SAMPLE_SCHEMA_RESPONSE_BODY, SAMPLE_SIDEBAR_RESOURCES, SAMPLE_STACK_SNIPPET, SAMPLE_STACK_TRACE, SAMPLE_VOICE_DEVICES, SAMPLE_VOICE_PERSONAS, SAMPLE_PRESENCE_NOW, SAMPLE_PRESENCE_SINCE, SAMPLE_WORK_STEPS, SAMPLE_RECEIPTS, SAMPLE_RECEIPTS_NOW } from '$lib/fixtures/chat';
 	import {
 		SAMPLE_BENTO_STATS,
 		SAMPLE_BOARD_ISSUES,
@@ -125,6 +125,8 @@
 		AgentHandoffGantt,
 		ModelPhaseStream,
 		AgentWorkTrace,
+		FleetStatus,
+		ActionReceipt,
 		GitHubChecksWaterfall,
 		GitHubPrActionBar,
 		GitHubPullRequestGraph,
@@ -1638,6 +1640,14 @@
 								<div class="flex min-h-24 items-end"><GitHubPrActionBar diff={SAMPLE_PR_DIFF} /></div>
 							{:else if item.slug === 'github-pr-graph'}
 								<GitHubPullRequestGraph title="Refresh sessions before they expire" number={128} lanes={SAMPLE_PR_GRAPH_LANES} commits={SAMPLE_PR_GRAPH_COMMITS} head="session" mergeState="clean" footer={{ label: 'Checks 2/5', tone: 'running' }} />
+							{:else if item.slug === 'fleet-status'}
+								<div class="mx-auto max-w-2xl"><FleetStatus title="Fleet" machines={SAMPLE_MACHINES} now={SAMPLE_FLEET_NOW} onSelectMachine={() => {}} onSelectWork={() => {}} /></div>
+							{:else if item.slug === 'action-receipt'}
+								<div class="mx-auto flex max-w-xl flex-col gap-2">
+									{#each SAMPLE_RECEIPTS as r (r.id)}
+										<ActionReceipt action={r.action} target={r.target} outcome={r.outcome} reason={r.reason} actor={r.actor} at={r.at} now={SAMPLE_RECEIPTS_NOW} run={r.run} onOpenTarget={() => {}} onOpenRun={() => {}} onUndo={r.id === 'r3' ? () => {} : undefined} />
+									{/each}
+								</div>
 							{:else if item.slug === 'github-checks-waterfall'}
 								<GitHubChecksWaterfall prNumber={128} commit={{ sha: 'd29f50a', message: 'Add session refresh tests' }} checks={SAMPLE_CHECK_RUNS} />
 							{:else if item.slug === 'metric-tiles'}

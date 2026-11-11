@@ -20,7 +20,7 @@ export interface CatalogItemMeta {
 }
 
 export const CATALOG_ITEMS: CatalogItemMeta[] = [
-	// 1. beUI Agents (21 components)
+	// 1. beUI Agents (22 components)
 	{
 		slug: 'chat-workbench',
 		name: 'ChatWorkbench',
@@ -596,6 +596,38 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   {elapsed}
   bind:expanded
   onSelectFile={(path) => console.log('open', path)}
+/>`
+	},
+
+	{
+		slug: 'action-receipt',
+		name: 'ActionReceipt',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/ActionReceipt.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'One record of something an agent did or refused to do for the person: the verb, what it touched, who did it and when, the run that proposed it, and the reason. Refused reads differently from done, and Undo shows only while it is done. Stacks as rows in an inbox with compact.',
+		usageSnippet: `<script lang="ts">
+  import { ActionReceipt } from 'agents-kit-svelte';
+</script>
+
+<ActionReceipt
+  action="Parked"
+  target={{ label: '#3412 Fix sign-in redirect', id: '3412' }}
+  outcome="done"
+  actor="You"
+  at="2026-11-11T11:59:00Z"
+  run={{ id: 'run-88', label: 'Run 88' }}
+  onUndo={(target) => console.log('unpark', target.id)}
+/>
+
+<ActionReceipt
+  action="Merge"
+  target={{ label: 'PR #212 Add retry to export' }}
+  outcome="refused"
+  reason="merging is not on the operator's list"
+  actor="Operator"
+  compact
 />`
 	},
 
@@ -1452,7 +1484,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 5. Agents UI Orchestration (11 components)
+	// 5. Agents UI Orchestration (12 components)
 	{
 		slug: 'agent-orchestrator',
 		name: 'AgentOrchestrator',
@@ -1783,6 +1815,46 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   label="Searching the docs"
   showControls
   onVariantChange={(next) => (variant = next)}
+/>`
+	},
+
+	{
+		slug: 'fleet-status',
+		name: 'FleetStatus',
+		category: 'Agents UI Orchestration',
+		sveltePath: 'src/lib/agents-ui/FleetStatus.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'What is happening on the machines that run agent work: presence, busy slots as a segmented bar, what runs on each machine, warning chips for missing safeguards and the machine the operator lives on. Stacked cards on a phone, dense rows on desktop.',
+		usageSnippet: `<script lang="ts">
+  import { FleetStatus, type Machine } from 'agents-kit-svelte';
+
+  let machines = $state<Machine[]>([
+    {
+      id: 'devbox',
+      name: 'devbox',
+      presence: 'online',
+      slots: { used: 4, total: 6 },
+      holdsOperator: true,
+      flags: [{ id: 'confined', label: 'Confined', ok: true }],
+      work: [{ id: '3412', label: '#3412 Fix sign-in redirect', status: 'running' }]
+    },
+    {
+      id: 'laptop',
+      name: 'laptop',
+      presence: 'offline',
+      lastSeen: '2026-11-11T09:00:00Z',
+      slots: { used: 0, total: 2 },
+      flags: [{ id: 'confined', label: 'Confinement off', ok: false }]
+    }
+  ]);
+</script>
+
+<FleetStatus
+  title="Fleet"
+  {machines}
+  onSelectMachine={(machine) => console.log('open', machine.id)}
+  onSelectWork={(work, machine) => console.log('open', work.id, 'on', machine.id)}
 />`
 	},
 
