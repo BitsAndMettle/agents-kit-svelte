@@ -1,6 +1,34 @@
 import { readFileSync } from 'node:fs';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openSection, press } from './helpers';
+
+/**
+ * Opens a section on a clock the test owns. The install comes before the page loads; `hold` then stops time, so the
+ * demos' "server" delays and the cooldown only move when the test calls `page.clock.runFor`.
+ */
+async function openOnClock(page: Page, slug: string): Promise<Locator> {
+	await page.clock.install();
+	return openSection(page, slug);
+}
+
+/** Stops the page's clock a moment ahead. */
+async function hold(page: Page): Promise<void> {
+	// Measured on the page clock, which may be ahead of the test process.
+	const now = await page.evaluate(() => Date.now());
+	await page.clock.pauseAt(new Date(now + 1000));
+}
+
+/** Starts recording every text the element shows from now on, in order, under `key`. */
+async function recordText(target: Locator, key: string): Promise<void> {
+	await target.evaluate((el, name) => {
+		const w = window as unknown as { __texts?: Record<string, string[]> };
+		const texts = (w.__texts ??= {});
+		texts[name] = [];
+		new MutationObserver(() => texts[name].push(el.textContent ?? '')).observe(el, { childList: true, characterData: true, subtree: true });
+	}, key);
+}
+
+const recorded = (page: Page, key: string) => page.evaluate((name) => (window as unknown as { __texts: Record<string, string[]> }).__texts[name], key);
 
 test.describe('AccountMenu', () => {
 	test('opens with the keyboard, shows the header, runs rows and Sign out, and returns focus', async ({ page }) => {
@@ -141,47 +169,81 @@ test.describe('SessionList', () => {
 	});
 
 	test('concurrent revokes each restore focus for their own row', async ({ page }) => {
-		const section = await openSection(page, 'session-list');
+		const section = await openOnClock(page, 'session-list');
 		const phone = section.getByRole('button', { name: 'Revoke Safari on iPhone' });
 		const tablet = section.getByRole('button', { name: 'Revoke Firefox on iPad' });
 		const confirm = page.getByRole('alertdialog').getByRole('button', { name: 'Revoke', exact: true });
+		await hold(page);
+		// The phone takes 2500 ms and the tablet 1000 ms on the test's clock; nothing settles until the test says so.
 		await phone.focus();
 		await press(page, 'Enter');
 		await confirm.click();
+		await page.clock.runFor(300);
 		await expect(page.getByRole('alertdialog')).toBeHidden();
 		await tablet.focus();
 		await press(page, 'Enter');
 		await confirm.click();
+		await page.clock.runFor(300);
 		await expect(page.getByRole('alertdialog')).toBeHidden();
-		// Back on the first row, which is still waiting, when it disappears.
+		await expect(phone).toHaveAttribute('aria-busy', 'true');
+		await expect(tablet).toHaveAttribute('aria-busy', 'true');
+		// The tablet row finishes first (its 1000 ms are up); the phone row is still waiting.
+		await page.clock.runFor(800);
+		await expect(section.getByTestId('sessions-log')).toHaveText('Revoked tablet');
+		await expect(phone).toHaveAttribute('aria-busy', 'true');
+		// Back on the phone row, which is still waiting, when it disappears.
 		await phone.focus();
 		await expect(phone).toBeFocused();
+		await page.clock.runFor(2000);
 		await expect(section.getByTestId('sessions-log')).toHaveText('Revoked phone');
 		await expect(phone).toHaveCount(0);
 		expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
-		// The tablet row finished first; the phone row's own restore lands on the row now in its place.
+		// The phone row's own restore lands on the row now in its place.
 		await expect(section.getByRole('button', { name: /^Revoke / }).first()).toBeFocused();
+	});
+
+	test('a revoke that throws at once is announced again on every retry', async ({ page }) => {
+		const section = await openSection(page, 'session-list');
+		const button = section.getByRole('button', { name: 'Revoke Opera on Linux' });
+		const row = section.getByRole('listitem').filter({ hasText: 'Opera on Linux' });
+		const message = 'The device could not be signed out. Try again.';
+		await recordText(row.getByRole('status'), 'revoke');
+		for (let attempt = 0; attempt < 2; attempt++) {
+			await button.focus();
+			await press(page, 'Enter');
+			await page.getByRole('alertdialog').getByRole('button', { name: 'Revoke', exact: true }).click();
+			await expect(row.getByRole('status')).toHaveText(message);
+			await expect(page.getByRole('alertdialog')).toBeHidden();
+		}
+		// The message was cleared and set again, so a screen reader hears the second failure too.
+		await expect.poll(async () => (await recorded(page, 'revoke')).slice(-3)).toEqual([message, '', message]);
 	});
 });
 
 test.describe('VerifyEmailBanner', () => {
-	test('Resend shows loading, a polite Sent, then waits out the cooldown', async ({ page }) => {
-		const section = await openSection(page, 'verify-email-banner');
+	test('Resend shows loading, a polite Sent, then waits out the cooldown with a stable name', async ({ page }) => {
+		const section = await openOnClock(page, 'verify-email-banner');
 		await expect(section).toContainText('ada@example.com is not verified');
 		const resend = section.getByRole('button', { name: 'Resend verification email' }).first();
 		await resend.focus();
+		await hold(page);
 		await press(page, 'Enter');
 		await expect(resend).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(1000);
 		await expect(section.getByRole('status').filter({ hasText: 'Sent' })).toBeVisible();
 		await expect(section.getByTestId('verify-sends')).toHaveText('1');
-		// The cooldown keeps the button focusable: aria-disabled, never disabled.
-		const waiting = section.getByRole('button', { name: /^Resend in \d{1,2}s$/ });
-		await expect(waiting).toHaveAttribute('aria-disabled', 'true');
-		await expect(waiting).not.toHaveAttribute('disabled', /.*/);
-		await expect(waiting).toBeFocused();
+		// The cooldown keeps the button focusable (aria-disabled, never disabled) and its name; the wait is its own line.
+		await expect(resend).toHaveAttribute('aria-disabled', 'true');
+		await expect(resend).not.toHaveAttribute('disabled', /.*/);
+		await expect(resend).toHaveAccessibleDescription(/^Resend in \d{1,2}s$/);
+		await expect(section.getByText(/^Resend in \d{1,2}s$/).first()).toBeVisible();
+		await expect(resend).toBeFocused();
 		await press(page, 'Enter');
+		await page.clock.runFor(1000);
 		await expect(section.getByTestId('verify-sends')).toHaveText('1');
-		await expect(resend).toBeEnabled({ timeout: 9000 });
+		await page.clock.runFor(5000);
+		await expect(resend).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(resend).toBeEnabled();
 	});
 
 	test('without onResend there is no Resend button and nothing is claimed as sent', async ({ page }) => {
@@ -196,7 +258,9 @@ test.describe('VerifyEmailBanner', () => {
 		const page = await context.newPage();
 		await page.goto('/');
 		const banner = page.getByTestId('banner-waiting');
-		await expect(banner.getByRole('button', { name: /Resend in \d+s/ })).toHaveAttribute('aria-disabled', 'true');
+		const resend = banner.getByRole('button', { name: 'Resend verification email' });
+		await expect(resend).toHaveAttribute('aria-disabled', 'true');
+		await expect(resend).toHaveAccessibleDescription(/^Resend in \d+s$/);
 		await context.close();
 	});
 
@@ -204,6 +268,27 @@ test.describe('VerifyEmailBanner', () => {
 		const section = await openSection(page, 'verify-email-banner');
 		const banner = section.getByTestId('banner-failing');
 		await banner.getByRole('button', { name: 'Resend verification email' }).click();
+		await expect(banner.getByRole('alert')).toContainText('could not be sent');
+	});
+
+	test('a resend that throws at once is announced again on every retry', async ({ page }) => {
+		const section = await openSection(page, 'verify-email-banner');
+		const banner = section.getByTestId('banner-throwing');
+		const resend = banner.getByRole('button', { name: 'Resend verification email' });
+		await page.evaluate(() => {
+			const w = window as unknown as { __failures: number };
+			w.__failures = 0;
+			const target = document.querySelector('[data-testid="banner-throwing"]')!;
+			new MutationObserver((records) => {
+				for (const record of records) for (const node of record.addedNodes) if (node.textContent?.includes('could not be sent')) w.__failures++;
+			}).observe(target, { childList: true, subtree: true });
+		});
+		const failures = () => page.evaluate(() => (window as unknown as { __failures: number }).__failures);
+		await resend.click();
+		await expect(banner.getByRole('alert')).toContainText('could not be sent');
+		await expect.poll(failures).toBe(1);
+		await resend.click();
+		await expect.poll(failures).toBe(2);
 		await expect(banner.getByRole('alert')).toContainText('could not be sent');
 	});
 

@@ -4,6 +4,10 @@
 
 	let step = $state<TwoFactorStep>(1);
 	let log = $state('');
+	/** Hands the backup codes over only after the verify, to show the step total stays at three. */
+	let late = $state(false);
+	const CODES = ['7k2m-9xqp', 'f3ab-81zd', 'q9wl-4tnc', 'x5rj-0vhe', 'm8dy-2gua', 'c1ps-6kbo'];
+	let backupCodes = $state<string[] | undefined>(CODES);
 
 	// A stand-in for the QR code your server draws: a plain pattern, not a real code.
 	const cells = Array.from({ length: 49 }, (_, i) => (i * 7 + (i % 5) * 3) % 3 !== 0);
@@ -14,6 +18,13 @@
 		if (code === '000000') throw new Error('network down');
 		if (code !== '123456') return { errors: { code: 'That code is not right. Check your app and try again.' } };
 		log = 'Verified';
+		if (late) backupCodes = CODES;
+	}
+
+	function toggleLate(checked: boolean): void {
+		late = checked;
+		backupCodes = checked ? undefined : CODES;
+		step = 1;
 	}
 </script>
 
@@ -26,6 +37,7 @@
 {/snippet}
 
 <div class="flex flex-col gap-3">
+	{#key late}
 	<TwoFactorSetup
 		bind:step
 		{qr}
@@ -33,14 +45,17 @@
 		issuer="Example app"
 		account="ada@example.com"
 		onVerify={verify}
-		backupCodes={['7k2m-9xqp', 'f3ab-81zd', 'q9wl-4tnc', 'x5rj-0vhe', 'm8dy-2gua', 'c1ps-6kbo']}
-		backupCodesProps={{ filename: 'example-backup-codes.txt' }}
+		bind:backupCodes
+		withBackupCodes
+		backupCodesProps={{ filename: 'example-backup-codes.txt', labels: { description: 'Keep these somewhere safe.' } }}
 		onComplete={() => {
 			log = 'Setup complete';
 			step = 1;
 		}}
 		onCancel={() => (log = 'Cancelled')}
 	/>
+	{/key}
 	<p class="m-0 text-center text-[13px] text-fg-light">Last action: <span data-testid="setup-log">{log}</span></p>
+	<label class="mx-auto flex items-center gap-2 text-xs text-fg-light"><input type="checkbox" checked={late} onchange={(event) => toggleLate(event.currentTarget.checked)} /> Hand over the backup codes after the verify</label>
 	<p class="m-0 text-center text-xs text-fg-light">The code that works is 123456; 000000 fails the request.</p>
 </div>

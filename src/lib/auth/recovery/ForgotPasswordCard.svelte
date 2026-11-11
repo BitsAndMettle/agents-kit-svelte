@@ -1,4 +1,12 @@
 <script lang="ts" module>
+	/** What `onSubmit` receives. */
+	export interface ForgotPasswordValues {
+		email: string;
+	}
+
+	/** Field names an error can be keyed by. */
+	export type ForgotPasswordField = 'email';
+
 	/** Every word the forgot-password screen shows or announces. */
 	export interface ForgotPasswordCardLabels {
 		title: string;
@@ -11,7 +19,7 @@
 		/** The confirmation. It must not reveal whether the account exists. `email` is empty when unknown. */
 		sent: (email: string) => string;
 		resend: string;
-		/** The resend button's text while the server's wait runs. */
+		/** The visible line under the Resend button while the server's wait runs. The button's own name stays `resend`. */
 		resendIn: (seconds: number) => string;
 		/** Polite note after a resend went out. */
 		resent: string;
@@ -33,7 +41,7 @@
 	
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'title' | 'hidden' | 'onsubmit' | 'oninput' | 'method'> {
 		/** Called with the email. Without it the form posts natively to `action`. Return an `AuthResult` to show errors. */
-		onSubmit?: AuthSubmitHandler<{ email: string }, 'email'>;
+		onSubmit?: AuthSubmitHandler<ForgotPasswordValues, ForgotPasswordField>;
 		/** Where a native post goes. */
 		action?: string;
 		/** Controlled pending state (wins over the handler's own). */
@@ -117,11 +125,10 @@
 	let resendError = $state(false);
 	let resent = $state(false);
 	let heading = $state<HTMLElement | null>(null);
-	let resendButton = $state<HTMLElement | null>(null);
 
 	let lastEmail = '';
 
-	const submit = new AuthSubmit<{ email: string }, 'email'>({
+	const submit = new AuthSubmit<ForgotPasswordValues, ForgotPasswordField>({
 		handler: () => onSubmit,
 		read: (data) => {
 			lastEmail = readText(data, 'email');
@@ -139,6 +146,7 @@
 
 	const cooldown = new Cooldown(() => resendAvailableAt);
 	const messageId = $props.id();
+	const waitId = `${messageId}-wait`;
 
 	const showSent = $derived(sent || submitted);
 	const address = $derived(sentTo || email);
@@ -149,19 +157,13 @@
 		if (target) void tick().then(() => target.focus());
 	});
 
-	// While the wait runs the button stays focusable: aria-disabled, never `disabled`. Button sets that attribute
-	// itself only for loading, so it is set here.
-	$effect(() => {
-		if (!resendButton) return;
-		if (cooldown.active) resendButton.setAttribute('aria-disabled', 'true');
-		else resendButton.removeAttribute('aria-disabled');
-	});
-
 	async function resend(): Promise<void> {
 		if (resending || cooldown.active) return;
 		resendError = false;
 		resent = false;
 		resending = true;
+		// Let the cleared message reach the page first, so a failure that comes straight back is announced again.
+		await tick();
 		try {
 			await onResend?.();
 			resent = true;
@@ -177,7 +179,7 @@
 	{#if showSent}
 		<div class="grid gap-5">
 			<div class="grid justify-items-center gap-2 text-center">
-				<svelte:element this={`h${headingLevel}`} bind:this={heading} tabindex={-1} class={cn(SURFACE.heading, 'm-0 text-lg focus:outline-none')}>{text.sentTitle}</svelte:element>
+				<svelte:element this={`h${headingLevel}`} bind:this={heading} tabindex={-1} aria-describedby={messageId} class={cn(SURFACE.heading, 'm-0 text-lg focus:outline-none')}>{text.sentTitle}</svelte:element>
 				<p id={messageId} class={cn(SURFACE.description, 'm-0 text-[13px]')}>{text.sent(address)}</p>
 			</div>
 			{#if resendError}
@@ -186,9 +188,9 @@
 			<p role="status" class="m-0 text-center text-xs font-medium text-fg-main empty:hidden">{resent ? text.resent : ''}</p>
 			<div class="grid gap-2">
 				{#if onResend}
-					<Button variant="secondary" size="lg" loading={resending} bind:ref={resendButton} class="aria-disabled:cursor-not-allowed aria-disabled:opacity-60" onclick={resend}>
-						{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}
-					</Button>
+					<Button variant="secondary" size="lg" loading={resending} softDisabled={cooldown.active} aria-describedby={cooldown.active ? waitId : undefined} onclick={resend}>{text.resend}</Button>
+					<!-- The name of the button stays put; the countdown is its own line, tied to the button, not live. -->
+					<p id={waitId} class="m-0 text-center text-xs text-fg-light empty:hidden">{cooldown.active ? text.resendIn(cooldown.remaining) : ''}</p>
 				{/if}
 				{#if signInHref !== undefined}
 					<Button variant="ghost" size="lg" href={signInHref} onclick={() => onBack?.()}>{text.backToSignIn}</Button>

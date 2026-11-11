@@ -34,6 +34,14 @@
 		await new Promise((resolve) => setTimeout(resolve, 200));
 		throw new Error('refused');
 	}
+	let throwing = $state<AuthSession[]>([
+		{ id: 'this', label: 'Chrome on Windows', kind: 'desktop', current: true },
+		{ id: 'sync', label: 'Opera on Linux', kind: 'desktop', location: 'Rome, Italy', lastActive: start - 40 * MINUTE }
+	]);
+	/** A revoke that throws at once, before any promise exists. */
+	function refuseAtOnce(): void {
+		throw new Error('refused');
+	}
 	function reset() {
 		sessions = [
 			{ id: 'this', label: 'Chrome on Windows', kind: 'desktop', location: 'Berlin, Germany', current: true },
@@ -51,5 +59,6 @@
 		<p class="m-0 text-[13px] text-fg-light" data-testid="sessions-log">{log}</p>
 	</div>
 	<SessionList sessions={failing} onRevoke={refuse} labels={{ title: 'Signed-in devices (failing)' }} />
+	<SessionList sessions={throwing} onRevoke={refuseAtOnce} labels={{ title: 'Signed-in devices (throwing)' }} />
 	<SessionList sessions={[]} labels={{ title: "Signed-in devices (none)" }} />
 </div>

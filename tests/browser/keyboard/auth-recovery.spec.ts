@@ -6,6 +6,22 @@ async function stubNativePost(page: Page): Promise<void> {
 	await page.route('**/demo-native-post', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>posted</p>' }));
 }
 
+/**
+ * Opens a section on a clock the test owns. The install comes before the page loads; `hold` then stops time, so the
+ * demo's 800 ms "server" and the cooldowns only move when the test calls `page.clock.runFor`.
+ */
+async function openOnClock(page: Page, slug: string): Promise<Locator> {
+	await page.clock.install();
+	return openSection(page, slug);
+}
+
+/** Stops the page's clock a moment ahead. Call it before the action whose in-flight state is under test. */
+async function hold(page: Page): Promise<void> {
+	// Measured on the page clock, which may be ahead of the test process.
+	const now = await page.evaluate(() => Date.now());
+	await page.clock.pauseAt(new Date(now + 1000));
+}
+
 const alertText = (section: Locator) => section.getByRole('alert').filter({ hasText: /\S/ });
 
 test.describe('ForgotPasswordCard', () => {
@@ -26,18 +42,23 @@ test.describe('ForgotPasswordCard', () => {
 	});
 
 	test('a pending submit shows loading and ignores a second submit, then shows the safe confirmation and focuses its heading', async ({ page }) => {
-		const section = await openSection(page, 'forgot-password-card');
+		const section = await openOnClock(page, 'forgot-password-card');
 		await section.locator('input[name=email]').fill('ada@example.com');
+		await hold(page);
 		const submit = section.getByRole('button', { name: 'Send reset link' });
 		await press(page, 'Enter');
 		await expect(submit).toHaveAttribute('aria-busy', 'true');
 		// The button keeps its name while loading, and a second submit does nothing.
 		await submit.click({ force: true });
 		await press(page, 'Enter');
+		await expect(section.getByTestId('forgot-calls')).toHaveText('1');
+		await page.clock.runFor(1000);
 		const heading = section.getByRole('heading', { name: 'Check your email' });
 		await expect(heading).toBeVisible();
 		await expect(section.getByTestId('forgot-calls')).toHaveText('1');
 		await expect(heading).toBeFocused();
+		// The focused heading is read together with the confirmation.
+		await expect(heading).toHaveAccessibleDescription('If an account exists for ada@example.com, we sent a link to reset the password.');
 		await expect(section.getByText('If an account exists for ada@example.com, we sent a link to reset the password.')).toBeVisible();
 		await expect(section.locator('form')).toHaveCount(0);
 	});
@@ -68,19 +89,43 @@ test.describe('ForgotPasswordCard', () => {
 		await expect(section.getByRole('button', { name: 'Send reset link' })).not.toHaveAttribute('aria-busy', 'true');
 	});
 
-	test('Resend waits out the server wait, shows loading, announces politely, and Back to sign in reports', async ({ page }) => {
-		const section = await openSection(page, 'forgot-password-card');
+	test('Resend keeps its name and focus through every wait, with a separate countdown line, and announces politely', async ({ page }) => {
+		const section = await openOnClock(page, 'forgot-password-card');
 		await section.locator('input[name=email]').fill('ada@example.com');
+		await hold(page);
 		await press(page, 'Enter');
-		const wait = section.getByRole('button', { name: /^Resend in \d+s$/ });
-		await expect(wait).toHaveAttribute('aria-disabled', 'true');
+		await page.clock.runFor(1000);
 		const resend = section.getByRole('button', { name: 'Resend email' });
-		await expect(resend).not.toHaveAttribute('aria-disabled', 'true', { timeout: 9000 });
+		const countdown = section.getByText(/^Resend in \d+s$/);
+		// The name never changes; the wait is a visible line the button is described by, and the line is not live.
+		await expect(resend).toHaveAttribute('aria-disabled', 'true');
+		await expect(resend).not.toHaveAttribute('disabled', /.*/);
+		await expect(resend).toHaveAccessibleDescription(/^Resend in \d+s$/);
+		await expect(countdown).toBeVisible();
+		await expect(countdown).not.toHaveAttribute('aria-live', /.*/);
 		await resend.focus();
 		await press(page, 'Enter');
-		await expect(section.getByRole('button', { name: /Resend/ })).toHaveAttribute('aria-busy', 'true');
+		await expect(section.getByTestId('forgot-log')).toHaveText('Requested for ada@example.com');
+		await page.clock.runFor(5000);
+		await expect(resend).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(countdown).toHaveCount(0);
+		await resend.focus();
+		await press(page, 'Enter');
+		await expect(resend).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(1000);
 		await expect(section.getByRole('status').filter({ hasText: 'We sent the link again.' })).toBeVisible();
 		await expect(section.getByTestId('forgot-log')).toHaveText('Resent');
+		// The whole wait after a resend keeps aria-disabled, and focus stays on the button.
+		await expect(resend).toHaveAttribute('aria-disabled', 'true');
+		await expect(resend).toBeFocused();
+		await page.clock.runFor(2000);
+		await expect(resend).toHaveAttribute('aria-disabled', 'true');
+		await expect(resend).toHaveAccessibleDescription(/^Resend in \d+s$/);
+		await press(page, 'Enter');
+		await page.clock.runFor(1000);
+		await expect(section.getByTestId('forgot-log')).toHaveText('Resent');
+		await page.clock.runFor(4000);
+		await expect(resend).not.toHaveAttribute('aria-disabled', 'true');
 		const back = section.getByRole('link', { name: 'Back to sign in' });
 		await expect(back).toHaveAttribute('href', '#forgot-password-card');
 		await back.focus();
@@ -132,16 +177,58 @@ test.describe('ResetPasswordCard', () => {
 		await expect.poll(() => confirm.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(true);
 	});
 
-	test('pending blocks a second submit; success shows the done state and focuses Continue to sign in', async ({ page }) => {
+	test('the mismatch also shows in place once the browser refuses a submit, and goes when fixed', async ({ page }) => {
 		const section = await openSection(page, 'reset-password-card');
+		const confirm = section.locator('input[name=confirmPassword]');
+		await section.locator('input[name=password]').fill('Longenough1');
+		await confirm.fill('Longenough2');
+		// Typing alone shows nothing in place; the refused submit does.
+		await expect(section.getByText('The passwords do not match.')).toHaveCount(0);
+		await expect(confirm).not.toHaveAttribute('aria-invalid', 'true');
+		await section.getByRole('button', { name: 'Reset password' }).click();
+		await expect(confirm).toBeFocused();
+		await expect(section.getByText('The passwords do not match.')).toBeVisible();
+		await expect(confirm).toHaveAttribute('aria-invalid', 'true');
+		await expect(confirm).toHaveAccessibleDescription(/The passwords do not match/);
+		await expect(section.getByTestId('reset-log')).toHaveText('');
+		await confirm.fill('Longenough1');
+		await expect(section.getByText('The passwords do not match.')).toHaveCount(0);
+		await expect(confirm).not.toHaveAttribute('aria-invalid', 'true');
+		// A later mismatch waits for another refused submit.
+		await confirm.fill('Longenough3');
+		await expect(section.getByText('The passwords do not match.')).toHaveCount(0);
+	});
+
+	test('onPasswordChange reports every edit, so a strength meter can follow', async ({ page }) => {
+		const section = await openSection(page, 'reset-password-card');
+		await expect(section.getByText('Password strength: Very weak')).toBeVisible();
+		await section.locator('input[name=password]').fill('abcdefghijkl');
+		await expect(section.getByText('Password strength: Good')).toBeVisible();
+	});
+
+	test('the password building blocks take their words from labels', async ({ page }) => {
+		const section = await openSection(page, 'reset-password-card');
+		await section.getByLabel('Use German words for the password fields').check();
+		await expect(section.getByRole('button', { name: 'Passwort anzeigen' })).toHaveCount(2);
+		await expect(section.getByText('Passwortstärke: Sehr schwach')).toBeVisible();
+		await section.locator('input[name=password]').fill('abcdefghijkl1');
+		await expect(section.getByText('Passwortstärke: Gut')).toBeVisible();
+		await expect(section.getByText('Password strength')).toHaveCount(0);
+		await expect(section.getByRole('button', { name: 'Show password' })).toHaveCount(0);
+	});
+
+	test('pending blocks a second submit; success shows the done state and focuses Continue to sign in', async ({ page }) => {
+		const section = await openOnClock(page, 'reset-password-card');
 		await section.locator('input[name=password]').fill('Longenough1');
 		await section.locator('input[name=confirmPassword]').fill('Longenough1');
+		await hold(page);
 		const submit = section.getByRole('button', { name: 'Reset password' });
 		await press(page, 'Enter');
 		await expect(submit).toHaveAttribute('aria-busy', 'true');
 		await submit.click({ force: true });
-		const heading = section.getByRole('heading', { name: 'Password updated' });
-		await expect(heading).toBeVisible();
+		await expect(section.getByRole('heading', { name: 'Password updated' })).toHaveCount(0);
+		await page.clock.runFor(1000);
+		await expect(section.getByRole('heading', { name: 'Password updated' })).toBeVisible();
 		const next = section.getByRole('link', { name: 'Continue to sign in' });
 		await expect(next).toBeFocused();
 		await expect(next).toHaveAttribute('href', '#reset-password-card');
@@ -185,6 +272,23 @@ test.describe('ResetPasswordCard', () => {
 		await request.focus();
 		await expect(request).toBeFocused();
 	});
+
+	test('a link that expires during a submit shows the expired state, never done, and focuses its heading', async ({ page }) => {
+		const section = await openOnClock(page, 'reset-password-card');
+		await section.locator('input[name=password]').fill('Expired-0123456');
+		await section.locator('input[name=confirmPassword]').fill('Expired-0123456');
+		await hold(page);
+		await press(page, 'Enter');
+		await expect(section.getByRole('button', { name: 'Reset password' })).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(1000);
+		const heading = section.getByRole('heading', { name: 'This link has expired' });
+		await expect(heading).toBeVisible();
+		await expect(heading).toBeFocused();
+		await expect(heading).toHaveAttribute('tabindex', '-1');
+		await expect(section.getByRole('heading', { name: 'Password updated' })).toHaveCount(0);
+		await expect(section.locator('form')).toHaveCount(0);
+		expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+	});
 });
 
 test.describe('TwoFactorSetup', () => {
@@ -203,6 +307,15 @@ test.describe('TwoFactorSetup', () => {
 		await expect(key).toHaveCSS('font-family', /mono/i);
 		await expect(section.getByText('Example app', { exact: true })).toBeVisible();
 		await expect(section.getByText('ada@example.com')).toBeVisible();
+	});
+
+	test('the setup key is named by text before it, not by an aria-label on the code', async ({ page }) => {
+		const section = await openSection(page, 'two-factor-setup');
+		await section.getByText("Can't scan? Enter this key").click();
+		const key = section.locator('code');
+		await expect(key).not.toHaveAttribute('aria-label', /.*/);
+		await expect(key).toHaveText('JBSW Y3DP EHPK 3PXP');
+		await expect(section.locator('details')).toContainText('Setup key: JBSW Y3DP EHPK 3PXP');
 	});
 
 	test('Copy key puts the plain key on the clipboard and says Copied politely', async ({ page, context }) => {
@@ -236,7 +349,7 @@ test.describe('TwoFactorSetup', () => {
 	});
 
 	test('the full flow: scan, a wrong code, a right code, saving the backup codes, then complete', async ({ page }) => {
-		const section = await openSection(page, 'two-factor-setup');
+		const section = await openOnClock(page, 'two-factor-setup');
 		await section.getByRole('button', { name: 'Next' }).click();
 		await expect(section.getByText('Step 2 of 3')).toBeVisible();
 		await expect(section.getByRole('heading', { name: 'Enter the code' })).toBeFocused();
@@ -246,10 +359,12 @@ test.describe('TwoFactorSetup', () => {
 		await code.focus();
 		await expect(code).toHaveAttribute('autocomplete', 'one-time-code');
 		await page.keyboard.type('111111');
+		await hold(page);
 		const verify = section.getByRole('button', { name: 'Verify' });
 		await press(page, 'Enter');
 		await expect(verify).toHaveAttribute('aria-busy', 'true');
 		await press(page, 'Enter');
+		await page.clock.runFor(1000);
 		await expect(section.getByText('That code is not right.')).toBeVisible();
 		await expect(code).toBeFocused();
 		await expect(code).toHaveAttribute('aria-invalid', 'true');
@@ -258,8 +373,12 @@ test.describe('TwoFactorSetup', () => {
 
 		await code.fill('123456');
 		await press(page, 'Enter');
+		await page.clock.runFor(1000);
 		await expect(section.getByText('Step 3 of 3')).toBeVisible();
 		await expect(section.getByRole('heading', { name: 'Save your backup codes' })).toBeFocused();
+		// The demo's own description and the kit's localised title both reach the codes box.
+		await expect(section.getByRole('heading', { name: 'Backup codes', exact: true })).toBeVisible();
+		await expect(section.getByText('Keep these somewhere safe.')).toBeVisible();
 		await expect(section.getByRole('listitem').filter({ hasText: /^[a-z0-9]{4}-[a-z0-9]{4}$/ })).toHaveCount(6);
 		const finish = section.getByRole('button', { name: 'Continue' });
 		await expect(finish).toBeDisabled();
@@ -267,6 +386,22 @@ test.describe('TwoFactorSetup', () => {
 		await finish.click();
 		await expect(section.getByTestId('setup-log')).toHaveText('Setup complete');
 		await expect(section.getByText('Step 1 of 3')).toBeVisible();
+	});
+
+	test('the step total stays at three when the backup codes only arrive after the verify', async ({ page }) => {
+		const section = await openOnClock(page, 'two-factor-setup');
+		await section.getByLabel('Hand over the backup codes after the verify').check();
+		await expect(section.getByText('Step 1 of 3')).toBeVisible();
+		await section.getByRole('button', { name: 'Next' }).click();
+		await expect(section.getByText('Step 2 of 3')).toBeVisible();
+		await section.locator('input[name=code]').fill('123456');
+		await hold(page);
+		await press(page, 'Enter');
+		await expect(section.getByText('Step 2 of 3')).toBeVisible();
+		await page.clock.runFor(1000);
+		await expect(section.getByText('Step 3 of 3')).toBeVisible();
+		await expect(section.getByRole('heading', { name: 'Save your backup codes' })).toBeFocused();
+		await expect(section.getByRole('listitem').filter({ hasText: /^[a-z0-9]{4}-[a-z0-9]{4}$/ })).toHaveCount(6);
 	});
 
 	test('Back returns to the scan step and moves focus to its heading; Cancel reports', async ({ page }) => {
@@ -277,6 +412,33 @@ test.describe('TwoFactorSetup', () => {
 		await expect(section.getByRole('heading', { name: 'Scan the QR code' })).toBeFocused();
 		await section.getByRole('button', { name: 'Cancel' }).click();
 		await expect(section.getByTestId('setup-log')).toHaveText('Cancelled');
+	});
+
+	test('leaving the verify step forgets a verify in flight: no jump to step 3, no completion, no stale error', async ({ page }) => {
+		const section = await openOnClock(page, 'two-factor-setup');
+		await section.getByRole('button', { name: 'Next' }).click();
+		await section.locator('input[name=code]').fill('123456');
+		await hold(page);
+		await press(page, 'Enter');
+		await expect(section.getByRole('button', { name: 'Verify' })).toHaveAttribute('aria-busy', 'true');
+		await section.getByRole('button', { name: 'Back' }).click();
+		await expect(section.getByText('Step 1 of 3')).toBeVisible();
+		await page.clock.runFor(1000);
+		// The settled verify changes nothing: still on the scan step, focus kept on its heading.
+		await expect(section.getByText('Step 1 of 3')).toBeVisible();
+		await expect(section.getByRole('heading', { name: 'Save your backup codes' })).toHaveCount(0);
+		await expect(section.getByRole('heading', { name: 'Scan the QR code' })).toBeFocused();
+		await expect(section.getByTestId('setup-log')).not.toHaveText('Setup complete');
+		// A wrong code that settles after leaving does not show its error when the person comes back.
+		await section.getByRole('button', { name: 'Next' }).click();
+		await section.locator('input[name=code]').fill('111111');
+		await press(page, 'Enter');
+		await section.getByRole('button', { name: 'Back' }).click();
+		await page.clock.runFor(1000);
+		await section.getByRole('button', { name: 'Next' }).click();
+		await expect(section.getByText('Step 2 of 3')).toBeVisible();
+		await expect(section.getByText('That code is not right.')).toHaveCount(0);
+		await expect(section.getByRole('button', { name: 'Verify' })).not.toHaveAttribute('aria-busy', 'true');
 	});
 
 	test('a rejected verification shows the generic error and stays on the verify step', async ({ page }) => {
