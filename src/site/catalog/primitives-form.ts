@@ -11,7 +11,7 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/form/Field.svelte',
 		upstreamSource: SOURCE,
 		description:
-			'Label, hint, error and required or optional mark for one form control. The kit controls inside it pick up its id, description, invalid and required state by themselves; the children snippet hands the same attributes to any other element. The error is announced politely when it appears. With `group`, it renders a fieldset and legend for a RadioGroup or several checkboxes.',
+			'Label, description, error and required or optional mark for one form control. The kit controls inside it pick up its id, description, invalid and required state by themselves; the children snippet hands the same attributes to any other element. The error is announced politely when it appears. With `group`, it renders a fieldset and legend for a RadioGroup or several checkboxes. A Checkbox or Switch with its own label keeps that label as its only name.',
 		usageSnippet: `<script lang="ts">
   import { Field, Input } from 'agents-kit-svelte';
 
@@ -19,7 +19,7 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
   let error = $derived(email && !email.includes('@') ? 'Enter an email address with an @.' : '');
 </script>
 
-<Field label="Work email" hint="Sign-in links go here." {error} required>
+<Field label="Work email" description="Sign-in links go here." {error} required>
   <Input type="email" name="email" bind:value={email} />
 </Field>
 
@@ -45,7 +45,7 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
 
 <Input name="q" aria-label="Search runs" placeholder="Search runs" clearable bind:value={query} />
 
-<Input name="budget" type="number" aria-label="Token budget" size="lg" value={40}>
+<Input name="budget" type="number" aria-label="Token budget" size="lg" defaultValue={40}>
   {#snippet trailing()}<span class="text-xs">k tokens</span>{/snippet}
 </Input>`
 	},
@@ -56,15 +56,21 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/form/Textarea.svelte',
 		upstreamSource: SOURCE,
 		description:
-			'A native textarea that can grow with its content (CSS field-sizing, with a script fallback) and shows a character count when `maxlength` is set. Screen readers hear how many characters are left once the text nears the limit, after a pause in typing, not on every key.',
+			'A native textarea that can grow with its content (CSS field-sizing, with a script fallback) and shows a character count when `maxlength` is set. Screen readers hear how many characters are left once the text nears the limit, after a pause in typing, not on every key. `formatCount` and `formatRemaining` supply the words.',
 		usageSnippet: `<script lang="ts">
   import { Field, Textarea } from 'agents-kit-svelte';
 
   let summary = $state('');
 </script>
 
-<Field label="Summary" hint="One or two sentences.">
-  <Textarea name="summary" maxlength={280} autoGrow maxRows={8} bind:value={summary} />
+<Field label="Summary" description="One or two sentences.">
+  <Textarea
+    name="summary"
+    maxlength={280}
+    autoGrow
+    formatRemaining={({ left }) => (left === 0 ? 'Limit reached' : left + ' left')}
+    bind:value={summary}
+  />
 </Field>`
 	},
 	{
@@ -74,7 +80,7 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/form/Checkbox.svelte',
 		upstreamSource: SOURCE,
 		description:
-			'A native checkbox with the kit mark, a label and an optional description. Supports `indeterminate` for "some selected" parents, `required`, and posts its `name` and `value` with a form like any checkbox.',
+			'A native checkbox with the kit mark, a label and an optional description. Supports `indeterminate` for "some selected" parents (a form reset restores `checked` but leaves `indeterminate` to you), `defaultChecked`, `required`, and posts its `name` and `value` with a form like any checkbox.',
 		usageSnippet: `<script lang="ts">
   import { Checkbox } from 'agents-kit-svelte';
 
@@ -94,7 +100,7 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/form/Switch.svelte',
 		upstreamSource: SOURCE,
 		description:
-			'An on/off setting: a native checkbox with `role="switch"`, so Space toggles it, it is read as a switch, and it posts with a form. Two sizes, an optional description, and `labelFirst` for settings rows.',
+			'An on/off setting: a native checkbox with `role="switch"`, so Space toggles it, it is read as a switch, and it posts with a form. Three sizes, an optional description, and `labelFirst` for settings rows.',
 		usageSnippet: `<script lang="ts">
   import { Switch } from 'agents-kit-svelte';
 
@@ -116,7 +122,7 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/form/RadioGroup.svelte',
 		upstreamSource: SOURCE,
 		description:
-			'One choice from a list, with optional descriptions and disabled options, laid out vertically or horizontally. Built on the headless RadioGroup: arrow keys move and select, Tab enters on the checked option, and a hidden native radio posts the value and makes `required` block a submit. Wrap it in `<Field group>` for a visible label.',
+			'One choice from a list, with optional descriptions and disabled options, laid out vertically or horizontally. Built on the headless RadioGroup: arrow keys move and select, Tab enters on the checked option, and a hidden native radio posts the value and makes `required` block a submit, with focus moved to the group and the reason shown. `defaultValue` sets the start and reset value. Wrap it in `<Field group>` for a visible label.',
 		usageSnippet: `<script lang="ts">
   import { Field, RadioGroup, type RadioOption } from 'agents-kit-svelte';
 

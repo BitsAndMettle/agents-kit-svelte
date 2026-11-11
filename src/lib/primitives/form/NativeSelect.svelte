@@ -1,4 +1,6 @@
 <script lang="ts" module>
+	import type { FormControlSize } from './classes';
+
 	/** One `<option>` of a NativeSelect. */
 	export interface NativeSelectOption {
 		value: string;
@@ -13,7 +15,7 @@
 		disabled?: boolean;
 	}
 
-	export type NativeSelectSize = 'sm' | 'md' | 'lg';
+	export type NativeSelectSize = FormControlSize;
 </script>
 
 <script lang="ts">
@@ -24,11 +26,13 @@
 	import { INPUT_CLASS } from '../../ui/styles';
 	import { fieldControlAttrs, getFieldContext } from './field';
 
-	export interface Props extends Omit<HTMLSelectAttributes, 'class' | 'children' | 'value' | 'size' | 'multiple'> {
+	export interface Props extends Omit<HTMLSelectAttributes, 'class' | 'children' | 'value' | 'defaultValue' | 'size' | 'multiple'> {
 		/** Options and option groups; or pass `<option>` elements as children. */
 		options?: (NativeSelectOption | NativeSelectOptionGroup)[];
 		/** The selected value; '' while the placeholder shows. Bindable. */
 		value?: string;
+		/** Starting value when `value` is not given, and what a form reset restores (defaults to the starting value). */
+		defaultValue?: string;
 		/** A first, unselectable option shown while nothing is chosen. With `required`, the form will not submit until a real option is picked. */
 		placeholder?: string;
 		size?: NativeSelectSize;
@@ -45,7 +49,8 @@
 
 	let {
 		options = [],
-		value = $bindable(''),
+		defaultValue,
+		value = $bindable(defaultValue ?? ''),
 		placeholder,
 		size = 'md',
 		invalid = false,
@@ -61,7 +66,7 @@
 	}: Props = $props();
 
 	const field = getFieldContext();
-	// A form reset restores the option selected at the start (or your own `defaultValue`).
+	// A form reset restores `defaultValue`, or the option selected at the start.
 	const initialValue = untrack(() => value);
 	const control = $derived(fieldControlAttrs(field, { id, describedBy, invalid, required: Boolean(required), disabled: Boolean(disabled) }));
 
@@ -77,7 +82,7 @@
 		{...control}
 		bind:this={ref}
 		bind:value
-		defaultValue={rest.defaultValue ?? initialValue}
+		defaultValue={defaultValue ?? initialValue}
 		onchange={(event) => {
 			onValueChange?.(event.currentTarget.value);
 			rest.onchange?.(event);

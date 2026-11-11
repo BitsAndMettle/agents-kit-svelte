@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { fieldControlAttrs, joinIds, type FieldState } from '../src/lib/primitives/form/field.ts';
-import { counterMessage, nearLimitThreshold } from '../src/lib/primitives/form/text-count.ts';
+import { counterMessage, formatCharacterCount, nearLimitThreshold } from '../src/lib/primitives/form/text-count.ts';
 import { sliderRatio } from '../src/lib/primitives/form/slider-ratio.ts';
 
 const field = (overrides: Partial<FieldState> = {}): FieldState => ({
 	controlId: 'f-control',
 	labelId: 'f-label',
+	descriptionId: 'f-hint',
 	hintId: 'f-hint',
 	errorId: undefined,
 	invalid: false,
@@ -44,7 +45,7 @@ test('a plain field gives its id, hint, error and states to the control', () => 
 });
 
 test('the error is referenced only while the control is invalid', () => {
-	assert.deepEqual(fieldControlAttrs(field({ hintId: undefined }), {}), { id: 'f-control' });
+	assert.deepEqual(fieldControlAttrs(field({ descriptionId: undefined, hintId: undefined }), {}), { id: 'f-control' });
 	assert.equal(fieldControlAttrs(field({ errorId: 'f-error', invalid: true }))['aria-errormessage'], 'f-error');
 });
 
@@ -76,6 +77,14 @@ test('the counter starts speaking near the limit', () => {
 	assert.equal(counterMessage(108, 120, 12), '12 characters left');
 	assert.equal(counterMessage(119, 120, 12), '1 character left');
 	assert.equal(counterMessage(120, 120, 12), 'Character limit reached, 120 of 120 used');
+	assert.equal(formatCharacterCount({ length: 45, max: 120, left: 75 }), '45 of 120 characters used');
+});
+
+test('the counter words come from the formatter', () => {
+	const german = ({ left }: { left: number }) => (left === 0 ? 'Limit erreicht' : `Noch ${left} Zeichen`);
+	assert.equal(counterMessage(110, 120, 12, german), 'Noch 10 Zeichen');
+	assert.equal(counterMessage(125, 120, 12, german), 'Limit erreicht');
+	assert.equal(counterMessage(10, 120, 12, german), '');
 });
 
 test('sliderRatio clamps and survives an empty range', () => {

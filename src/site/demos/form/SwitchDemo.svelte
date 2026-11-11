@@ -21,6 +21,7 @@
 	</div>
 	<div class="flex flex-wrap gap-x-6 gap-y-2">
 		<Switch size="sm" label="Compact" />
+		<Switch size="lg" label="Large" defaultChecked />
 		<Switch label="Status {autoRetry ? 'on' : 'off'}" checked={autoRetry} onCheckedChange={(next) => (autoRetry = next)} />
 	</div>
 </DemoForm>

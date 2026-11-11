@@ -5,10 +5,16 @@
 	import { cn } from '../../ui/cn';
 	import { fieldControlAttrs, getFieldContext, joinIds } from './field';
 
-	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'type' | 'checked' | 'indeterminate'> {
+	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'type' | 'checked' | 'defaultChecked' | 'indeterminate'> {
 		/** Bindable. */
 		checked?: boolean;
-		/** Shows a dash and reads as "mixed"; cleared when the user toggles. Bindable. */
+		/** Starting state when `checked` is not given, and what a form reset restores (defaults to the starting state). */
+		defaultChecked?: boolean;
+		/**
+		 * Shows a dash and reads as "mixed"; the browser clears it when the user toggles. Bindable.
+		 * A form reset restores `checked` but not this: as with a native checkbox, `indeterminate`
+		 * stays whatever you set it to, so recompute it from your own state after a reset.
+		 */
 		indeterminate?: boolean;
 		/** Label text; or pass content as children. */
 		label?: string;
@@ -26,7 +32,8 @@
 	}
 
 	let {
-		checked = $bindable(false),
+		defaultChecked,
+		checked = $bindable(defaultChecked ?? false),
 		indeterminate = $bindable(false),
 		label,
 		description,
@@ -44,7 +51,7 @@
 
 	const uid = $props.id();
 	const field = getFieldContext();
-	// A form reset restores the state the control started in (or your own `defaultChecked`).
+	// A form reset restores `defaultChecked`, or the state the control started in.
 	const initialChecked = untrack(() => checked);
 	const descriptionId = `${uid}-description`;
 	const control = $derived(
@@ -57,6 +64,12 @@
 		})
 	);
 	const inputId = $derived(control.id ?? `${uid}-input`);
+	// In a plain Field the input takes the Field's id, so the Field's <label for> points at it too.
+	// The inline label stays the one accessible name: never "Field label + own label".
+	const labelId = `${uid}-label`;
+	const labelledBy = $derived(
+		rest['aria-labelledby'] ?? (field && !field.group && (label || children) && !rest['aria-label'] ? labelId : undefined)
+	);
 </script>
 
 <div class={cn('inline-grid grid-cols-[auto_1fr] items-start gap-x-2 gap-y-0.5 text-[13px] has-disabled:opacity-60', className)}>
@@ -67,7 +80,8 @@
 			type="checkbox"
 			bind:this={ref}
 			bind:checked
-			defaultChecked={rest.defaultChecked ?? initialChecked}
+			defaultChecked={defaultChecked ?? initialChecked}
+			aria-labelledby={labelledBy}
 			bind:indeterminate
 			onchange={(event) => {
 				onCheckedChange?.(event.currentTarget.checked);
@@ -79,7 +93,7 @@
 		<Minus aria-hidden="true" strokeWidth={3} class="pointer-events-none col-start-1 row-start-1 size-3 text-fg-inverse opacity-0 motion-safe:transition-opacity peer-indeterminate:opacity-100" />
 	</span>
 	{#if label || children}
-		<label for={inputId} class={['min-w-0 cursor-pointer leading-5 text-fg-main', description && 'font-medium']}>
+		<label id={labelId} for={inputId} class={['min-w-0 cursor-pointer leading-5 text-fg-main', description && 'font-medium']}>
 			{#if children}{@render children()}{:else}{label}{/if}
 		</label>
 	{/if}
