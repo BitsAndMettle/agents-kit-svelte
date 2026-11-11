@@ -87,6 +87,34 @@ export interface CitationItem {
 	url?: string;
 }
 
+/** Device kinds `DeviceApprovalCard` can show an icon for. */
+export type DeviceKind = 'phone' | 'tablet' | 'laptop' | 'desktop' | 'browser';
+
+/** The device asking for approval in `DeviceApprovalCard`. */
+export interface DeviceApprovalDevice {
+	name: string;
+	kind?: DeviceKind;
+	platform?: string;
+	location?: string;
+}
+
+export type DeviceApprovalStatus = 'pending' | 'approving' | 'approved' | 'denied' | 'expired';
+
+/** Whether a quoted source was checked against the real text. */
+export type CitedSourceCheck = 'verified' | 'unverified' | 'mismatch';
+
+/** One source behind a `CitedAnswer`: the quote, where it is, and its check state. */
+export interface CitedSource {
+	id: string;
+	title: string;
+	quote: string;
+	href?: string;
+	location?: string;
+	check: CitedSourceCheck;
+}
+
+export type CitedAnswerStatus = 'draft' | 'sent' | 'withheld';
+
 export interface ApprovalQuestionOption {
 	id: string;
 	label: string;
@@ -507,6 +535,8 @@ export type DynamicUINodeType =
 	| 'agent-work-trace'
 	| 'fleet-status'
 	| 'action-receipt';
+	| 'device-approval'
+	| 'cited-answer';
 
 export interface DynamicUINode {
 	id: string;

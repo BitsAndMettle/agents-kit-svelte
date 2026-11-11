@@ -8,7 +8,9 @@ export { default as AgentWorkTrace } from '../agents/AgentWorkTrace.svelte';
 export { default as ActionReceipt } from '../agents/ActionReceipt.svelte';
 export { default as ApprovalCard } from '../agents/ApprovalCard.svelte';
 export { default as Citations } from '../agents/Citations.svelte';
+export { default as CitedAnswer } from '../agents/CitedAnswer.svelte';
 export { default as CodeBlock } from '../agents/CodeBlock.svelte';
+export { default as DeviceApprovalCard } from '../agents/DeviceApprovalCard.svelte';
 export { default as FileDiff } from '../agents/FileDiff.svelte';
 export { default as ImageGeneration } from '../agents/ImageGeneration.svelte';
 export { default as Message } from '../agents/Message.svelte';
@@ -48,6 +50,10 @@ export const TrailsideClaudeChat: typeof ChatWorkbench = ChatWorkbench;
 export * from '../state/chat-helpers';
 export * from '../agents/presence';
 export * from '../core/agent';
+export { groupCode, speakCode, timeLeft, formatRequestedAgo } from '../agents/device-approval';
+export type { TimeLeft } from '../agents/device-approval';
+export { summarizeSources } from '../agents/cited-answer';
+export type { SourcesState, SourcesSummary } from '../agents/cited-answer';
 export type * from '../types';
 
 // Types declared in the components themselves.

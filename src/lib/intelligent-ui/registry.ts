@@ -23,6 +23,8 @@ import GitHubPullRequestCard from '../github/GitHubPullRequestCard.svelte';
 import AgentGenerativeSurface from './AgentGenerativeSurface.svelte';
 import AgentHandoffGantt from '../charts/AgentHandoffGantt.svelte';
 import AgentWorkTrace from '../agents/AgentWorkTrace.svelte';
+import CitedAnswer from '../agents/CitedAnswer.svelte';
+import DeviceApprovalCard from '../agents/DeviceApprovalCard.svelte';
 import GitHubChecksWaterfall from '../github/GitHubChecksWaterfall.svelte';
 import GitHubPrActionBar from '../github/GitHubPrActionBar.svelte';
 import GitHubPullRequestGraph from '../github/GitHubPullRequestGraph.svelte';
@@ -257,6 +259,23 @@ export const defaultUIRegistry: UIRegistry = {
 			onOpenTarget: (target: { id?: string; label: string }) => emit('open-target', target.id ?? target.label),
 			onOpenRun: (run: { id: string }) => emit('open-run', run.id),
 			onUndo: (target: { id?: string; label: string }) => emit('undo', target.id ?? target.label)
+	'device-approval': {
+		component: DeviceApprovalCard,
+		required: ['device', 'code', 'requestedAt'],
+		props: (props, emit) => ({
+			...props,
+			onApprove: () => emit('approve-device'),
+			onDeny: () => emit('deny-device')
+		})
+	},
+	'cited-answer': {
+		component: CitedAnswer,
+		required: ['question', 'answer', 'sources'],
+		props: (props, emit) => ({
+			...props,
+			onOpenSource: (source: { id: string }) => emit('open-source', source.id),
+			onSend: () => emit('send-answer'),
+			onEdit: () => emit('edit-answer')
 		})
 	},
 	'feature-card': {

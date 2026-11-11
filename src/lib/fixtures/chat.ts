@@ -6,6 +6,7 @@
 import type { ActionReceiptData, WorkStep } from '../types';
 import type { WorkStep } from '../types';
 import type { AutonomyLevel } from '../agents/level-dial';
+import type { CitedSource, DeviceApprovalDevice, WorkStep } from '../types';
 import type { SidebarResource } from '../agents/AISidebar.svelte';
 import type { SchemaParameterItem, SchemaPropertyItem } from '../ai-elements/SchemaDisplay.svelte';
 import type { PlanMilestone } from '../ai-elements/PlanCard.svelte';
@@ -430,3 +431,63 @@ export const SAMPLE_RISK_TOGGLE = {
 		acknowledge: 'I understand agents can merge protected changes without asking me.'
 	}
 };
+/** Reference time for the `DeviceApprovalCard` sample. */
+export const SAMPLE_DEVICE_NOW = '2026-11-11T09:00:00Z';
+
+/** Sample device for `DeviceApprovalCard`: a phone asking to act with the same rights. */
+export const SAMPLE_APPROVAL_DEVICE: DeviceApprovalDevice = {
+	name: 'Pixel 9',
+	kind: 'phone',
+	platform: 'Android 16',
+	location: 'Berlin, Germany'
+};
+
+/** Match code shown on both screens in the `DeviceApprovalCard` sample. */
+export const SAMPLE_APPROVAL_CODE = '482 913';
+
+/** Request time, expiry and abilities for the `DeviceApprovalCard` sample (expires 4 minutes after `SAMPLE_DEVICE_NOW`). */
+export const SAMPLE_APPROVAL_REQUESTED_AT = '2026-11-11T08:59:30Z';
+export const SAMPLE_APPROVAL_EXPIRES_AT = '2026-11-11T09:04:00Z';
+export const SAMPLE_APPROVAL_GRANTS: string[] = [
+	'See your agents and their runs',
+	'Approve or stop work on your behalf',
+	'Start new runs on your repositories'
+];
+
+/** Sample question for `CitedAnswer`. */
+export const SAMPLE_CITED_QUESTION = 'Should the retry button show on cancelled runs?';
+
+export const SAMPLE_CITED_ANSWER =
+	'No. The plan limits Retry to failed runs, and says a cancelled run is restarted from the board instead, so showing Retry there would create a second way to do the same thing.';
+
+/** Two quotes from a plan document, both found in the source. */
+export const SAMPLE_CITED_SOURCES: CitedSource[] = [
+	{
+		id: 'plan-retry',
+		title: 'Run controls plan',
+		location: 'docs/plans/run-controls.md, section 3.2',
+		href: 'https://example.com/plans/run-controls#retry',
+		quote: 'Retry is offered on failed runs only. A run that ended any other way does not show it.',
+		check: 'verified'
+	},
+	{
+		id: 'plan-cancel',
+		title: 'Run controls plan',
+		location: 'docs/plans/run-controls.md, section 4.1',
+		quote: 'A cancelled run is restarted from its card on the board, which keeps one history per card.',
+		check: 'verified'
+	}
+];
+
+/** Same answer, but the second quote could not be found in its source. */
+export const SAMPLE_CITED_SOURCES_MISMATCH: CitedSource[] = [
+	SAMPLE_CITED_SOURCES[0],
+	{
+		...SAMPLE_CITED_SOURCES[1],
+		quote: 'Cancelled runs show Retry so that people can restart them in one tap.',
+		check: 'mismatch'
+	}
+];
+
+/** Who asked the `CitedAnswer` sample question. */
+export const SAMPLE_CITED_ASKED_BY = 'Builder on card #3412';
