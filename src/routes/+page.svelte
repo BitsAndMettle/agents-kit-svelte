@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS } from '$lib/fixtures/workflows';
+	import { SAMPLE_AUTONOMY_LEVELS, SAMPLE_RISK_TOGGLE } from '$lib/fixtures/chat';
 	import { SAMPLE_CONTEXT_CHUNKS, SAMPLE_DIFF_ROWS, SAMPLE_FILTER_ROWS, SAMPLE_FINE_TUNE_FIELDS, SAMPLE_FLOWCHART_NODES, SAMPLE_INSIGHTS, SAMPLE_RECOMMENDATION_ALTERNATIVES, SAMPLE_RECOMMENDATION_REASONING, SAMPLE_RECORDS, SAMPLE_SEARCH_ITEMS, SAMPLE_SELECTION_ACTIONS, SAMPLE_TOOL_DIFFS, SAMPLE_TOOL_STEPS } from '$lib/fixtures/data';
 	import { SAMPLE_CHAIN_OF_THOUGHT, SAMPLE_ENV_VARIABLES, SAMPLE_PACKAGE_DEPENDENCIES, SAMPLE_PACKAGE_SCRIPTS, SAMPLE_PLAN_MILESTONES, SAMPLE_PREVIEW_LOGS, SAMPLE_PROMPT_SUGGESTIONS, SAMPLE_SCHEMA_PARAMETERS, SAMPLE_SCHEMA_REQUEST_BODY, SAMPLE_SCHEMA_RESPONSE_BODY, SAMPLE_SIDEBAR_RESOURCES, SAMPLE_STACK_SNIPPET, SAMPLE_STACK_TRACE, SAMPLE_VOICE_DEVICES, SAMPLE_VOICE_PERSONAS, SAMPLE_WORK_STEPS } from '$lib/fixtures/chat';
 	import {
@@ -69,6 +70,8 @@
 		AgentToolPalette,
 		ApprovalCard,
 		BorderBeam,
+		LevelDial,
+		RiskToggle,
 		ChainOfThought,
 		Citations,
 		CodeBlock,
@@ -405,6 +408,19 @@
 		{ label: 'timeoutMs', value: '10000', code: true }
 	];
 
+	let levelDialValue = $state('careful');
+	let levelDialPending = $state<string | undefined>(undefined);
+	let riskToggleOn = $state(false);
+
+	/** Pretends to apply a level: shows the spinner for a moment, then accepts it. */
+	function applyLevel(levelId: string): void {
+		levelDialPending = levelId;
+		setTimeout(() => {
+			levelDialValue = levelId;
+			levelDialPending = undefined;
+		}, 600);
+	}
+
 	const sampleQuestions: ApprovalQuestion[] = [
 		{
 			id: 'q-scope',
@@ -603,7 +619,7 @@
 
 	const sampleCheckpoint: CheckpointEntry = {
 		id: 'cp-1',
-		title: 'Verified 94 Svelte 5 components + unit suite',
+		title: 'Verified 96 Svelte 5 components + unit suite',
 		description: 'All static and unit checks green',
 		commitSha: '456f3b4',
 		worktreeBranch: 'trailside/2151-drawer-hydration',
@@ -620,7 +636,7 @@
 			tests: [
 				{
 					id: 'tc-1',
-					name: 'all 94 Svelte components comply with Svelte 5 Runes and semantic tokens',
+					name: 'all 96 Svelte components comply with Svelte 5 Runes and semantic tokens',
 					status: 'passed' as const,
 					durationMs: 6
 				}
@@ -744,7 +760,7 @@
 	}
 
 	const STREAM_TEXT =
-		'All 94 Svelte 5 components verified with svelte-check (0 errors, 0 warnings), and every preview on this page is live.';
+		'All 96 Svelte 5 components verified with svelte-check (0 errors, 0 warnings), and every preview on this page is live.';
 
 	function liveStream(): { text: string; done: boolean } {
 		const words = STREAM_TEXT.split(' ');
@@ -765,7 +781,7 @@
 		'▶ svelte5 audit',
 		'  ✔ every component uses Runes (41ms)',
 		'  ✔ no hex colors in components (12ms)',
-		'✔ all 94 Svelte components pass audit (105ms)'
+		'✔ all 96 Svelte components pass audit (105ms)'
 	];
 
 	/**
@@ -1323,7 +1339,7 @@
 									summary="corepack pnpm test"
 									status="success"
 									meta="96ms · 9 passed"
-									output="✔ all 94 Svelte components in src/ comply with Svelte 5 Runes, Props typing, and semantic token rules"
+									output="✔ all 96 Svelte components in src/ comply with Svelte 5 Runes, Props typing, and semantic token rules"
 									defaultOpen={true}
 								/>
 							{:else if item.slug === 'file-diff'}
@@ -1340,6 +1356,24 @@
 									title="Confirm verification scope before creating PR"
 									questions={sampleQuestions}
 								/>
+							{:else if item.slug === 'level-dial'}
+								<div class="mx-auto max-w-md">
+									<LevelDial
+										title="Autonomy"
+										levels={SAMPLE_AUTONOMY_LEVELS}
+										value={levelDialValue}
+										pending={levelDialPending}
+										onChange={applyLevel}
+									/>
+								</div>
+							{:else if item.slug === 'risk-toggle'}
+								<div class="mx-auto max-w-md">
+									<RiskToggle
+										{...SAMPLE_RISK_TOGGLE}
+										checked={riskToggleOn}
+										onChange={(next) => (riskToggleOn = next)}
+									/>
+								</div>
 							{:else if item.slug === 'prompt-input'}
 								<PromptInput agents={sampleAgents} selectedAgentId="claude-code" />
 							{:else if item.slug === 'message'}
@@ -1373,7 +1407,7 @@
 										author="AK-S Agent"
 										timestamp="21:16"
 										collapsible={true}
-										text="All 94 Svelte 5 components are live with strict TypeScript Props, OKLCH dark/light tokens, and interactive showcases."
+										text="All 96 Svelte 5 components are live with strict TypeScript Props, OKLCH dark/light tokens, and interactive showcases."
 									/>
 								</div>
 							{:else if item.slug === 'message-scroller'}

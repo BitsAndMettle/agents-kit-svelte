@@ -4,6 +4,7 @@
  */
 
 import type { WorkStep } from '../types';
+import type { AutonomyLevel } from '../agents/level-dial';
 import type { SidebarResource } from '../agents/AISidebar.svelte';
 import type { SchemaParameterItem, SchemaPropertyItem } from '../ai-elements/SchemaDisplay.svelte';
 import type { PlanMilestone } from '../ai-elements/PlanCard.svelte';
@@ -322,3 +323,62 @@ export const SAMPLE_WORK_STEPS: WorkStep[] = [
 	{ id: 'w5', label: 'Pushed 4a1c9e to #128', kind: 'push', status: 'done' },
 	{ id: 'w6', label: 'Fixed the checkout test', detail: 'Pushed 4a1c9e', kind: 'result', status: 'done' }
 ];
+
+/** Sample data for `LevelDial`: an agent that opens and merges pull requests. */
+export const SAMPLE_AUTONOMY_LEVELS: AutonomyLevel[] = [
+	{
+		id: 'careful',
+		label: 'Careful',
+		summary: 'Works on a branch and asks before anything leaves it.',
+		allows: ['Read the repository', 'Commit to its own branch'],
+		asks: ['Open a pull request', 'Merge a pull request', 'Change protected files']
+	},
+	{
+		id: 'balanced',
+		label: 'Balanced',
+		summary: 'Opens pull requests itself; you still approve every merge.',
+		allows: ['Read the repository', 'Commit to its own branch', 'Open a pull request'],
+		asks: ['Merge a pull request', 'Change protected files']
+	},
+	{
+		id: 'trusted',
+		label: 'Trusted',
+		summary: 'Merges its own pull requests once checks are green.',
+		allows: [
+			'Read the repository',
+			'Commit to its own branch',
+			'Open a pull request',
+			'Merge a pull request with green checks'
+		],
+		asks: ['Merge with failing checks', 'Change protected files']
+	},
+	{
+		id: 'autopilot',
+		label: 'Autopilot',
+		summary: 'Merges and ships without waiting for you.',
+		allows: [
+			'Read the repository',
+			'Commit to its own branch',
+			'Open a pull request',
+			'Merge a pull request with green checks',
+			'Merge with failing checks'
+		],
+		asks: ['Change protected files']
+	}
+];
+
+/** Sample data for `RiskToggle`. */
+export const SAMPLE_RISK_TOGGLE = {
+	label: 'Merge protected changes without asking',
+	description: 'Agents on this devbox can merge changes to protected files on their own.',
+	scope: 'devbox',
+	risk: {
+		title: 'Protected files guard releases and secrets',
+		points: [
+			'A bad merge to a protected file can break every build.',
+			'Changes go live without a person reading them first.',
+			'Undoing a merge means a new pull request, not a button.'
+		],
+		acknowledge: 'I understand agents can merge protected changes without asking me.'
+	}
+};

@@ -3,6 +3,8 @@ import AgentActivity from '../agents/AgentActivity.svelte';
 import ApprovalCard from '../agents/ApprovalCard.svelte';
 import CodeBlock from '../agents/CodeBlock.svelte';
 import FileDiff from '../agents/FileDiff.svelte';
+import LevelDial from '../agents/LevelDial.svelte';
+import RiskToggle from '../agents/RiskToggle.svelte';
 import TodoList from '../agents/TodoList.svelte';
 import ToolApproval from '../agents/ToolApproval.svelte';
 import ToolResult from '../agents/ToolResult.svelte';
@@ -98,6 +100,24 @@ export const defaultUIRegistry: UIRegistry = {
 		props: (props, emit) => ({
 			...props,
 			onSubmit: (answers: unknown) => emit('submit', JSON.stringify(answers))
+		})
+	},
+	'level-dial': {
+		component: LevelDial,
+		required: ['levels', 'value'],
+		props: (props, emit) => ({
+			...props,
+			onChange: (levelId: string, detail: { direction: string }) =>
+				emit(detail.direction === 'up' ? 'raise-level' : 'lower-level', levelId)
+		})
+	},
+	'risk-toggle': {
+		component: RiskToggle,
+		required: ['label', 'checked', 'risk'],
+		props: (props, emit) => ({
+			...props,
+			onChange: (next: boolean, detail: { acknowledged: boolean }) =>
+				emit(next ? 'turn-on' : 'turn-off', JSON.stringify({ acknowledged: detail.acknowledged }))
 		})
 	},
 	'github-issue-card': {
