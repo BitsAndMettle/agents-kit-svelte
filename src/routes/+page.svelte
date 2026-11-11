@@ -192,7 +192,8 @@
 		'Agentic Skills',
 		'Charts & Timelines',
 		'Voice & Effects',
-		'Primitives'
+		'Primitives',
+		'Auth'
 	];
 
 	type CardTabMode = 'preview' | 'usage' | 'source';
