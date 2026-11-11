@@ -12,6 +12,7 @@ import type { AgentRoute, RouteClassification, RoutingHistoryEntry } from '../ag
 import type { WorkflowStep } from '../agents-ui/AgentSequentialWorkflow.svelte';
 import type { AgentTask } from '../agents-ui/AgentTaskQueue.svelte';
 import type { AgentTool } from '../agents-ui/AgentToolPalette.svelte';
+import type { BlockedItem } from '../agents-ui/blocked-work';
 
 /** Sample data for `AgentArtifact`. */
 export const SAMPLE_ARTIFACT_VERSIONS: ArtifactVersion[] = [
@@ -603,3 +604,42 @@ export const SAMPLE_ARTIFACT_METADATA: ArtifactMetadata = {
 	size: '2.4 KB',
 	schemaJson: SAMPLE_ARTIFACT_SCHEMA_JSON
 };
+
+/** Sample data for `BlockedWorkList`: four stuck items, one with a confirmed danger action, one with no actions. */
+export const SAMPLE_BLOCKED_ITEMS: BlockedItem[] = [
+	{
+		id: 'w-3412',
+		ref: '#3412',
+		title: 'Add rate limiting to the export endpoint',
+		reason: { kind: 'unstarted', label: 'Not started for 40 min', since: 'Ready since 09:10' },
+		actions: [{ id: 'start', label: 'Start now' }]
+	},
+	{
+		id: 'w-3398',
+		ref: '#3398',
+		title: 'Move invoice totals to the new currency helper',
+		reason: { kind: 'blocker-closed', label: 'Its blockers have closed', detail: '#3391 and #3395 merged this morning.' },
+		actions: [
+			{ id: 'release', label: 'Release' },
+			{ id: 'park', label: 'Park it' }
+		]
+	},
+	{
+		id: 'w-3377',
+		ref: '#3377',
+		title: 'Retire the legacy webhook signer',
+		reason: { kind: 'hold', label: 'Held after a failed run', detail: 'The last run failed twice on the same test.' },
+		actions: [
+			{ id: 'retry', label: 'Retry' },
+			{ id: 'discard', label: 'Discard run', tone: 'danger', confirm: 'Discard the failed run and its branch? Its notes are kept, but the work is lost.' }
+		]
+	},
+	{
+		id: 'w-3350',
+		ref: '#3350',
+		title: 'Approve the production migration for team billing',
+		reason: { kind: 'needs-person', label: 'Only you can land this' },
+		actions: [],
+		note: 'Open the pull request on the host to land it.'
+	}
+];

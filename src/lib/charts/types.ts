@@ -230,3 +230,24 @@ export interface RunMark {
 	/** Anything your click handler needs. */
 	data?: unknown;
 }
+
+/** One child card in a `FeatureProposalCard`. */
+export interface ProposalCard {
+	id: string;
+	title: string;
+	size?: 'S' | 'M' | 'L';
+	/** Ids of earlier cards this one waits for. */
+	dependsOn?: string[];
+	note?: string;
+}
+
+/** What an agent proposes, and what the person sends back after editing it. */
+export interface FeatureProposal {
+	title: string;
+	summary?: string;
+	criteria: string[];
+	cards: ProposalCard[];
+	estimate?: string;
+}
+
+export type ProposalStatus = 'proposed' | 'approving' | 'approved' | 'declined';

@@ -27,6 +27,8 @@ import GitHubPullRequestGraph from '../github/GitHubPullRequestGraph.svelte';
 import GenerativeChart from '../charts/GenerativeChart.svelte';
 import ModelPhaseStream from '../charts/ModelPhaseStream.svelte';
 import FeatureCard from '../charts/FeatureCard.svelte';
+import FeatureProposalCard from '../charts/FeatureProposalCard.svelte';
+import BlockedWorkList from '../agents-ui/BlockedWorkList.svelte';
 import FeatureLineage from '../charts/FeatureLineage.svelte';
 import FeatureTimeline from '../charts/FeatureTimeline.svelte';
 import RunReplayScrubber from '../charts/RunReplayScrubber.svelte';
@@ -202,6 +204,24 @@ export const defaultUIRegistry: UIRegistry = {
 			...props,
 			onOpen: (feature: { id: string }) => emit('open-feature', feature.id),
 			onSelectCards: (state: string) => emit('select-cards', state)
+		})
+	},
+	'feature-proposal': {
+		component: FeatureProposalCard,
+		required: ['title', 'cards'],
+		props: (props, emit) => ({
+			...props,
+			onApprove: (proposal: { cards: { id: string }[] }) => emit('approve-proposal', proposal.cards.map((c) => c.id).join(',')),
+			onRevise: (note: string) => emit('revise-proposal', note),
+			onDecline: () => emit('decline-proposal')
+		})
+	},
+	'blocked-work-list': {
+		component: BlockedWorkList,
+		required: ['items'],
+		props: (props, emit) => ({
+			...props,
+			onAction: (item: { id: string }, action: { id: string }) => emit('blocked-work-action', `${item.id}:${action.id}`)
 		})
 	},
 	'feature-lineage': {

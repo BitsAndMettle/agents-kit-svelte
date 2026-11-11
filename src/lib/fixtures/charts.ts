@@ -6,6 +6,7 @@
 import type { GitHubIncidentData, GitHubIssueData, GitHubPullRequestData, GitHubReleaseData } from '../types';
 import type {
 	ChartSpec,
+	FeatureProposal,
 	FeatureSummary,
 	LineageEdge,
 	LineageNode,
@@ -541,3 +542,18 @@ export const SAMPLE_RUN_MARKS: RunMark[] = [
 	{ id: 'h5', t: 250, label: 'Review approved', kind: 'handoff' },
 	{ id: 'done', t: 282, label: 'Verified: all 4 criteria met', kind: 'done' }
 ];
+
+/** A new Feature an agent proposes, for `FeatureProposalCard`: five cards, two with dependencies. */
+export const SAMPLE_PROPOSAL: FeatureProposal = {
+	title: 'Weekly digest email',
+	summary: 'Send each member one email a week with what changed in their projects, with a one-click unsubscribe.',
+	criteria: ['A member gets at most one digest a week', 'Members who unsubscribe stop receiving it within a minute', 'An empty week sends nothing'],
+	estimate: 'About 3 hours of agent time',
+	cards: [
+		{ id: 'c-schema', title: 'Store each member\'s digest preference', size: 'S', note: 'A weekly on/off flag with a default of on.' },
+		{ id: 'c-build', title: 'Build the weekly summary from recent activity', size: 'M' },
+		{ id: 'c-template', title: 'Design the email template', size: 'S' },
+		{ id: 'c-send', title: 'Schedule and send the digest', size: 'L', dependsOn: ['c-schema', 'c-build', 'c-template'], note: 'Skips members with nothing to report.' },
+		{ id: 'c-unsub', title: 'Add one-click unsubscribe', size: 'S', dependsOn: ['c-schema'] }
+	]
+};
