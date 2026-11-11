@@ -45,7 +45,8 @@
 		trigger?: Snippet<[Part]>;
 		/**
 		 * Non-interactive content at the top of the menu, above the rows (for example who is
-		 * signed in). It is not a menu item: keyboard navigation skips it.
+		 * signed in). It is not a menu item: keyboard navigation skips it. Its text is the
+		 * menu's accessible description, so a screen reader announces it on opening.
 		 */
 		header?: Snippet;
 		/** Bindable. */
@@ -185,7 +186,7 @@
 	</button>
 {/if}
 
-<div {...menu.content} class={cn(MENU_SURFACE, menuClass)}>
-	{#if header}<div role="presentation">{@render header()}</div>{/if}
+<div {...menu.content} aria-describedby={header ? `${id}-header` : undefined} class={cn(MENU_SURFACE, menuClass)}>
+	{#if header}<div id="{id}-header" role="presentation">{@render header()}</div>{/if}
 	{@render menuEntries(menu, items)}
 </div>

@@ -17,6 +17,7 @@
 </script>
 
 <script lang="ts">
+	import type { Attachment } from 'svelte/attachments';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { isThenable } from './promise';
 	import { cn } from '../../ui/cn';
@@ -60,11 +61,28 @@
 	let pending = $state(false);
 	let outcome = $state<'sent' | 'failed' | null>(null);
 
+	/** Marks the button aria-disabled during a wait: `Button` only does so while loading, and `disabled` would drop keyboard focus to the page. */
+	const waiting: Attachment<HTMLElement> = (el) => {
+		if (!cooldown.active) return;
+		const mark = () => el.setAttribute('aria-disabled', 'true');
+		mark();
+		// Button rewrites its own aria-disabled when loading ends; mark again once that settles.
+		const observer = new MutationObserver(() => {
+			if (el.getAttribute('aria-disabled') !== 'true') mark();
+		});
+		observer.observe(el, { attributes: true, attributeFilter: ['aria-disabled'] });
+		return () => {
+			observer.disconnect();
+			el.removeAttribute('aria-disabled');
+		};
+	};
+
 	async function resend(): Promise<void> {
-		if (pending || cooldown.active) return;
+		// aria-disabled leaves the button focusable, so the click is guarded here.
+		if (pending || cooldown.active || !onResend) return;
 		outcome = null;
 		try {
-			const result = onResend?.();
+			const result = onResend();
 			if (isThenable(result)) {
 				pending = true;
 				await result;
@@ -81,7 +99,7 @@
 <div {...rest} class={cn('w-full', className)}>
 	<Alert tone="warning" title={text.title} description={text.message(email)} onDismiss={onDismiss ? () => onDismiss() : undefined} dismissLabel={text.dismiss}>
 		{#snippet actions()}
-			<Button size="xs" variant="secondary" loading={pending} disabled={cooldown.active} onclick={resend}>
+			<Button size="xs" variant="secondary" loading={pending} class={cooldown.active ? 'cursor-not-allowed opacity-60' : ''} onclick={resend} {@attach waiting}>
 				{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}
 			</Button>
 			{#if onChangeEmail}

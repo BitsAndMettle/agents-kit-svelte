@@ -3,6 +3,8 @@
 	export interface AccountMenuLabels {
 		/** Accessible name of the trigger, from the person's name (or email). */
 		menuLabel: (name: string) => string;
+		/** Accessible name of the trigger when the person has neither a name nor an email. */
+		menuLabelAnonymous: string;
 		signOut: string;
 	}
 </script>
@@ -10,6 +12,7 @@
 <script lang="ts">
 	import type { HTMLButtonAttributes } from 'svelte/elements';
 	import { LogOut } from '@lucide/svelte';
+	import { isThenable } from './promise';
 	import { cn } from '../../ui/cn';
 	import { Avatar } from '../../primitives/display';
 	import { DropdownMenu, type MenuEntry } from '../../primitives/menus';
@@ -22,12 +25,14 @@
 		user: AuthUser;
 		/** Rows between the header and "Sign out", in DropdownMenu's own item format (links, icons, separators, tones). */
 		items?: MenuEntry[];
-		/** Choosing "Sign out". Your app ends the session. */
+		/** Choosing "Sign out". Your app ends the session. Return a promise to show busy on the button until it settles. */
 		onSignOut?: () => unknown;
 		/** Shows the person's name next to the avatar. Default false. */
 		showName?: boolean;
 		/** Bindable. */
 		open?: boolean;
+		/** Whether the menu starts open (uncontrolled). Default false. */
+		defaultOpen?: boolean;
 		onOpenChange?: (open: boolean, reason: ChangeReason) => void;
 		/** Default `bottom-end`. */
 		placement?: OverlayPlacement;
@@ -44,7 +49,8 @@
 		items = [],
 		onSignOut,
 		showName = false,
-		open = $bindable(false),
+		open = $bindable(),
+		defaultOpen = false,
 		onOpenChange,
 		placement = 'bottom-end',
 		labels,
@@ -55,6 +61,7 @@
 
 	const text = $derived<AccountMenuLabels>({
 		menuLabel: (name) => `Account menu for ${name}`,
+		menuLabelAnonymous: 'Account menu',
 		signOut: 'Sign out',
 		...labels
 	});
@@ -64,16 +71,32 @@
 	const entries: MenuEntry[] = $derived([
 		...items,
 		...(items.length > 0 ? ([{ kind: 'separator' }] satisfies MenuEntry[]) : []),
-		{ value: 'account-menu-sign-out', label: text.signOut, icon: LogOut, onSelect: () => void onSignOut?.() }
+		{ value: 'account-menu-sign-out', label: text.signOut, icon: LogOut, onSelect: () => void signOut() }
 	]);
+	let signingOut = $state(false);
+
+	async function signOut(): Promise<void> {
+		if (signingOut) return;
+		try {
+			const result = onSignOut?.();
+			if (isThenable(result)) {
+				signingOut = true;
+				await result;
+			}
+		} catch {
+			// The app reports its own failure; the menu can be used again.
+		} finally {
+			signingOut = false;
+		}
+	}
 </script>
 
-<DropdownMenu items={entries} bind:open {onOpenChange} {placement} bind:ref>
+<DropdownMenu items={entries} bind:open {defaultOpen} {onOpenChange} {placement} bind:ref>
 	{#snippet trigger(part)}
-		<button {...rest} {...part} class={cn(TRIGGER, showName && 'pr-3', className)}>
+		<button {...rest} {...part} aria-busy={signingOut || undefined} class={cn(TRIGGER, showName && 'pr-3', className)}>
 			<Avatar decorative src={user.avatarSrc} name={display} size="md" />
 			{#if showName && display}<span aria-hidden="true" class="max-w-40 truncate">{display}</span>{/if}
-			<span class="sr-only">{text.menuLabel(display)}</span>
+			<span class="sr-only">{display ? text.menuLabel(display) : text.menuLabelAnonymous}</span>
 		</button>
 	{/snippet}
 	{#snippet header()}

@@ -33,6 +33,26 @@ test.describe('AccountMenu', () => {
 		const section = await openSection(page, 'account-menu');
 		await expect(section.getByRole('button', { name: 'Account menu for grace@example.com' })).toBeVisible();
 	});
+
+	test('a person with neither name nor email gets the anonymous trigger name', async ({ page }) => {
+		const section = await openSection(page, 'account-menu');
+		await expect(section.getByTestId('anonymous-menu')).toHaveAccessibleName('Account menu');
+	});
+
+	test('the menu header is in the accessibility tree as the menu description', async ({ page }) => {
+		const section = await openSection(page, 'account-menu');
+		await section.getByRole('button', { name: 'Account menu for Ada Lovelace' }).click();
+		const menu = page.getByRole('menu', { name: 'Account menu for Ada Lovelace' });
+		await expect(menu).toBeVisible();
+		await expect(menu).toHaveAccessibleDescription(/Ada Lovelace\s+ada@example\.com/);
+	});
+
+	test('defaultOpen mounts the menu open', async ({ page }) => {
+		const section = await openSection(page, 'account-menu');
+		await expect(page.getByRole('menu', { name: 'Account menu for Open Olive' })).toHaveCount(0);
+		await section.getByRole('button', { name: 'Show a menu open by default' }).click();
+		await expect(page.getByRole('menu', { name: 'Account menu for Open Olive' })).toBeVisible();
+	});
 });
 
 test.describe('SessionList', () => {
@@ -89,8 +109,50 @@ test.describe('SessionList', () => {
 		await dialog.getByRole('button', { name: 'Sign out others' }).click();
 		await expect(section.getByTestId('sessions-log')).toHaveText('Revoked all others');
 		await expect(all).toHaveCount(0);
-		await expect(section.getByRole('listitem')).toHaveCount(1);
+		await expect(section.getByRole('list').first().getByRole('listitem')).toHaveCount(1);
 		await expect(section.getByRole('heading', { name: 'Signed-in devices', exact: true })).toBeFocused();
+	});
+
+	test('the server render reserves the last-active line instead of leaving it empty', async ({ request }) => {
+		const html = await (await request.get('/')).text();
+		const start = html.indexOf('id="session-list"');
+		expect(start).toBeGreaterThan(-1);
+		expect(html.slice(start, start + 60000)).toContain('data-last-active-placeholder');
+	});
+
+	test('a failed revoke tells the person politely and leaves the row to try again', async ({ page }) => {
+		const section = await openSection(page, 'session-list');
+		const button = section.getByRole('button', { name: 'Revoke Brave on Android' });
+		await button.focus();
+		await press(page, 'Enter');
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Revoke', exact: true }).click();
+		const row = section.getByRole('listitem').filter({ hasText: 'Brave on Android' });
+		await expect(row.getByRole('status')).toHaveText('The device could not be signed out. Try again.');
+		await expect(button).not.toHaveAttribute('aria-busy', 'true');
+		await expect(button).toBeVisible();
+	});
+
+	test('concurrent revokes each restore focus for their own row', async ({ page }) => {
+		const section = await openSection(page, 'session-list');
+		const phone = section.getByRole('button', { name: 'Revoke Safari on iPhone' });
+		const tablet = section.getByRole('button', { name: 'Revoke Firefox on iPad' });
+		const confirm = page.getByRole('alertdialog').getByRole('button', { name: 'Revoke', exact: true });
+		await phone.focus();
+		await press(page, 'Enter');
+		await confirm.click();
+		await expect(page.getByRole('alertdialog')).toBeHidden();
+		await tablet.focus();
+		await press(page, 'Enter');
+		await confirm.click();
+		await expect(page.getByRole('alertdialog')).toBeHidden();
+		// Back on the first row, which is still waiting, when it disappears.
+		await phone.focus();
+		await expect(phone).toBeFocused();
+		await expect(section.getByTestId('sessions-log')).toHaveText('Revoked phone');
+		await expect(phone).toHaveCount(0);
+		expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+		// The tablet row finished first; the phone row's own restore lands on the row now in its place.
+		await expect(section.getByRole('button', { name: /^Revoke / }).first()).toBeFocused();
 	});
 });
 
@@ -98,21 +160,42 @@ test.describe('VerifyEmailBanner', () => {
 	test('Resend shows loading, a polite Sent, then waits out the cooldown', async ({ page }) => {
 		const section = await openSection(page, 'verify-email-banner');
 		await expect(section).toContainText('ada@example.com is not verified');
-		const resend = section.getByRole('button', { name: 'Resend verification email' });
+		const resend = section.getByRole('button', { name: 'Resend verification email' }).first();
 		await resend.focus();
 		await press(page, 'Enter');
 		await expect(resend).toHaveAttribute('aria-busy', 'true');
 		await expect(section.getByRole('status').filter({ hasText: 'Sent' })).toBeVisible();
 		await expect(section.getByTestId('verify-sends')).toHaveText('1');
-		await expect(section.getByRole('button', { name: /Resend in \d+s/ })).toBeDisabled();
+		// The cooldown keeps the button focusable: aria-disabled, never disabled.
+		const waiting = section.getByRole('button', { name: /Resend in \d+s/ });
+		await expect(waiting).toHaveAttribute('aria-disabled', 'true');
+		await expect(waiting).not.toHaveAttribute('disabled', /.*/);
+		await expect(waiting).toBeFocused();
+		await press(page, 'Enter');
+		await expect(section.getByTestId('verify-sends')).toHaveText('1');
 		await expect(resend).toBeEnabled({ timeout: 9000 });
+	});
+
+	test('without onResend nothing is claimed as sent', async ({ page }) => {
+		const section = await openSection(page, 'verify-email-banner');
+		const banner = section.getByTestId('banner-plain');
+		await banner.getByRole('button', { name: 'Resend verification email' }).click();
+		await expect(banner.getByRole('status')).toHaveText('');
+		await expect(banner).not.toContainText('Sent');
+	});
+
+	test('a rejected resend shows the failure message', async ({ page }) => {
+		const section = await openSection(page, 'verify-email-banner');
+		const banner = section.getByTestId('banner-failing');
+		await banner.getByRole('button', { name: 'Resend verification email' }).click();
+		await expect(banner.getByRole('alert')).toContainText('could not be sent');
 	});
 
 	test('Change email and Dismiss are real buttons that only call back', async ({ page }) => {
 		const section = await openSection(page, 'verify-email-banner');
 		await expect(section.getByRole('button', { name: 'Change email' })).toBeVisible();
 		await section.getByRole('button', { name: 'Dismiss' }).click();
-		await expect(section.getByRole('button', { name: 'Resend verification email' })).toHaveCount(0);
+		await expect(section.getByRole('button', { name: 'Dismiss' })).toHaveCount(0);
 		await expect(section.getByRole('button', { name: 'Show the banner again' })).toBeVisible();
 	});
 });
@@ -181,6 +264,23 @@ test.describe('BackupCodes', () => {
 		await expect(section.getByTestId('codes-log')).toHaveText('Regenerated', { timeout: 5000 });
 		await expect(dialog).toBeHidden();
 		await expect(section.getByRole('list').getByRole('listitem').first()).toHaveText('b2vc-5hma');
+	});
+
+	test('Regenerate clears the acknowledgement and the Copied state', async ({ page, context }) => {
+		await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+		const section = await openSection(page, 'backup-codes');
+		await section.getByRole('button', { name: 'Copy all' }).click();
+		await expect(section.getByRole('status')).toHaveText('Copied');
+		const box = section.getByRole('checkbox', { name: 'I have saved these codes' });
+		await box.check();
+		await expect(section.getByRole('button', { name: 'Continue' })).toBeEnabled();
+		await section.getByRole('button', { name: 'Regenerate' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Regenerate' }).click();
+		await expect(section.getByTestId('codes-log')).toHaveText('Regenerated', { timeout: 5000 });
+		await expect(section.getByRole('list').getByRole('listitem').first()).toHaveText('b2vc-5hma');
+		await expect(box).not.toBeChecked();
+		await expect(section.getByRole('button', { name: 'Continue' })).toBeDisabled();
+		await expect(section.getByRole('status')).toHaveText('');
 	});
 
 	test('Continue stays disabled until the acknowledgement is checked', async ({ page }) => {
