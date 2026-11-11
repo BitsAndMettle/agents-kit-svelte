@@ -3,17 +3,17 @@
 </script>
 
 <div class="flex flex-wrap items-start gap-6">
-	<ButtonGroup label="Run controls">
+	<ButtonGroup aria-label="Run controls">
 		<Button>Pause</Button>
 		<Button>Retry</Button>
 		<Button variant="danger">Stop</Button>
 	</ButtonGroup>
-	<ButtonGroup label="Stacked actions" orientation="vertical">
+	<ButtonGroup aria-label="Stacked actions" orientation="vertical">
 		<Button>Approve</Button>
 		<Button>Request changes</Button>
 		<Button>Reject</Button>
 	</ButtonGroup>
-	<ButtonGroup label="Spaced actions" attached={false}>
+	<ButtonGroup aria-label="Spaced actions" attached={false}>
 		<Button variant="ghost">Cancel</Button>
 		<Button variant="primary">Save</Button>
 	</ButtonGroup>

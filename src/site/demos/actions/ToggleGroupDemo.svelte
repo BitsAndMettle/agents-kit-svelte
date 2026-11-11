@@ -4,6 +4,7 @@
 
 	let view = $state<string | string[] | null>('list');
 	let marks = $state<string | string[] | null>(['bold']);
+	let posted = $state('');
 	let align = $state<string | string[] | null>('left');
 </script>
 
@@ -14,7 +15,7 @@
 <div class="space-y-4 text-sm">
 	<div class="flex flex-wrap items-center gap-4">
 		<ToggleGroup
-			label="View"
+			aria-label="View"
 			bind:value={view}
 			items={[
 				{ value: 'list', label: 'List' },
@@ -24,7 +25,7 @@
 			]}
 		/>
 		<ToggleGroup
-			label="Text marks"
+			aria-label="Text marks"
 			multiple
 			bind:value={marks}
 			items={[
@@ -34,15 +35,15 @@
 			]}
 		/>
 		<ToggleGroup
-			label="Alignment"
+			aria-label="Alignment"
 			bind:value={align}
 			items={[
-				{ value: 'left', icon: left, ariaLabel: 'Align left' },
-				{ value: 'center', icon: center, ariaLabel: 'Align center' },
-				{ value: 'right', icon: right, ariaLabel: 'Align right' }
+				{ value: 'left', icon: left, 'aria-label': 'Align left' },
+				{ value: 'center', icon: center, 'aria-label': 'Align center' },
+				{ value: 'right', icon: right, 'aria-label': 'Align right' }
 			]}
 		/>
-		<ToggleGroup label="Sort order" orientation="vertical" value="newest">
+		<ToggleGroup aria-label="Sort order" orientation="vertical" value="newest">
 			{#snippet children({ item, itemClass })}
 				{#each ['newest', 'oldest'] as v (v)}
 					<button {...item({ value: v })} class={itemClass(v)}>{v}</button>
@@ -50,6 +51,19 @@
 			{/snippet}
 		</ToggleGroup>
 	</div>
+	<form
+		class="flex flex-wrap items-center gap-2"
+		data-testid="toggle-form"
+		onsubmit={(e) => {
+			e.preventDefault();
+			posted = new URLSearchParams(new FormData(e.currentTarget) as unknown as Record<string, string>).toString();
+		}}
+	>
+		<ToggleGroup aria-label="Notify me by" name="notify" multiple defaultValue={['email']} items={[{ value: 'email', label: 'Email' }, { value: 'push', label: 'Push' }]} />
+		<button type="submit" class="text-xs underline">Submit</button>
+		<button type="reset" class="text-xs underline">Reset</button>
+		<span class="text-xs text-fg-light" data-testid="posted">{posted}</span>
+	</form>
 	<p class="text-xs text-fg-light" data-testid="view-state">
 		View {view ?? 'none'}, marks {Array.isArray(marks) ? marks.join(', ') || 'none' : marks}, align {align ?? 'none'}
 	</p>

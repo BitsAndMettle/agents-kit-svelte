@@ -40,7 +40,7 @@ export const PRIMITIVES_ACTIONS: CatalogItemMeta[] = [
   let removing = $state(false);
 </script>
 
-<IconButton label="Delete run" variant="danger" loading={removing} onclick={() => (removing = true)}>
+<IconButton aria-label="Delete run" variant="danger" loading={removing} onclick={() => (removing = true)}>
   <Trash2 />
 </IconButton>`
 	},
@@ -56,7 +56,7 @@ export const PRIMITIVES_ACTIONS: CatalogItemMeta[] = [
   import { Button, ButtonGroup } from 'agents-kit-svelte/primitives';
 </script>
 
-<ButtonGroup label="Run controls">
+<ButtonGroup aria-label="Run controls">
   <Button>Pause</Button>
   <Button>Retry</Button>
   <Button variant="danger">Stop</Button>
@@ -97,7 +97,7 @@ export const PRIMITIVES_ACTIONS: CatalogItemMeta[] = [
 </script>
 
 <ToggleGroup
-  label="View"
+  aria-label="View"
   bind:value={view}
   items={[
     { value: 'list', label: 'List' },
