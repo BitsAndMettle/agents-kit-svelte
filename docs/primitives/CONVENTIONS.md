@@ -31,3 +31,7 @@ One way to say each thing, across every primitive. When a prop names a concept b
 - `ref` (bindable) exposes that same element.
 - Every component exports `XProps` from its group's `index.ts`.
 - No hard-coded user-facing words: every visible or announced string is a prop with an English default (`closeLabel`, `previousLabel`, `formatCount`, …).
+
+## Recorded deviations
+
+- **Tooltip has no `open` / `defaultOpen` / `onOpenChange`.** A tooltip is opened only by hover and keyboard focus, through the shared delay group in the headless layer, whose open state is read-only on purpose: a tooltip that code can pin open breaks the "one tooltip at a time" and "Escape closes the tooltip first" rules. Use a `Popover` for anything that must open on command.
