@@ -692,6 +692,8 @@ Evidence:
 - `corepack pnpm check` reports 0/0, and `corepack pnpm test` passes 165/165.
 - `tests/browser/headless` on `PW_PORT=5191` passes. Failures seen mid-run in the groups, menu and requestClose specs were Vite reloads from concurrent edits; on rerun they passed, the requestClose spec 15/15.
 
+- **Restored-focus mark ends on blur too (controller, final integration).** `isRestoringFocus(el)` was cleared only by a `setTimeout(0)`; under test load the timer could fire after a fast Shift+Tab, Tab, so the person's own refocus read as restored (2 failures in 70 runs). The mark now also clears on the element's next `blur`, with the timer kept as a backstop; 200/200 runs after the change. The shared contract (internal, tooltip-only) is unchanged.
+
 ## Open questions and risks
 
 - **Toasts during a modal.** Is a `popover="manual"` toast region shown after a modal `<dialog>` still inert? If it is, should the Toaster move its region into the topmost dialog while one is open, or should toasts stay non-interactive during modals? This needs a Playwright spike before Toaster is built.

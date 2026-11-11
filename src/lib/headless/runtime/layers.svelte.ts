@@ -634,10 +634,15 @@ export class LayerStack {
 		for (const candidate of candidates) {
 			if (!canFocus(candidate)) continue;
 			// Mark before focusing: focus/focusin handlers run inside focus().
+			// The mark ends when that focus does (blur), or at the next task, whichever is first:
+			// a timer alone can fire late under load and mislabel the person's next focus.
 			this.restored.add(candidate);
-			setTimeout(() => this.restored.delete(candidate), 0);
+			const clear = () => this.restored.delete(candidate);
+			candidate.addEventListener('blur', clear, { once: true });
+			setTimeout(clear, 0);
 			if (focusQuietly(candidate)) return;
-			this.restored.delete(candidate);
+			candidate.removeEventListener('blur', clear);
+			clear();
 		}
 	}
 
