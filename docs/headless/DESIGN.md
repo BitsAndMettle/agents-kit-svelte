@@ -694,6 +694,13 @@ Evidence:
 
 - **Restored-focus mark ends on blur too (controller, final integration).** `isRestoringFocus(el)` was cleared only by a `setTimeout(0)`; under test load the timer could fire after a fast Shift+Tab, Tab, so the person's own refocus read as restored (2 failures in 70 runs). The mark now also clears on the element's next `blur`, with the timer kept as a backstop; 200/200 runs after the change. The shared contract (internal, tooltip-only) is unchanged.
 
+- **A backdrop press returns focus to the modal's trigger (found by the overlays builder).**
+  - The bug: under reduced motion, the backdrop press closed the dialog during `pointerdown`. The press's `mousedown` then moved focus to `<body>`. An `'outside'` close returned focus only if it was still inside the layer, so focus stayed on `<body>`.
+  - The new rule: when an outside press closes a MODAL layer, `<body>` counts as lost and focus goes back to the trigger. Behind a modal everything is inert, so the press cannot have aimed at another control.
+  - The stack also calls `preventDefault()` on that `pointerdown`, which suppresses the compatibility mouse events so `mousedown` cannot blur the returned focus; `click` still fires. Touch presses are decided on `click`, which comes after `mousedown`, and restore from `<body>` the same way.
+  - Non-modal outside closes keep the old rule: focus stays wherever the press put it.
+  - Spec R3 runs with reduced motion and with motion. It failed under reduced motion before the change and passed 10/10 after.
+
 ## Open questions and risks
 
 - **Toasts during a modal.** Is a `popover="manual"` toast region shown after a modal `<dialog>` still inert? If it is, should the Toaster move its region into the topmost dialog while one is open, or should toasts stay non-interactive during modals? This needs a Playwright spike before Toaster is built.

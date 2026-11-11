@@ -238,6 +238,21 @@ test.describe('red-team regressions', () => {
 	});
 });
 
+for (const motion of ['reduce', 'no-preference'] as const) {
+	test(`R3. a backdrop press returns focus to the modal's trigger (motion: ${motion})`, async ({ page }) => {
+		await page.emulateMedia({ reducedMotion: motion });
+		await openFixture(page);
+		await trigger(page, 'settings').click();
+		await expectShown(content(page, 'settings'), true);
+		await page.mouse.click(5, 790);
+		await expectShown(content(page, 'settings'), false);
+		await expect(trigger(page, 'settings')).toBeFocused();
+		await page.waitForTimeout(500); // and it stays there after the press completes
+		await expect(trigger(page, 'settings')).toBeFocused();
+		expect(await logEntries(page)).toContain('settings:closed:outside');
+	});
+}
+
 for (const strategy of ['native', 'fallback'] as Strategy[]) {
 	test.describe(`red-team positioning (${strategy})`, () => {
 		test.beforeEach(async ({ page }) => {
