@@ -7,7 +7,9 @@
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children'> {
 		/** The current page, 1-based. Bindable. */
-		page?: number;
+		value?: number;
+		defaultValue?: number;
+		onValueChange?: (page: number) => void;
 		pageCount: number;
 		/** Pages shown on each side of the current page. Default 1. */
 		siblings?: number;
@@ -15,38 +17,55 @@
 		boundaries?: number;
 		/** Builds the URL of a page; renders links instead of buttons. */
 		href?: (page: number) => string;
-		onPageChange?: (page: number) => void;
 		/**
-		 * `auto` shows "Page 3 of 12" below the `sm` breakpoint and numbers above it;
+		 * `auto` shows the short form ("Page 3 of 12") below the `sm` breakpoint and numbers above it;
 		 * `true` always shows the short form, `false` never does.
 		 */
 		compact?: boolean | 'auto';
-		/** Accessible name of the navigation landmark. */
-		label?: string;
+		/** Render the bar even when there is only one page. Nothing renders for fewer than two otherwise. */
+		showSinglePage?: boolean;
+		previousLabel?: string;
+		nextLabel?: string;
+		/** Accessible name of one page button or link. */
+		pageLabel?: (page: number) => string;
+		/** The short form shown on narrow screens. */
+		summaryLabel?: (page: number, pageCount: number) => string;
+		/** The nav element. The landmark's name is `aria-label`. */
+		ref?: HTMLElement;
 		class?: string;
 	}
 
 	let {
-		page = $bindable(1),
+		value = $bindable(),
+		defaultValue = 1,
+		onValueChange,
 		pageCount,
 		siblings = 1,
 		boundaries = 1,
 		href,
-		onPageChange,
 		compact = 'auto',
-		label = 'Pagination',
+		showSinglePage = false,
+		previousLabel = 'Previous',
+		nextLabel = 'Next',
+		pageLabel = (n) => `Page ${n}`,
+		summaryLabel = (n, total) => `Page ${n} of ${total}`,
+		ref = $bindable(),
+		'aria-label': ariaLabel = 'Pagination',
 		class: className = '',
 		...rest
 	}: Props = $props();
 
+	export type PaginationProps = Props;
+
 	let count = $derived(Math.max(0, Math.floor(pageCount)));
-	let current = $derived(Math.min(Math.max(1, Math.floor(page)), Math.max(1, count)));
+	let current = $derived(Math.min(Math.max(1, Math.floor(value ?? defaultValue)), Math.max(1, count)));
 	let tokens = $derived(paginationRange({ page: current, pageCount: count, siblings, boundaries }));
+	let visible = $derived(count >= 2 || (showSinglePage && count === 1));
 
 	function go(target: number): void {
 		if (target < 1 || target > count || target === current) return;
-		page = target;
-		onPageChange?.(target);
+		value = target;
+		onValueChange?.(target);
 	}
 
 	/** Records the page for a link click and lets the browser follow the link. */
@@ -77,38 +96,41 @@
 	{/if}
 {/snippet}
 
-<nav {...rest} aria-label={label} class={cn('text-sm', className)}>
-	<ul class="m-0 flex list-none flex-wrap items-center justify-center gap-1 p-0">
-		<li>{@render step(current - 1, 'Previous', current <= 1, false)}</li>
-		<li class={summaryClass}>
-			<span class="px-2 text-[13px] font-medium whitespace-nowrap text-fg-light">Page {current} of {count}</span>
-		</li>
-		{#each tokens as token (token)}
-			<li class={numbersClass}>
-				{#if typeof token === 'number'}
-					{@const isCurrent = token === current}
-					{#if href}
-						<a
-							href={href(token)}
-							aria-label="Page {token}"
-							aria-current={isCurrent ? 'page' : undefined}
-							onclick={(event) => follow(event, token)}
-							class={cn(buttonClass('ghost', 'md'), ITEM)}>{token}</a
-						>
-					{:else}
-						<button
-							type="button"
-							aria-label="Page {token}"
-							aria-current={isCurrent ? 'page' : undefined}
-							onclick={() => go(token)}
-							class={cn(buttonClass('ghost', 'md'), ITEM)}>{token}</button
-						>
-					{/if}
-				{:else}
-					<span aria-hidden="true" class="inline-flex h-8 min-w-8 items-center justify-center text-fg-light">…</span>
-				{/if}
+{#if visible}
+	<nav {...rest} bind:this={ref} aria-label={ariaLabel} class={cn('text-sm', className)}>
+		<ul class="m-0 flex list-none flex-wrap items-center justify-center gap-1 p-0">
+			<li>{@render step(current - 1, previousLabel, current <= 1, false)}</li>
+			<li class={summaryClass}>
+				<span class="px-2 text-[13px] font-medium whitespace-nowrap text-fg-light">{summaryLabel(current, count)}</span>
 			</li>
-		{/each}
-		<li>{@render step(current + 1, 'Next', current >= count, true)}</li>
-	</ul>
-</nav>
+			{#each tokens as token (token)}
+				{#if typeof token === 'number'}
+					<li class={numbersClass}>
+						{#if href}
+							<a
+								href={href(token)}
+								aria-label={pageLabel(token)}
+								aria-current={token === current ? 'page' : undefined}
+								onclick={(event) => follow(event, token)}
+								class={cn(buttonClass('ghost', 'md'), ITEM)}>{token}</a
+							>
+						{:else}
+							<button
+								type="button"
+								aria-label={pageLabel(token)}
+								aria-current={token === current ? 'page' : undefined}
+								onclick={() => go(token)}
+								class={cn(buttonClass('ghost', 'md'), ITEM)}>{token}</button
+							>
+						{/if}
+					</li>
+				{:else}
+					<li aria-hidden="true" class={numbersClass}>
+						<span class="inline-flex h-8 min-w-8 items-center justify-center text-fg-light">…</span>
+					</li>
+				{/if}
+			{/each}
+			<li>{@render step(current + 1, nextLabel, current >= count, true)}</li>
+		</ul>
+	</nav>
+{/if}

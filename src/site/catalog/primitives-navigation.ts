@@ -22,7 +22,7 @@ export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
 {#snippet logs()}<p>Logs from the last run</p>{/snippet}
 
 <Tabs
-  label="Card sections"
+  aria-label="Card sections"
   variant="segmented"
   bind:value
   items={[
@@ -52,8 +52,8 @@ export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
   bind:value
   headingLevel={3}
   items={[
-    { value: 'what', title: 'What is a run?', content: what },
-    { value: 'where', title: 'Where do logs go?', content: where }
+    { value: 'what', label: 'What is a run?', content: what },
+    { value: 'where', label: 'Where do logs go?', content: where }
   ]}
 />`
 	},
@@ -72,10 +72,10 @@ export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
 <Breadcrumb
   items={[
     { label: 'Workspace', href: '/' },
-    { label: 'Projects', href: '/projects' },
-    { label: 'Trailside', href: '/projects/trailside' },
-    { label: 'Runs', href: '/projects/trailside/runs' },
-    { label: 'Run 42' }
+    { label: 'Teams', href: '/teams' },
+    { label: 'Acme', href: '/teams/acme' },
+    { label: 'Reports', href: '/teams/acme/reports' },
+    { label: 'Report 42' }
   ]}
 />`
 	},
@@ -94,12 +94,12 @@ export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
 </script>
 
 <Pagination
-  bind:page
+  bind:value={page}
   pageCount={12}
   siblings={1}
   boundaries={1}
-  label="Run pages"
-  onPageChange={(next) => console.log('page', next)}
+  aria-label="Run pages"
+  onValueChange={(next) => console.log('page', next)}
 />`
 	}
 ];

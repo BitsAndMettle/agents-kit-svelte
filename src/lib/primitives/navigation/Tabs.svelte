@@ -32,8 +32,11 @@
 		 * it is shown and keeps it, `active` mounts only the selected one.
 		 */
 		mount?: 'eager' | 'lazy' | 'active';
-		/** Accessible name of the tab list. */
-		label?: string;
+		/** The root element. */
+		ref?: HTMLDivElement;
+		/** Names the tab list (the real attribute, passed through to it). */
+		'aria-label'?: string;
+		'aria-labelledby'?: string;
 		class?: string;
 	}
 
@@ -46,10 +49,14 @@
 		orientation = 'horizontal',
 		activation = 'automatic',
 		mount = 'eager',
-		label,
+		ref = $bindable(),
+		'aria-label': ariaLabel,
+		'aria-labelledby': ariaLabelledby,
 		class: className = '',
 		...rest
 	}: Props = $props();
+
+	export type TabsProps = Props;
 
 	const id = $props.id();
 
@@ -96,8 +103,8 @@
 	);
 </script>
 
-<div {...rest} class={cn('flex gap-3', vertical ? 'flex-row' : 'flex-col', className)}>
-	<div {...tabs.list} aria-label={label} class={listClass}>
+<div {...rest} bind:this={ref} class={cn('flex gap-3', vertical ? 'flex-row' : 'flex-col', className)}>
+	<div {...tabs.list} aria-label={ariaLabel} aria-labelledby={ariaLabelledby} class={listClass}>
 		{#each items as item (item.value)}
 			<button {...tabs.tab({ value: item.value, disabled: item.disabled })} class={tabClass}>
 				{#if typeof item.label === 'string'}{item.label}{:else}{@render item.label()}{/if}

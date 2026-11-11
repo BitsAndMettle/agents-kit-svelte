@@ -4,7 +4,7 @@
 	/** One accordion item: a header (text or a snippet) and its panel content. */
 	export interface AccordionItem {
 		value: string;
-		title: string | Snippet;
+		label: string | Snippet;
 		disabled?: boolean;
 		content: Snippet;
 	}
@@ -28,6 +28,8 @@
 		onValueChange?: (value: string | string[] | null) => void;
 		/** Heading level of each header, 2 to 6. Default 3. */
 		headingLevel?: 2 | 3 | 4 | 5 | 6;
+		/** The root element. */
+		ref?: HTMLDivElement;
 		class?: string;
 	}
 
@@ -39,9 +41,12 @@
 		defaultValue,
 		onValueChange,
 		headingLevel = 3,
+		ref = $bindable(),
 		class: className = '',
 		...rest
 	}: Props = $props();
+
+	export type AccordionProps = Props;
 
 	const id = $props.id();
 
@@ -78,7 +83,7 @@
 	}>(multiple ? several : single);
 </script>
 
-<div {...rest} {...accordion.root} class={cn('divide-y divide-card-border overflow-hidden rounded-card border border-card-border bg-card-bg', className)}>
+<div {...rest} {...accordion.root} bind:this={ref} class={cn('divide-y divide-card-border overflow-hidden rounded-card border border-card-border bg-card-bg', className)}>
 		{#each items as item (item.value)}
 			<div>
 				<svelte:element this={`h${headingLevel}`} class="m-0 text-sm font-medium text-fg-main">
@@ -87,7 +92,7 @@
 						class="group flex w-full items-center justify-between gap-3 px-4 py-3 text-start transition-colors hover:bg-canvas-secondary aria-disabled:cursor-default aria-disabled:data-[state=closed]:cursor-not-allowed aria-disabled:data-[state=closed]:opacity-50 aria-disabled:hover:bg-transparent"
 					>
 						<span class="min-w-0">
-							{#if typeof item.title === 'string'}{item.title}{:else}{@render item.title()}{/if}
+							{#if typeof item.label === 'string'}{item.label}{:else}{@render item.label()}{/if}
 						</span>
 						<ChevronDown
 							aria-hidden="true"
