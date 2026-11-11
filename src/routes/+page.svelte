@@ -157,6 +157,7 @@
 	import { SAMPLE_SKILLS, SAMPLE_SKILL_MANIFEST, SAMPLE_SKILL_PROPOSAL, SAMPLE_SKILL_STEPS } from '$lib/entries/fixtures';
 	import { SAMPLE_BURN_POINTS, SAMPLE_CHART_SPECS, SAMPLE_FLEET_METRICS, SAMPLE_FEATURE, SAMPLE_FEATURE_START, SAMPLE_HANDOFFS, SAMPLE_RUN_DURATION, SAMPLE_RUN_MARKS, SAMPLE_TIMELINE_ITEMS, SAMPLE_TIMELINE_MILESTONES, SAMPLE_TIMELINE_TODAY, SAMPLE_TOKEN_BUDGET, SAMPLE_LINEAGE_EDGES, SAMPLE_LINEAGE_NODES, SAMPLE_HANDOFF_LANES, SAMPLE_HANDOFF_SPANS, SAMPLE_MODEL_EVENTS, SAMPLE_MODEL_SERIES, SAMPLE_PHASE_BANDS, SAMPLE_PROPOSAL } from '$lib/fixtures/charts';
 	import { CATALOG_ITEMS, type CatalogCategory } from '$site/catalog-registry';
+	import { PRIMITIVE_DEMOS } from '$site/demos/index';
 	import { holdHeight } from '$site/hold-height';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type {
@@ -190,7 +191,8 @@
 		'AI Elements & Coding',
 		'Agentic Skills',
 		'Charts & Timelines',
-		'Voice & Effects'
+		'Voice & Effects',
+		'Primitives'
 	];
 
 	type CardTabMode = 'preview' | 'usage' | 'source';
@@ -1734,6 +1736,9 @@
 								<BorderBeam />
 							{:else if item.slug === 'svelte5-motion-lab'}
 								<Svelte5MotionLab />
+							{:else if PRIMITIVE_DEMOS[item.slug]}
+								{@const Demo = PRIMITIVE_DEMOS[item.slug]}
+								<Demo />
 							{/if}
 							{/key}
 						</div>

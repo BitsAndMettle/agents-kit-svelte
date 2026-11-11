@@ -77,8 +77,12 @@ test('every single .svelte component in src/lib/ has a dedicated 1-to-1 showcase
 		relative(rootDir, f).replace(/\\/g, '/')
 	);
 
-	assert.equal(libSvelteFiles.length, 104, 'Expected 104 .svelte components in src/lib/');
-	assert.equal(CATALOG_ITEMS.length, 104, 'Expected 104 catalog items in CATALOG_ITEMS');
+	assert.equal(
+		CATALOG_ITEMS.length,
+		libSvelteFiles.length,
+		'Every .svelte component in src/lib/ needs exactly one catalogue entry'
+	);
+	assert.equal(new Set(CATALOG_ITEMS.map((item) => item.slug)).size, CATALOG_ITEMS.length, 'Catalogue slugs must be unique');
 
 	const catalogPaths = new Set(CATALOG_ITEMS.map((item) => item.sveltePath));
 	for (const relPath of libSvelteFiles) {
@@ -89,9 +93,14 @@ test('every single .svelte component in src/lib/ has a dedicated 1-to-1 showcase
 	}
 
 	const pageSource = readFileSync(join(rootDir, 'src', 'routes', '+page.svelte'), 'utf8');
+	const demosDir = join(rootDir, 'src', 'site', 'demos');
+	const demoSources = readdirSync(demosDir)
+		.filter((f) => f.startsWith('primitives-') && f.endsWith('.ts'))
+		.map((f) => readFileSync(join(demosDir, f), 'utf8'))
+		.join('\n');
 	for (const item of CATALOG_ITEMS) {
 		assert.ok(
-			pageSource.includes(`item.slug === '${item.slug}'`),
+			pageSource.includes(`item.slug === '${item.slug}'`) || demoSources.includes(`'${item.slug}':`),
 			`Catalog slug '${item.slug}' (${item.sveltePath}) is not rendered in src/routes/+page.svelte`
 		);
 		const lineCount = item.usageSnippet.trim().split('\n').length;
