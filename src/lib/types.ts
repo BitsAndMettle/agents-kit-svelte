@@ -504,7 +504,9 @@ export type DynamicUINodeType =
 	| 'github-pr-action-bar'
 	| 'github-pr-graph'
 	| 'github-checks-waterfall'
-	| 'agent-work-trace';
+	| 'agent-work-trace'
+	| 'fleet-status'
+	| 'action-receipt';
 
 export interface DynamicUINode {
 	id: string;
@@ -610,4 +612,72 @@ export interface WorkStep {
 	files?: string[];
 	/** Draws the step on a short branch off the main line, e.g. a test run inside an edit. */
 	nested?: boolean;
+}
+
+/** Whether a machine is reachable, shown by `FleetStatus`. */
+export type MachinePresence = 'online' | 'stale' | 'offline';
+
+/** What a unit of work on a machine is doing. */
+export type MachineWorkStatus = 'running' | 'reviewing' | 'waiting';
+
+/** One unit of work running on a machine in `FleetStatus`. */
+export interface MachineWork {
+	id: string;
+	label: string;
+	status?: MachineWorkStatus;
+}
+
+/** A safeguard or setting of a machine. `ok: false` shows as a warning chip. */
+export interface MachineFlag {
+	id: string;
+	label: string;
+	ok: boolean;
+}
+
+/** One machine that runs agent work, shown by `FleetStatus`. */
+export interface Machine {
+	id: string;
+	name: string;
+	presence: MachinePresence;
+	/** When the machine last reported in (ISO 8601). */
+	lastSeen?: string;
+	/** Work slots: how many are busy of how many exist. */
+	slots: { used: number; total: number };
+	/** What is running here. */
+	work?: MachineWork[];
+	/** Safeguards such as confinement or autostart. A flag with `ok: false` is a warning. */
+	flags?: MachineFlag[];
+	/** Marks the machine the operator agent lives on. */
+	holdsOperator?: boolean;
+	/** A short problem statement, shown in the warning colour. */
+	alert?: string;
+}
+
+/** How an action turned out, shown by `ActionReceipt`. */
+export type ActionOutcome = 'done' | 'refused' | 'pending' | 'undone';
+
+/** What an action was done to. */
+export interface ActionTarget {
+	label: string;
+	/** Makes the label a link. */
+	href?: string;
+	id?: string;
+}
+
+/** The run that proposed an action. */
+export interface ActionRun {
+	id: string;
+	label: string;
+}
+
+/** One `ActionReceipt` as data, e.g. for a list of them. */
+export interface ActionReceiptData {
+	id: string;
+	action: string;
+	target: ActionTarget;
+	outcome: ActionOutcome;
+	reason?: string;
+	actor?: string;
+	at?: string;
+	run?: ActionRun;
 }

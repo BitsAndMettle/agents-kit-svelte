@@ -1,4 +1,4 @@
-/** Multi-agent orchestration: orchestrator, routing hub, task queue, parallel and sequential workflows, evaluator, ops monitor and tool palette. */
+/** Multi-agent orchestration: orchestrator, fleet status, routing hub, task queue, parallel and sequential workflows, evaluator, ops monitor and tool palette. */
 
 export { default as AgentArtifact } from '../agents-ui/AgentArtifact.svelte';
 export { default as AgentEvaluator } from '../agents-ui/AgentEvaluator.svelte';
@@ -11,6 +11,8 @@ export { default as AgentSequentialWorkflow } from '../agents-ui/AgentSequential
 export { default as AgentTaskQueue } from '../agents-ui/AgentTaskQueue.svelte';
 export { default as AgentThinkingIndicator } from '../agents-ui/AgentThinkingIndicator.svelte';
 export { default as AgentToolPalette } from '../agents-ui/AgentToolPalette.svelte';
+export { default as FleetStatus } from '../agents-ui/FleetStatus.svelte';
+export { fleetSummary, relativeTime, slotSegments, workPreview } from '../agents-ui/fleet';
 
 export type * from '../types';
 

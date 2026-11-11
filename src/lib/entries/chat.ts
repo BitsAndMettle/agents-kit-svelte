@@ -1,10 +1,11 @@
-/** Conversation and coding-agent UI: messages, composer, activity, todos, tool approval and results, diffs, code, terminal, context meter, checkpoints and the chat workbench. */
+/** Conversation and coding-agent UI: messages, composer, activity, todos, tool approval and results, action receipts, diffs, code, terminal, context meter, checkpoints and the chat workbench. */
 
 export { default as AISidebar } from '../agents/AISidebar.svelte';
 export { default as AgentActivity } from '../agents/AgentActivity.svelte';
 export { default as AgentDisclosure } from '../agents/AgentDisclosure.svelte';
 export { default as AgentProgress } from '../agents/AgentProgress.svelte';
 export { default as AgentWorkTrace } from '../agents/AgentWorkTrace.svelte';
+export { default as ActionReceipt } from '../agents/ActionReceipt.svelte';
 export { default as ApprovalCard } from '../agents/ApprovalCard.svelte';
 export { default as Citations } from '../agents/Citations.svelte';
 export { default as CodeBlock } from '../agents/CodeBlock.svelte';

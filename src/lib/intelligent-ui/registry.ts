@@ -26,6 +26,8 @@ import GitHubPrActionBar from '../github/GitHubPrActionBar.svelte';
 import GitHubPullRequestGraph from '../github/GitHubPullRequestGraph.svelte';
 import GenerativeChart from '../charts/GenerativeChart.svelte';
 import ModelPhaseStream from '../charts/ModelPhaseStream.svelte';
+import FleetStatus from '../agents-ui/FleetStatus.svelte';
+import ActionReceipt from '../agents/ActionReceipt.svelte';
 import FeatureCard from '../charts/FeatureCard.svelte';
 import FeatureLineage from '../charts/FeatureLineage.svelte';
 import FeatureTimeline from '../charts/FeatureTimeline.svelte';
@@ -193,6 +195,25 @@ export const defaultUIRegistry: UIRegistry = {
 		props: (props, emit) => ({
 			...props,
 			onSelectFile: (path: string) => emit('open-file', path)
+		})
+	},
+	'fleet-status': {
+		component: FleetStatus,
+		required: ['machines'],
+		props: (props, emit) => ({
+			...props,
+			onSelectMachine: (machine: { id: string }) => emit('open-machine', machine.id),
+			onSelectWork: (work: { id: string }, machine: { id: string }) => emit('open-work', `${machine.id}:${work.id}`)
+		})
+	},
+	'action-receipt': {
+		component: ActionReceipt,
+		required: ['action', 'target', 'outcome'],
+		props: (props, emit) => ({
+			...props,
+			onOpenTarget: (target: { id?: string; label: string }) => emit('open-target', target.id ?? target.label),
+			onOpenRun: (run: { id: string }) => emit('open-run', run.id),
+			onUndo: (target: { id?: string; label: string }) => emit('undo', target.id ?? target.label)
 		})
 	},
 	'feature-card': {

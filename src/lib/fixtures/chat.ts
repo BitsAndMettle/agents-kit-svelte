@@ -3,7 +3,7 @@
  * Import from `agents-kit-svelte/fixtures`. Components never fall back to it.
  */
 
-import type { WorkStep } from '../types';
+import type { ActionReceiptData, WorkStep } from '../types';
 import type { SidebarResource } from '../agents/AISidebar.svelte';
 import type { SchemaParameterItem, SchemaPropertyItem } from '../ai-elements/SchemaDisplay.svelte';
 import type { PlanMilestone } from '../ai-elements/PlanCard.svelte';
@@ -321,4 +321,47 @@ export const SAMPLE_WORK_STEPS: WorkStep[] = [
 	{ id: 'w4', label: '12 e2e tests passed', kind: 'run', status: 'done', nested: true },
 	{ id: 'w5', label: 'Pushed 4a1c9e to #128', kind: 'push', status: 'done' },
 	{ id: 'w6', label: 'Fixed the checkout test', detail: 'Pushed 4a1c9e', kind: 'result', status: 'done' }
+];
+
+/** The time `SAMPLE_RECEIPTS` is read at. */
+export const SAMPLE_RECEIPTS_NOW = '2026-11-11T12:00:00Z';
+
+/** Sample receipts for `ActionReceipt`: three done (one with Undo) and a refused merge. */
+export const SAMPLE_RECEIPTS: ActionReceiptData[] = [
+	{
+		id: 'r1',
+		action: 'Re-offered',
+		target: { label: '#3398 Pairing copy', id: '3398' },
+		outcome: 'done',
+		actor: 'Operator',
+		at: '2026-11-11T11:56:00Z',
+		reason: 'Its runner went offline, so the card went back to the queue.'
+	},
+	{
+		id: 'r2',
+		action: 'Released',
+		target: { label: '#3431 Retry the export job', id: '3431' },
+		outcome: 'done',
+		actor: 'Operator',
+		at: '2026-11-11T11:40:00Z'
+	},
+	{
+		id: 'r3',
+		action: 'Parked',
+		target: { label: '#3412 Fix sign-in redirect', id: '3412' },
+		outcome: 'done',
+		actor: 'You',
+		at: '2026-11-11T11:59:00Z',
+		run: { id: 'run-88', label: 'Run 88' }
+	},
+	{
+		id: 'r4',
+		action: 'Merge',
+		target: { label: 'PR #212 Add retry to export', id: '212' },
+		outcome: 'refused',
+		reason: "merging is not on the operator's list",
+		actor: 'Operator',
+		at: '2026-11-11T11:30:00Z',
+		run: { id: 'run-85', label: 'Run 85' }
+	}
 ];

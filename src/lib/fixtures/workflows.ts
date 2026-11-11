@@ -2,6 +2,7 @@
  * Sample data for the workflow components (orchestration, evaluation, queues and
  * tools). Import from `agents-kit-svelte/fixtures`; components never fall back to it.
  */
+import type { Machine } from '../types';
 import type { ArtifactMetadata, ArtifactVersion } from '../agents-ui/AgentArtifact.svelte';
 import type { EvalIteration } from '../agents-ui/AgentEvaluator.svelte';
 import type { FormField } from '../agents-ui/AgentFormGenerator.svelte';
@@ -603,3 +604,51 @@ export const SAMPLE_ARTIFACT_METADATA: ArtifactMetadata = {
 	size: '2.4 KB',
 	schemaJson: SAMPLE_ARTIFACT_SCHEMA_JSON
 };
+
+/** The time `SAMPLE_MACHINES` is read at, for `FleetStatus`. */
+export const SAMPLE_FLEET_NOW = '2026-11-11T12:00:00Z';
+
+/** Sample data for `FleetStatus`: a busy devbox that holds the operator, an offline laptop, a stale mini PC. */
+export const SAMPLE_MACHINES: Machine[] = [
+	{
+		id: 'devbox',
+		name: 'devbox',
+		presence: 'online',
+		lastSeen: '2026-11-11T11:59:40Z',
+		slots: { used: 4, total: 6 },
+		holdsOperator: true,
+		flags: [
+			{ id: 'confined', label: 'Confined', ok: true },
+			{ id: 'autostart', label: 'Autostart', ok: true }
+		],
+		work: [
+			{ id: '3412', label: '#3412 Fix sign-in redirect', status: 'running' },
+			{ id: '3420', label: '#3420 Board empty state', status: 'running' },
+			{ id: '3398', label: '#3398 Pairing copy', status: 'reviewing' },
+			{ id: '3431', label: '#3431 Retry the export job', status: 'waiting' }
+		]
+	},
+	{
+		id: 'laptop',
+		name: 'laptop',
+		presence: 'offline',
+		lastSeen: '2026-11-11T09:00:00Z',
+		slots: { used: 0, total: 2 },
+		flags: [
+			{ id: 'confined', label: 'Confinement off', ok: false },
+			{ id: 'autostart', label: 'Autostart', ok: true }
+		],
+		alert: 'Offline for 3 hours. Its queued work waits.'
+	},
+	{
+		id: 'minipc',
+		name: 'mini PC',
+		presence: 'stale',
+		lastSeen: '2026-11-11T11:48:00Z',
+		slots: { used: 0, total: 2 },
+		flags: [
+			{ id: 'confined', label: 'Confined', ok: true },
+			{ id: 'autostart', label: 'Autostart', ok: false }
+		]
+	}
+];
