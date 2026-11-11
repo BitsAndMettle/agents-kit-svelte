@@ -30,8 +30,7 @@
 	import { AuthCard } from '../fields';
 	import { AuthSubmit, Cooldown, readText, type AuthSubmitHandler } from '../shared';
 	import type { TimeInput } from '../../core/time';
-	import { afterSuccess } from './result';
-
+	
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'title' | 'hidden' | 'onsubmit' | 'oninput' | 'method'> {
 		/** Called with the email. Without it the form posts natively to `action`. Return an `AuthResult` to show errors. */
 		onSubmit?: AuthSubmitHandler<{ email: string }, 'email'>;
@@ -118,22 +117,24 @@
 	let resendError = $state(false);
 	let resent = $state(false);
 	let heading = $state<HTMLElement | null>(null);
+	let resendButton = $state<HTMLElement | null>(null);
+
+	let lastEmail = '';
 
 	const submit = new AuthSubmit<{ email: string }, 'email'>({
-		handler: () => {
-			const handler = onSubmit;
-			if (!handler) return undefined;
-			return (values, context) =>
-				afterSuccess(handler(values, context), () => {
-					sentTo = values.email;
-					submitted = true;
-				});
+		handler: () => onSubmit,
+		read: (data) => {
+			lastEmail = readText(data, 'email');
+			return { email: lastEmail };
 		},
-		read: (data) => ({ email: readText(data, 'email') }),
 		pending: () => pending,
 		error: () => error,
 		errors: () => errors,
-		genericError: () => text.genericError
+		genericError: () => text.genericError,
+		onSuccess: () => {
+			sentTo = lastEmail;
+			submitted = true;
+		}
 	});
 
 	const cooldown = new Cooldown(() => resendAvailableAt);
@@ -146,6 +147,14 @@
 	$effect(() => {
 		const target = heading;
 		if (target) void tick().then(() => target.focus());
+	});
+
+	// While the wait runs the button stays focusable: aria-disabled, never `disabled`. Button sets that attribute
+	// itself only for loading, so it is set here.
+	$effect(() => {
+		if (!resendButton) return;
+		if (cooldown.active) resendButton.setAttribute('aria-disabled', 'true');
+		else resendButton.removeAttribute('aria-disabled');
 	});
 
 	async function resend(): Promise<void> {
@@ -177,7 +186,7 @@
 			<p role="status" class="m-0 text-center text-xs font-medium text-fg-main empty:hidden">{resent ? text.resent : ''}</p>
 			<div class="grid gap-2">
 				{#if onResend}
-					<Button variant="secondary" size="lg" loading={resending} disabled={cooldown.active} onclick={resend}>
+					<Button variant="secondary" size="lg" loading={resending} bind:ref={resendButton} class="aria-disabled:cursor-not-allowed aria-disabled:opacity-60" onclick={resend}>
 						{cooldown.active ? text.resendIn(cooldown.remaining) : text.resend}
 					</Button>
 				{/if}

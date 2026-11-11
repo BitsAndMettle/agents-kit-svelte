@@ -49,8 +49,7 @@
 	import { AuthCard, OtpInput } from '../fields';
 	import { BackupCodes, type BackupCodesProps } from '../account';
 	import { AuthSubmit, readText, type AuthSubmitHandler } from '../shared';
-	import { afterSuccess } from './result';
-	import { groupSecret, plainSecret } from './secret';
+		import { groupSecret, plainSecret } from './secret';
 	import { copyText } from './clipboard';
 
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'title' | 'hidden' | 'onsubmit' | 'oninput' | 'method'> {
@@ -169,20 +168,16 @@
 	const total = $derived(backupCodes?.length ? 3 : 2);
 	const subLevel = $derived(Math.min(6, headingLevel + 1) as 2 | 3 | 4 | 5 | 6);
 	const submit = new AuthSubmit<{ code: string }, 'code'>({
-		handler: () => {
-			const handler = onVerify;
-			if (!handler) return undefined;
-			return (values, context) =>
-				afterSuccess(handler(values, context), () => {
-					if (backupCodes?.length) step = 3;
-					else onComplete?.();
-				});
-		},
+		handler: () => onVerify,
 		read: (data) => ({ code: readText(data, 'code', false) }),
 		pending: () => pending,
 		error: () => error,
 		errors: () => errors,
-		genericError: () => text.genericError
+		genericError: () => text.genericError,
+		onSuccess: () => {
+			if (backupCodes?.length) step = 3;
+			else onComplete?.();
+		}
 	});
 
 	// A new step replaces the old one, so focus would be lost with it: move it to the new step's heading.

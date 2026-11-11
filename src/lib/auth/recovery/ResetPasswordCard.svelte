@@ -29,8 +29,7 @@
 	import { Field } from '../../primitives/form';
 	import { AuthCard, PasswordInput, type PasswordRule, type PasswordStrength } from '../fields';
 	import { AuthSubmit, readText, type AuthSubmitHandler } from '../shared';
-	import { afterSuccess } from './result';
-
+	
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'title' | 'hidden' | 'onsubmit' | 'oninput' | 'method'> {
 		/** Called with the new password. Without it the form posts natively to `action`. Return an `AuthResult` to show errors. */
 		onSubmit?: AuthSubmitHandler<{ password: string }, 'password' | 'confirmPassword'>;
@@ -129,16 +128,13 @@
 	let doneHeading = $state<HTMLElement | null>(null);
 
 	const submit = new AuthSubmit<{ password: string }, 'password' | 'confirmPassword'>({
-		handler: () => {
-			const handler = onSubmit;
-			if (!handler) return undefined;
-			return (values, context) => afterSuccess(handler(values, context), () => (submitted = true));
-		},
+		handler: () => onSubmit,
 		read: (data) => ({ password: readText(data, 'password', false) }),
 		pending: () => pending,
 		error: () => error,
 		errors: () => errors,
-		genericError: () => text.genericError
+		genericError: () => text.genericError,
+		onSuccess: () => (submitted = true)
 	});
 
 	const showDone = $derived(done || submitted);

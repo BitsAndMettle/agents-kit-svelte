@@ -73,9 +73,9 @@ test.describe('ForgotPasswordCard', () => {
 		await section.locator('input[name=email]').fill('ada@example.com');
 		await press(page, 'Enter');
 		const wait = section.getByRole('button', { name: /^Resend in \d+s$/ });
-		await expect(wait).toBeDisabled();
+		await expect(wait).toHaveAttribute('aria-disabled', 'true');
 		const resend = section.getByRole('button', { name: 'Resend email' });
-		await expect(resend).toBeEnabled({ timeout: 9000 });
+		await expect(resend).not.toHaveAttribute('aria-disabled', 'true', { timeout: 9000 });
 		await resend.focus();
 		await press(page, 'Enter');
 		await expect(section.getByRole('button', { name: /Resend/ })).toHaveAttribute('aria-busy', 'true');
