@@ -21,6 +21,16 @@
  * Attribute order rule: spread `rest` FIRST and the part LAST, so the part's ids and
  * aria-* win.
  *
+ * Ids: a part sets `id` only on an element whose identity it owns: layer content, title,
+ * description, and ListNav items (whose id `aria-activedescendant` points at). Trigger and
+ * anchor parts NEVER set an id, so a trigger can sit on a ListNav item (a submenu trigger
+ * is a menu item; a combobox input is an anchor) without one id overwriting the other.
+ * Behaviour that needs the trigger or anchor uses the element its attachment received;
+ * native anchoring marks the anchor with a script-written `data-ak-anchor` token. A
+ * pattern that must reference a trigger by id (a menu's `aria-labelledby`) reads the id
+ * from whoever owns that element (the ListNav item id), or sets one itself when the
+ * trigger is its own and is not a nav item.
+ *
  * Other invariants (enforced by the internal `part()` builder and its callers):
  * - the attachment function is identity-stable for the life of the behaviour (per item
  *   value for item parts), so re-spreading on every state change never re-runs it;
