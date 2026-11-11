@@ -5,6 +5,3 @@ test-results/
 playwright-report/
 dist/
 *.tgz
-
-playwright-report/
-test-results/
