@@ -14,7 +14,7 @@
 		{#snippet footer()}Updated 2 hours ago{/snippet}
 	</Card>
 	<Card title="Open the board" description="The whole card is a link" href="#card">
-		One tab stop, click anywhere, and <a href="#card-inner">a link in the body</a> still works.
+		<span id="card-inner">One tab stop, click anywhere, and <a href="#card-inner">a link in the body</a> still works.</span>
 	</Card>
 	<Card title="Open settings" description="The whole card is a button" onSelect={() => (opened += 1)}>
 		Opened {opened} times.

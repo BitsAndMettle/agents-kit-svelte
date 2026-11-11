@@ -43,7 +43,7 @@ test.describe('DropdownMenu', () => {
 			await expect(trigger).toBeFocused();
 		}
 		// The destructive row carries the danger tone.
-		await expect(section.getByRole('menuitem', { name: 'Delete' })).toHaveClass(/text-status-danger/);
+		await expect(section.getByRole('menuitem', { name: 'Delete', includeHidden: true })).toHaveClass(/text-status-danger/);
 	});
 
 	test('choosing an item closes the menu, runs it and returns focus to the trigger', async ({ page }) => {
