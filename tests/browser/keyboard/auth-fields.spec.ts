@@ -136,6 +136,22 @@ test.describe('PasswordInput', () => {
 	});
 });
 
+/** Records the value carried by every input event that reaches the form. */
+const watchFormInput = (input: Locator) =>
+	input.evaluate((el: HTMLInputElement) => {
+		const w = window as unknown as { __seen: string[] };
+		w.__seen = [];
+		el.form!.addEventListener('input', (e) => w.__seen.push((e.target as HTMLInputElement).value));
+	});
+const seenFormInput = (page: Page) => page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);
+
+/** Sets the selection, then inserts text the way an IME commit, drop or autofill does (a cancelable insertText). */
+async function insertAt(page: Page, input: Locator, start: number, end: number, text: string): Promise<void> {
+	await input.focus();
+	await input.evaluate((el: HTMLInputElement, [s, e]) => el.setSelectionRange(s, e), [start, end]);
+	await page.keyboard.insertText(text);
+}
+
 const paste = (input: Locator, text: string) =>
 	input.evaluate((el, value) => {
 		const data = new DataTransfer();
@@ -238,47 +254,55 @@ test.describe('OtpInput', () => {
 		await expect(code).toHaveAttribute('aria-invalid', 'true');
 		await code.focus();
 		await press(page, 'Control+a', 'Backspace');
-		await code.evaluate((el: HTMLInputElement) => {
-			const w = window as unknown as { __seen: string[] };
-			w.__seen = [];
-			el.form!.addEventListener('input', (e) => w.__seen.push((e.target as HTMLInputElement).value));
-		});
+		await watchFormInput(code);
 		await paste(code, '123 456');
 		await expect(code).toHaveValue('123456');
-		expect(await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen)).toContain('123456');
+		expect(await seenFormInput(page)).toContain('123456');
 		await expect(code).not.toHaveAttribute('aria-invalid');
 	});
 
-	test('text typed during an IME composition is left alone until it ends', async ({ page }) => {
+	test('during a composition the input is left alone, the cells show the cleaned text, and compositionend commits it', async ({ page }) => {
 		const section = await openSection(page, 'otp-input');
 		const code = section.locator('input[name=code]');
+		const cells = section.locator('[data-otp-cell]');
 		await code.focus();
-		const result = await code.evaluate((el: HTMLInputElement) => {
+		await code.evaluate((el: HTMLInputElement) => {
 			el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
 			el.value = '１２';
 			el.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true, data: '１２' }));
-			const during = el.value;
-			el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '１２' }));
-			return { during, after: el.value };
 		});
-		expect(result.during).toBe('１２');
-		expect(result.after).toBe('12');
-		await expect(section.locator('[data-otp-cell]').nth(1)).toHaveText('2');
+		await expect(cells.nth(0)).toHaveText('1');
+		await expect(cells.nth(1)).toHaveText('2');
+		await expect(code).toHaveValue('１２');
+		await code.evaluate((el: HTMLInputElement) => el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '１２' })));
+		await expect(code).toHaveValue('12');
+		await expect(cells.nth(1)).toHaveText('2');
 	});
 
-	test('a real IME composition of plain ASCII is committed at compositionend', async ({ page }) => {
+	test('a real IME composition shows its text in the cells while open, and commits it at the end', async ({ page }) => {
 		const section = await openSection(page, 'otp-input');
 		const code = section.locator('input[name=code]');
+		const cells = section.locator('[data-otp-cell]');
 		await code.focus();
 		const cdp = await page.context().newCDPSession(page);
+		await cdp.send('Input.imeSetComposition', { text: '123', selectionStart: 3, selectionEnd: 3 });
+		await expect(cells.nth(0)).toHaveText('1');
+		await expect(cells.nth(1)).toHaveText('2');
+		await expect(cells.nth(2)).toHaveText('3');
+		await expect(cells.nth(3)).toHaveText('');
 		await cdp.send('Input.imeSetComposition', { text: '123456', selectionStart: 6, selectionEnd: 6 });
+		await expect(cells.nth(5)).toHaveText('6');
+		// Still composing: nothing is committed, so the code is not complete yet.
+		await expect(section.getByText('Type a code to see it complete.')).toBeVisible();
 		await cdp.send('Input.insertText', { text: '123456' });
 		await expect(code).toHaveValue('123456');
-		await expect(section.locator('[data-otp-cell]').nth(5)).toHaveText('6');
+		await expect(cells.nth(5)).toHaveText('6');
 		await expect(section.getByText('Complete: 123456')).toBeVisible();
 		const backup = section.locator('input[name=backup]');
 		await backup.focus();
 		await cdp.send('Input.imeSetComposition', { text: 'ab12cd34', selectionStart: 8, selectionEnd: 8 });
+		await expect(cells.nth(13)).toHaveText('4');
+		await expect(sent(section)).toHaveText('');
 		await cdp.send('Input.insertText', { text: 'ab12cd34' });
 		await expect(sent(section)).toContainText('backup=ab12cd34');
 	});
@@ -291,11 +315,54 @@ test.describe('OtpInput', () => {
 		await page.keyboard.type('9');
 		await expect(code).toHaveValue('129456');
 		await expect(section.locator('[data-otp-cell]').nth(5)).toHaveText('6');
+		await code.evaluate((el: HTMLInputElement) => el.setSelectionRange(5, 5));
+		await page.keyboard.type('7');
+		await expect(code).toHaveValue('129457');
+		await page.keyboard.type('8');
+		await expect(code).toHaveValue('129457');
 	});
 
-	test('a native label names the input; the fallback name only applies without one', async ({ page }) => {
+	test('a selection replaced by inserted text: the whole code by longer or shorter text, one cell by several', async ({ page }) => {
 		const section = await openSection(page, 'otp-input');
-		await expect(section.locator('input[name=native]')).toHaveAccessibleName('Code from your authenticator app');
+		const code = section.locator('input[name=code]');
+		await code.fill('123456');
+		await insertAt(page, code, 0, 6, '6543210');
+		await expect(code).toHaveValue('654321');
+		await insertAt(page, code, 0, 6, '78');
+		await expect(code).toHaveValue('78');
+		await code.fill('123456');
+		await insertAt(page, code, 2, 3, '999');
+		await expect(code).toHaveValue('129994');
+		expect(await code.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([5, 5]);
+		await insertAt(page, code, 1, 4, '-');
+		await expect(code).toHaveValue('129994');
+		await insertAt(page, code, 0, 6, '１２ ３');
+		await expect(code).toHaveValue('123');
+	});
+
+	test('typed and inserted text tell the form with an input event carrying the new value', async ({ page }) => {
+		const section = await openSection(page, 'otp-input');
+		const code = section.locator('input[name=code]');
+		await code.focus();
+		await watchFormInput(code);
+		await page.keyboard.type('12');
+		await page.keyboard.insertText('3 4');
+		await expect(code).toHaveValue('1234');
+		expect(await seenFormInput(page)).toEqual(expect.arrayContaining(['1', '12', '1234']));
+	});
+
+	test('a native label or a Field names the input, and no aria-label is added on the server render or after hydration', async ({ page }) => {
+		const html = await (await page.request.get('/')).text();
+		for (const name of ['native', 'code', 'backup']) {
+			const tag = html.match(new RegExp(`<input[^>]*name="${name}"[^>]*>`))?.[0];
+			expect(tag, name).toBeTruthy();
+			expect(tag, name).not.toContain('aria-label=');
+		}
+		const section = await openSection(page, 'otp-input');
+		const native = section.locator('input[name=native]');
+		await expect(native).toHaveAccessibleName('Code from your authenticator app');
+		await expect(native).not.toHaveAttribute('aria-label');
+		await expect(section.locator('input[name=code]')).not.toHaveAttribute('aria-label');
 	});
 
 	test('autoSubmit fires once per fill, and an edit while full does not submit again', async ({ page }) => {
@@ -387,13 +454,20 @@ test.describe('OtpInput', () => {
 		await expect(sent(section)).toHaveText('Sent: code=246810, backup=ab12cd34, saved=123456, loaded=123456, native=');
 	});
 
-	test('reset restores the empty value and clears the cells', async ({ page }) => {
+	test('reset restores the starting values and redraws the cells', async ({ page }) => {
 		const section = await openSection(page, 'otp-input');
 		const code = section.locator('input[name=code]');
+		const saved = section.locator('input[name=saved]');
+		const cells = section.locator('[data-otp-cell]');
 		await code.fill('123456');
+		await insertAt(page, saved, 0, 6, '987');
+		await expect(saved).toHaveValue('987');
 		await reset(section);
 		await expect(code).toHaveValue('');
-		await expect(section.locator('[data-otp-cell]').first()).toHaveText('');
+		await expect(cells.first()).toHaveText('');
+		await expect(saved).toHaveValue('123456');
+		await expect(cells.nth(14)).toHaveText('1');
+		await expect(cells.nth(19)).toHaveText('6');
 	});
 });
 

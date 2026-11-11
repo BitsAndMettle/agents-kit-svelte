@@ -3,18 +3,13 @@
 	import type { HTMLInputAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
 	import { fieldControlAttrs, getFieldContext, type FormControlSize } from '../../primitives/form';
-	import { activeCells, caretForClick, normalizeCode, startsGroup } from './otp';
+	import { activeCells, applyEdit, caretForClick, normalizeCode, startsGroup } from './otp';
 
 	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'size' | 'value' | 'defaultValue' | 'type' | 'maxlength' | 'minlength' | 'pattern' | 'inputmode'> {
 		/** The code as typed. Bindable. */
 		value?: string;
 		/** Starting value when `value` is not given, and what a form reset restores. */
 		defaultValue?: string;
-		/**
-		 * Fallback accessible name when no `Field`, native `<label for>`, `aria-label` or `aria-labelledby` names the input.
-		 * A recorded deviation from the no-label-prop rule: the input has no visible text of its own, so an unnamed one would be unusable.
-		 */
-		codeLabel?: string;
 		/** Number of characters, and of cells drawn. */
 		length?: number;
 		/** Cells per visual group, for a wider gap in the middle (3 gives 3 + 3). 0 means no groups. */
@@ -44,7 +39,6 @@
 		groupSize = 0,
 		alphanumeric = false,
 		name = 'code',
-		codeLabel = 'One-time code',
 		size = 'md',
 		invalid = false,
 		onValueChange,
@@ -64,6 +58,10 @@
 	const control = $derived(fieldControlAttrs(field, { id, describedBy, invalid, required: Boolean(required), disabled: Boolean(disabled) }));
 
 	let focused = $state(false);
+	/** True while an IME composition is open: the input then holds raw composed text we must not rewrite. */
+	let composing = $state(false);
+	/** The cleaned composed text, drawn in the cells while composing so typed characters are visible. */
+	let composed = $state('');
 	let start = $state(0);
 	let end = $state(0);
 	/** Whether the code was full at the last edit, so completion fires once per fill and never on mount. */
@@ -78,17 +76,10 @@
 		wasFull = length > 0 && clean.length >= length;
 	});
 
-	const chars = $derived(Array.from({ length }, (_, i) => clean[i] ?? ''));
+	const shown = $derived(composing ? composed : clean);
+	const chars = $derived(Array.from({ length }, (_, i) => shown[i] ?? ''));
 	const active = $derived(focused && !control.disabled ? activeCells(start, end, length) : Array<boolean>(length).fill(false));
 	const pattern = $derived(`[${alphanumeric ? '0-9A-Za-z' : '0-9'}]{${length}}`);
-
-	/** A group Field has no `for` label to name the input, so it needs its own name like a standalone one. */
-	const needsName = $derived(!field || field.group);
-	/** A native `<label for>` names the input already, and `aria-label` would override it (WCAG 2.5.3), so the fallback steps aside. */
-	let hasNativeLabel = $state(false);
-	$effect(() => {
-		hasNativeLabel = (ref?.labels?.length ?? 0) > 0;
-	});
 
 	const CELLS: Record<FormControlSize, string> = {
 		sm: 'h-9 w-8 text-base',
@@ -132,63 +123,79 @@
 		}
 	}
 
-	/**
-	 * Cleans the text the input holds. When the code is already full and an insert would push it past
-	 * `length`, the typed characters overwrite the ones after the caret (as a full code expects), so
-	 * nothing is dropped from the end without the person seeing it.
-	 */
-	function cleanEdit(raw: string, caretRaw: number): { next: string; caret: number } {
-		const all = normalizeCode(raw, Number.MAX_SAFE_INTEGER, alphanumeric);
-		const caretAll = normalizeCode(raw.slice(0, caretRaw), Number.MAX_SAFE_INTEGER, alphanumeric).length;
-		const previous = clean;
-		if (all.length > length && previous.length >= length && all.length > previous.length) {
-			const inserted = all.length - previous.length;
-			const at = Math.max(0, caretAll - inserted);
-			const typed = all.slice(at, at + inserted);
-			const next = (previous.slice(0, at) + typed + previous.slice(at + typed.length)).slice(0, length);
-			return { next, caret: Math.min(at + typed.length, length) };
-		}
-		const next = all.slice(0, length);
-		return { next, caret: Math.min(caretAll, next.length) };
+	/** Insert types the browser lets us cancel and place ourselves. Deletions stay native. */
+	const INSERT_TYPES = new Set(['insertText', 'insertFromPaste', 'insertFromDrop', 'insertReplacementText', 'insertFromYank']);
+
+	/** Tells the form about an edit we placed ourselves (no native input event came), so `AuthSubmit` and Field errors react. */
+	function announceInput(input: HTMLInputElement, inputType: string, data: string): void {
+		input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType, data }));
 	}
 
-	/** Cleans what the input holds now. Not while an IME composition is open: rewriting would break it (compositionend commits). */
+	/** Places `text` at the current selection through `applyEdit`, the one edit rule. */
+	function insert(input: HTMLInputElement, text: string, inputType: string): void {
+		const prev = input.value;
+		const from = input.selectionStart ?? prev.length;
+		const to = input.selectionEnd ?? from;
+		const { value: next, caret } = applyEdit(prev, from, to, text, length, alphanumeric);
+		commit(next, caret);
+		if (next !== prev) announceInput(input, inputType, text);
+	}
+
+	/** Every cancelable insert is placed by `applyEdit`, so a full code, a selection and separators all behave the same way. */
+	function handleBeforeInput(event: InputEvent & { currentTarget: HTMLInputElement }): void {
+		(rest.onbeforeinput as ((e: InputEvent) => void) | undefined)?.(event);
+		if (event.defaultPrevented || !event.cancelable || composing || event.isComposing || !INSERT_TYPES.has(event.inputType)) return;
+		const text = event.data ?? (event.dataTransfer ? event.dataTransfer.getData('text/plain') || event.dataTransfer.getData('text') : null);
+		// No text to read (a drop of something else): let the browser insert it, and the input handler cleans it.
+		if (!text) return;
+		event.preventDefault();
+		insert(event.currentTarget, text, event.inputType);
+	}
+
+	/**
+	 * Deletions, and inserts the browser would not let us cancel (some autofill), land here: the text is
+	 * cleaned and cut to length. While an IME composition is open the input is left alone (rewriting it
+	 * would break the composition) and the cells draw the cleaned composed text instead.
+	 */
 	function handleInput(event: Event & { currentTarget: HTMLInputElement }): void {
-		if ((event as unknown as InputEvent).isComposing) {
-			(rest.oninput as ((e: Event) => void) | undefined)?.(event);
-			return;
-		}
 		const input = event.currentTarget;
 		const raw = input.value;
-		const { next, caret } = cleanEdit(raw, input.selectionStart ?? raw.length);
-		commit(next, caret);
+		if (composing || (event as unknown as InputEvent).isComposing) {
+			composed = normalizeCode(raw, length, alphanumeric);
+			readSelection();
+		} else {
+			const next = normalizeCode(raw, length, alphanumeric);
+			const caret = normalizeCode(raw.slice(0, input.selectionStart ?? raw.length), length, alphanumeric).length;
+			commit(next, Math.min(caret, next.length));
+		}
 		(rest.oninput as ((e: Event) => void) | undefined)?.(event);
 	}
 
-	/** The composed text was never committed (input events during composition are skipped), so always commit it here, clean or not. */
-	function handleCompositionEnd(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
-		(rest.oncompositionend as ((e: CompositionEvent) => void) | undefined)?.(event);
-		const input = event.currentTarget;
-		const raw = input.value;
-		const { next, caret } = cleanEdit(raw, input.selectionStart ?? raw.length);
-		commit(next, caret);
+	function handleCompositionStart(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
+		composed = clean;
+		composing = true;
+		(rest.oncompositionstart as ((e: CompositionEvent) => void) | undefined)?.(event);
 	}
 
-	/** The browser would cut a pasted "123 456" at the length before we could clean it, so we place the text ourselves. */
+	/** Input events during the composition were not committed, so commit the cleaned text here always, even when it is already clean. */
+	function handleCompositionEnd(event: CompositionEvent & { currentTarget: HTMLInputElement }): void {
+		composing = false;
+		const input = event.currentTarget;
+		const raw = input.value;
+		const next = normalizeCode(raw, length, alphanumeric);
+		const caret = normalizeCode(raw.slice(0, input.selectionStart ?? raw.length), length, alphanumeric).length;
+		commit(next, Math.min(caret, next.length));
+		(rest.oncompositionend as ((e: CompositionEvent) => void) | undefined)?.(event);
+	}
+
+	/** A paste event lets us place the text before any browser cut; it goes through the same `applyEdit` as every insert. */
 	function handlePaste(event: ClipboardEvent & { currentTarget: HTMLInputElement }): void {
 		(rest.onpaste as ((e: ClipboardEvent) => void) | undefined)?.(event);
 		if (event.defaultPrevented) return;
-		const text = event.clipboardData?.getData('text');
-		if (text === undefined || text === '') return;
+		const text = event.clipboardData?.getData('text/plain') || event.clipboardData?.getData('text');
+		if (!text) return;
 		event.preventDefault();
-		const input = event.currentTarget;
-		const from = input.selectionStart ?? input.value.length;
-		const to = input.selectionEnd ?? from;
-		const pasted = normalizeCode(text, length, alphanumeric);
-		const next = normalizeCode(input.value.slice(0, from) + pasted + input.value.slice(to), length, alphanumeric);
-		commit(next, Math.min(from + pasted.length, next.length));
-		// We placed the text ourselves, so no native input event came: tell the form (it clears a field error on input).
-		input.dispatchEvent(new Event('input', { bubbles: true }));
+		insert(event.currentTarget, text, 'insertFromPaste');
 	}
 
 	/** A click goes to the clicked cell (never past the end of the text), as the cells are what the person sees. */
@@ -251,14 +258,15 @@
 		defaultValue={cleanDefault ?? initialValue}
 		{name}
 		{autocomplete}
-		aria-label={rest['aria-label'] ?? (needsName && rest['aria-labelledby'] === undefined && !hasNativeLabel ? codeLabel : undefined)}
 		type="text"
 		inputmode={alphanumeric ? 'text' : 'numeric'}
 		{pattern}
 		autocapitalize="off"
 		autocorrect="off"
 		spellcheck="false"
+		onbeforeinput={handleBeforeInput}
 		oninput={handleInput}
+		oncompositionstart={handleCompositionStart}
 		oncompositionend={handleCompositionEnd}
 		onpaste={handlePaste}
 		onmousedown={handleMouseDown}
