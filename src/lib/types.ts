@@ -87,6 +87,34 @@ export interface CitationItem {
 	url?: string;
 }
 
+/** Device kinds `DeviceApprovalCard` can show an icon for. */
+export type DeviceKind = 'phone' | 'tablet' | 'laptop' | 'desktop' | 'browser';
+
+/** The device asking for approval in `DeviceApprovalCard`. */
+export interface DeviceApprovalDevice {
+	name: string;
+	kind?: DeviceKind;
+	platform?: string;
+	location?: string;
+}
+
+export type DeviceApprovalStatus = 'pending' | 'approving' | 'approved' | 'denied' | 'expired';
+
+/** Whether a quoted source was checked against the real text. */
+export type CitedSourceCheck = 'verified' | 'unverified' | 'mismatch';
+
+/** One source behind a `CitedAnswer`: the quote, where it is, and its check state. */
+export interface CitedSource {
+	id: string;
+	title: string;
+	quote: string;
+	href?: string;
+	location?: string;
+	check: CitedSourceCheck;
+}
+
+export type CitedAnswerStatus = 'draft' | 'sent' | 'withheld';
+
 export interface ApprovalQuestionOption {
 	id: string;
 	label: string;
@@ -504,7 +532,17 @@ export type DynamicUINodeType =
 	| 'github-pr-action-bar'
 	| 'github-pr-graph'
 	| 'github-checks-waterfall'
-	| 'agent-work-trace';
+	| 'agent-work-trace'
+	| 'metric-tiles'
+	| 'presence-banner'
+	| 'fleet-status'
+	| 'action-receipt'
+	| 'blocked-work-list'
+	| 'feature-proposal'
+	| 'level-dial'
+	| 'risk-toggle'
+	| 'device-approval'
+	| 'cited-answer';
 
 export interface DynamicUINode {
 	id: string;
@@ -610,4 +648,83 @@ export interface WorkStep {
 	files?: string[];
 	/** Draws the step on a short branch off the main line, e.g. a test run inside an edit. */
 	nested?: boolean;
+}
+
+/** Whether something the person depends on is reachable, for `PresenceBanner`. */
+export type PresenceState = 'online' | 'stale' | 'offline' | 'reconnecting';
+
+/** The one action a `PresenceBanner` offers, e.g. "Move" or "Retry". */
+export interface PresenceAction {
+	label: string;
+	onAction: () => void;
+}
+
+/** Whether a machine is reachable, shown by `FleetStatus`. */
+export type MachinePresence = 'online' | 'stale' | 'offline';
+
+/** What a unit of work on a machine is doing. */
+export type MachineWorkStatus = 'running' | 'reviewing' | 'waiting';
+
+/** One unit of work running on a machine in `FleetStatus`. */
+export interface MachineWork {
+	id: string;
+	label: string;
+	status?: MachineWorkStatus;
+}
+
+/** A safeguard or setting of a machine. `ok: false` shows as a warning chip. */
+export interface MachineFlag {
+	id: string;
+	label: string;
+	ok: boolean;
+}
+
+/** One machine that runs agent work, shown by `FleetStatus`. */
+export interface Machine {
+	id: string;
+	name: string;
+	presence: MachinePresence;
+	/** When the machine last reported in (ISO 8601). */
+	lastSeen?: string;
+	/** Work slots: how many are busy of how many exist. */
+	slots: { used: number; total: number };
+	/** What is running here. */
+	work?: MachineWork[];
+	/** Safeguards such as confinement or autostart. A flag with `ok: false` is a warning. */
+	flags?: MachineFlag[];
+	/** A short label next to the name, e.g. "Operator" for the machine an agent lives on. */
+	badge?: string;
+	/** A short problem statement, shown in the warning colour. */
+	alert?: string;
+}
+
+/** How an action turned out, shown by `ActionReceipt`. */
+export type ActionOutcome = 'done' | 'refused' | 'pending' | 'undone';
+
+/** What an action was done to. */
+export interface ActionTarget {
+	label: string;
+	/** Makes the label a link. */
+	href?: string;
+	id?: string;
+}
+
+/** The run that proposed an action. */
+export interface ActionRun {
+	id: string;
+	label: string;
+}
+
+/** One `ActionReceipt` as data, e.g. for a list of them. */
+export interface ActionReceiptData {
+	id: string;
+	action: string;
+	target: ActionTarget;
+	outcome: ActionOutcome;
+	reason?: string;
+	actor?: string;
+	at?: string;
+	run?: ActionRun;
+	/** Whether Undo is offered while the outcome is `done`. */
+	undoable?: boolean;
 }

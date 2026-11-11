@@ -3,6 +3,8 @@ import AgentActivity from '../agents/AgentActivity.svelte';
 import ApprovalCard from '../agents/ApprovalCard.svelte';
 import CodeBlock from '../agents/CodeBlock.svelte';
 import FileDiff from '../agents/FileDiff.svelte';
+import LevelDial from '../agents/LevelDial.svelte';
+import RiskToggle from '../agents/RiskToggle.svelte';
 import TodoList from '../agents/TodoList.svelte';
 import ToolApproval from '../agents/ToolApproval.svelte';
 import ToolResult from '../agents/ToolResult.svelte';
@@ -21,12 +23,20 @@ import GitHubPullRequestCard from '../github/GitHubPullRequestCard.svelte';
 import AgentGenerativeSurface from './AgentGenerativeSurface.svelte';
 import AgentHandoffGantt from '../charts/AgentHandoffGantt.svelte';
 import AgentWorkTrace from '../agents/AgentWorkTrace.svelte';
+import CitedAnswer from '../agents/CitedAnswer.svelte';
+import DeviceApprovalCard from '../agents/DeviceApprovalCard.svelte';
 import GitHubChecksWaterfall from '../github/GitHubChecksWaterfall.svelte';
 import GitHubPrActionBar from '../github/GitHubPrActionBar.svelte';
 import GitHubPullRequestGraph from '../github/GitHubPullRequestGraph.svelte';
 import GenerativeChart from '../charts/GenerativeChart.svelte';
 import ModelPhaseStream from '../charts/ModelPhaseStream.svelte';
+import FleetStatus from '../agents-ui/FleetStatus.svelte';
+import ActionReceipt from '../agents/ActionReceipt.svelte';
 import FeatureCard from '../charts/FeatureCard.svelte';
+import MetricTiles from '../charts/MetricTiles.svelte';
+import PresenceBanner from '../agents/PresenceBanner.svelte';
+import FeatureProposalCard from '../charts/FeatureProposalCard.svelte';
+import BlockedWorkList from '../agents-ui/BlockedWorkList.svelte';
 import FeatureLineage from '../charts/FeatureLineage.svelte';
 import FeatureTimeline from '../charts/FeatureTimeline.svelte';
 import RunReplayScrubber from '../charts/RunReplayScrubber.svelte';
@@ -98,6 +108,24 @@ export const defaultUIRegistry: UIRegistry = {
 		props: (props, emit) => ({
 			...props,
 			onSubmit: (answers: unknown) => emit('submit', JSON.stringify(answers))
+		})
+	},
+	'level-dial': {
+		component: LevelDial,
+		required: ['levels', 'value'],
+		props: (props, emit) => ({
+			...props,
+			onChange: (levelId: string, detail: { direction: string }) =>
+				emit(detail.direction === 'up' ? 'raise-level' : 'lower-level', levelId)
+		})
+	},
+	'risk-toggle': {
+		component: RiskToggle,
+		required: ['label', 'checked', 'risk'],
+		props: (props, emit) => ({
+			...props,
+			onChange: (next: boolean, detail: { acknowledged: boolean }) =>
+				emit(next ? 'turn-on' : 'turn-off', JSON.stringify({ acknowledged: detail.acknowledged }))
 		})
 	},
 	'github-issue-card': {
@@ -195,6 +223,65 @@ export const defaultUIRegistry: UIRegistry = {
 			onSelectFile: (path: string) => emit('open-file', path)
 		})
 	},
+	'metric-tiles': {
+		component: MetricTiles,
+		required: ['metrics'],
+		props: (props, emit) => ({
+			...props,
+			onSelect: (metric: { id: string }) => emit('select-metric', metric.id)
+		})
+	},
+	'presence-banner': {
+		component: PresenceBanner,
+		required: ['state', 'subject'],
+		props: (props, emit) => {
+			const action = props.action as { label?: string } | undefined;
+			return {
+				...props,
+				action: action?.label ? { label: action.label, onAction: () => emit('presence-action', action.label) } : undefined,
+				onDismiss: () => emit('dismiss')
+			};
+		}
+	},
+	'fleet-status': {
+		component: FleetStatus,
+		required: ['machines'],
+		props: (props, emit) => ({
+			...props,
+			onSelectMachine: (machine: { id: string }) => emit('open-machine', machine.id),
+			onSelectWork: (work: { id: string }, machine: { id: string }) => emit('open-work', JSON.stringify({ machineId: machine.id, workId: work.id }))
+		})
+	},
+	'action-receipt': {
+		component: ActionReceipt,
+		required: ['action', 'target', 'outcome'],
+		props: (props, emit) => ({
+			...props,
+			onOpenTarget: (target: { id?: string; label: string }) => emit('open-target', target.id ?? target.label),
+			onOpenRun: (run: { id: string }) => emit('open-run', run.id),
+			// Undo only for actions the agent says it can reverse; a merge, for one, cannot be.
+			onUndo: props.undoable === true ? (target: { id?: string; label: string }) => emit('undo', target.id ?? target.label) : undefined
+		})
+	},
+	'device-approval': {
+		component: DeviceApprovalCard,
+		required: ['device', 'code', 'requestedAt'],
+		props: (props, emit) => ({
+			...props,
+			onApprove: () => emit('approve-device'),
+			onDeny: () => emit('deny-device')
+		})
+	},
+	'cited-answer': {
+		component: CitedAnswer,
+		required: ['question', 'answer', 'sources'],
+		props: (props, emit) => ({
+			...props,
+			onOpenSource: (source: { id: string }) => emit('open-source', source.id),
+			onSend: () => emit('send-answer'),
+			onEdit: () => emit('edit-answer')
+		})
+	},
 	'feature-card': {
 		component: FeatureCard,
 		required: ['feature'],
@@ -202,6 +289,25 @@ export const defaultUIRegistry: UIRegistry = {
 			...props,
 			onOpen: (feature: { id: string }) => emit('open-feature', feature.id),
 			onSelectCards: (state: string) => emit('select-cards', state)
+		})
+	},
+	'feature-proposal': {
+		component: FeatureProposalCard,
+		required: ['title', 'cards'],
+		props: (props, emit) => ({
+			...props,
+			// The whole edited proposal goes back, so renamed and removed cards reach the agent.
+			onApprove: (proposal: unknown) => emit('approve-proposal', JSON.stringify(proposal)),
+			onRevise: (note: string, proposal: unknown) => emit('revise-proposal', JSON.stringify({ note, proposal })),
+			onDecline: () => emit('decline-proposal')
+		})
+	},
+	'blocked-work-list': {
+		component: BlockedWorkList,
+		required: ['items'],
+		props: (props, emit) => ({
+			...props,
+			onAction: (item: { id: string }, action: { id: string }) => emit('blocked-work-action', JSON.stringify({ itemId: item.id, actionId: action.id }))
 		})
 	},
 	'feature-lineage': {

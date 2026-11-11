@@ -3,7 +3,8 @@
  * Import from `agents-kit-svelte/fixtures`. Components never fall back to it.
  */
 
-import type { WorkStep } from '../types';
+import type { ActionReceiptData, CitedSource, DeviceApprovalDevice, WorkStep } from '../types';
+import type { AutonomyLevel } from '../agents/level-dial';
 import type { SidebarResource } from '../agents/AISidebar.svelte';
 import type { SchemaParameterItem, SchemaPropertyItem } from '../ai-elements/SchemaDisplay.svelte';
 import type { PlanMilestone } from '../ai-elements/PlanCard.svelte';
@@ -322,3 +323,170 @@ export const SAMPLE_WORK_STEPS: WorkStep[] = [
 	{ id: 'w5', label: 'Pushed 4a1c9e to #128', kind: 'push', status: 'done' },
 	{ id: 'w6', label: 'Fixed the checkout test', detail: 'Pushed 4a1c9e', kind: 'result', status: 'done' }
 ];
+
+/** The moment the sample presence banners are drawn at. */
+export const SAMPLE_PRESENCE_NOW = '2026-11-11T02:22:00Z';
+
+/** When the sample operator went offline: 12 minutes before `SAMPLE_PRESENCE_NOW`. */
+export const SAMPLE_PRESENCE_SINCE = '2026-11-11T02:10:00Z';
+/** The time `SAMPLE_RECEIPTS` is read at. */
+export const SAMPLE_RECEIPTS_NOW = '2026-11-11T12:00:00Z';
+
+/** Sample receipts for `ActionReceipt`: three done (one with Undo) and a refused merge. */
+export const SAMPLE_RECEIPTS: ActionReceiptData[] = [
+	{
+		id: 'r1',
+		action: 'Re-offered',
+		target: { label: '#3398 Pairing copy', id: '3398' },
+		outcome: 'done',
+		actor: 'Operator',
+		at: '2026-11-11T11:56:00Z',
+		reason: 'Its runner went offline, so the card went back to the queue.'
+	},
+	{
+		id: 'r2',
+		action: 'Released',
+		target: { label: '#3431 Retry the export job', id: '3431' },
+		outcome: 'done',
+		actor: 'Operator',
+		at: '2026-11-11T11:40:00Z'
+	},
+	{
+		id: 'r3',
+		action: 'Parked',
+		target: { label: '#3412 Fix sign-in redirect', id: '3412' },
+		outcome: 'done',
+		actor: 'You',
+		at: '2026-11-11T11:59:00Z',
+		undoable: true,
+		run: { id: 'run-88', label: 'Run 88' }
+	},
+	{
+		id: 'r4',
+		action: 'Merge',
+		target: { label: 'PR #212 Add retry to export', id: '212' },
+		outcome: 'refused',
+		reason: "merging is not on the operator's list",
+		actor: 'Operator',
+		at: '2026-11-11T11:30:00Z',
+		run: { id: 'run-85', label: 'Run 85' }
+	}
+];
+/** Sample data for `LevelDial`: an agent that opens and merges pull requests. */
+export const SAMPLE_AUTONOMY_LEVELS: AutonomyLevel[] = [
+	{
+		id: 'careful',
+		label: 'Careful',
+		summary: 'Works on a branch and asks before anything leaves it.',
+		allows: ['Read the repository', 'Commit to its own branch'],
+		asks: ['Open a pull request', 'Merge a pull request', 'Change protected files']
+	},
+	{
+		id: 'balanced',
+		label: 'Balanced',
+		summary: 'Opens pull requests itself; you still approve every merge.',
+		allows: ['Read the repository', 'Commit to its own branch', 'Open a pull request'],
+		asks: ['Merge a pull request', 'Change protected files']
+	},
+	{
+		id: 'trusted',
+		label: 'Trusted',
+		summary: 'Merges its own pull requests once checks are green.',
+		allows: [
+			'Read the repository',
+			'Commit to its own branch',
+			'Open a pull request',
+			'Merge a pull request with green checks'
+		],
+		asks: ['Merge with failing checks', 'Change protected files']
+	},
+	{
+		id: 'autopilot',
+		label: 'Autopilot',
+		summary: 'Merges and ships without waiting for you.',
+		allows: [
+			'Read the repository',
+			'Commit to its own branch',
+			'Open a pull request',
+			'Merge a pull request with green checks',
+			'Merge with failing checks'
+		],
+		asks: ['Change protected files']
+	}
+];
+
+/** Sample data for `RiskToggle`. */
+export const SAMPLE_RISK_TOGGLE = {
+	label: 'Merge protected changes without asking',
+	description: 'Agents on this devbox can merge changes to protected files on their own.',
+	scope: 'devbox',
+	risk: {
+		title: 'Protected files guard releases and secrets',
+		points: [
+			'A bad merge to a protected file can break every build.',
+			'Changes go live without a person reading them first.',
+			'Undoing a merge means a new pull request, not a button.'
+		],
+		acknowledge: 'I understand agents can merge protected changes without asking me.'
+	}
+};
+/** Reference time for the `DeviceApprovalCard` sample. */
+export const SAMPLE_DEVICE_NOW = '2026-11-11T09:00:00Z';
+
+/** Sample device for `DeviceApprovalCard`: a phone asking to act with the same rights. */
+export const SAMPLE_APPROVAL_DEVICE: DeviceApprovalDevice = {
+	name: 'Pixel 9',
+	kind: 'phone',
+	platform: 'Android 16',
+	location: 'Berlin, Germany'
+};
+
+/** Match code shown on both screens in the `DeviceApprovalCard` sample. */
+export const SAMPLE_APPROVAL_CODE = '482 913';
+
+/** Request time, expiry and abilities for the `DeviceApprovalCard` sample (expires 4 minutes after `SAMPLE_DEVICE_NOW`). */
+export const SAMPLE_APPROVAL_REQUESTED_AT = '2026-11-11T08:59:30Z';
+export const SAMPLE_APPROVAL_EXPIRES_AT = '2026-11-11T09:04:00Z';
+export const SAMPLE_APPROVAL_GRANTS: string[] = [
+	'See your agents and their runs',
+	'Approve or stop work on your behalf',
+	'Start new runs on your repositories'
+];
+
+/** Sample question for `CitedAnswer`. */
+export const SAMPLE_CITED_QUESTION = 'Should the retry button show on cancelled runs?';
+
+export const SAMPLE_CITED_ANSWER =
+	'No. The plan limits Retry to failed runs, and says a cancelled run is restarted from the board instead, so showing Retry there would create a second way to do the same thing.';
+
+/** Two quotes from a plan document, both found in the source. */
+export const SAMPLE_CITED_SOURCES: CitedSource[] = [
+	{
+		id: 'plan-retry',
+		title: 'Run controls plan',
+		location: 'docs/plans/run-controls.md, section 3.2',
+		href: 'https://example.com/plans/run-controls#retry',
+		quote: 'Retry is offered on failed runs only. A run that ended any other way does not show it.',
+		check: 'verified'
+	},
+	{
+		id: 'plan-cancel',
+		title: 'Run controls plan',
+		location: 'docs/plans/run-controls.md, section 4.1',
+		quote: 'A cancelled run is restarted from its card on the board, which keeps one history per card.',
+		check: 'verified'
+	}
+];
+
+/** Same answer, but the second quote could not be found in its source. */
+export const SAMPLE_CITED_SOURCES_MISMATCH: CitedSource[] = [
+	SAMPLE_CITED_SOURCES[0],
+	{
+		...SAMPLE_CITED_SOURCES[1],
+		quote: 'Cancelled runs show Retry so that people can restart them in one tap.',
+		check: 'mismatch'
+	}
+];
+
+/** Who asked the `CitedAnswer` sample question. */
+export const SAMPLE_CITED_ASKED_BY = 'Builder on card #3412';

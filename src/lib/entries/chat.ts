@@ -1,20 +1,26 @@
-/** Conversation and coding-agent UI: messages, composer, activity, todos, tool approval and results, diffs, code, terminal, context meter, checkpoints and the chat workbench. */
+/** Conversation and coding-agent UI: messages, composer, activity, todos, tool approval and results, action receipts, diffs, code, terminal, context meter, checkpoints and the chat workbench. */
 
 export { default as AISidebar } from '../agents/AISidebar.svelte';
 export { default as AgentActivity } from '../agents/AgentActivity.svelte';
 export { default as AgentDisclosure } from '../agents/AgentDisclosure.svelte';
 export { default as AgentProgress } from '../agents/AgentProgress.svelte';
 export { default as AgentWorkTrace } from '../agents/AgentWorkTrace.svelte';
+export { default as ActionReceipt } from '../agents/ActionReceipt.svelte';
 export { default as ApprovalCard } from '../agents/ApprovalCard.svelte';
 export { default as Citations } from '../agents/Citations.svelte';
+export { default as CitedAnswer } from '../agents/CitedAnswer.svelte';
 export { default as CodeBlock } from '../agents/CodeBlock.svelte';
+export { default as DeviceApprovalCard } from '../agents/DeviceApprovalCard.svelte';
 export { default as FileDiff } from '../agents/FileDiff.svelte';
 export { default as ImageGeneration } from '../agents/ImageGeneration.svelte';
 export { default as Message } from '../agents/Message.svelte';
 export { default as MessageBubble } from '../agents/MessageBubble.svelte';
+export { default as LevelDial } from '../agents/LevelDial.svelte';
 export { default as MessageScroller } from '../agents/MessageScroller.svelte';
+export { default as PresenceBanner } from '../agents/PresenceBanner.svelte';
 export { default as PromptInput } from '../agents/PromptInput.svelte';
 export { default as ReasoningText } from '../agents/ReasoningText.svelte';
+export { default as RiskToggle } from '../agents/RiskToggle.svelte';
 export { default as StreamingResponse } from '../agents/StreamingResponse.svelte';
 export { default as ThinkingShimmer } from '../agents/ThinkingShimmer.svelte';
 export { default as TodoList } from '../agents/TodoList.svelte';
@@ -42,7 +48,12 @@ export { ChatWorkbench };
 export const TrailsideClaudeChat: typeof ChatWorkbench = ChatWorkbench;
 
 export * from '../state/chat-helpers';
+export { clockTime, formatElapsed, type TimeInput } from '../core/time';
 export * from '../core/agent';
+export { groupCode, speakCode, timeLeft, formatRequestedAgo } from '../agents/device-approval';
+export type { TimeLeft } from '../agents/device-approval';
+export { summarizeSources } from '../agents/cited-answer';
+export type { SourcesState, SourcesSummary } from '../agents/cited-answer';
 export type * from '../types';
 
 // Types declared in the components themselves.
@@ -50,6 +61,9 @@ export type { SidebarResourceKind, SidebarResource } from '../agents/AISidebar.s
 export type { ImageGenerationStatus } from '../agents/ImageGeneration.svelte';
 export type { MessageBubbleVariant, MessageBubbleAlign } from '../agents/MessageBubble.svelte';
 export type { RailItem } from '../agents/MessageScroller.svelte';
+export type { AutonomyLevel, LevelChanges, LevelDirection } from '../agents/level-dial';
+export { levelChanges, levelDirection } from '../agents/level-dial';
+export type { RiskNotice } from '../agents/RiskToggle.svelte';
 export type { ChainStepStatus, ChainOfThoughtStepItem } from '../ai-elements/ChainOfThought.svelte';
 export type { EnvVariableEntry } from '../ai-elements/EnvironmentVariables.svelte';
 export type { PackageChangeType, PackageDependencyItem, PackageScriptItem } from '../ai-elements/PackageInfo.svelte';

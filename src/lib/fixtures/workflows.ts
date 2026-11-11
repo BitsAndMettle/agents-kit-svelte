@@ -2,6 +2,7 @@
  * Sample data for the workflow components (orchestration, evaluation, queues and
  * tools). Import from `agents-kit-svelte/fixtures`; components never fall back to it.
  */
+import type { Machine } from '../types';
 import type { ArtifactMetadata, ArtifactVersion } from '../agents-ui/AgentArtifact.svelte';
 import type { EvalIteration } from '../agents-ui/AgentEvaluator.svelte';
 import type { FormField } from '../agents-ui/AgentFormGenerator.svelte';
@@ -12,6 +13,7 @@ import type { AgentRoute, RouteClassification, RoutingHistoryEntry } from '../ag
 import type { WorkflowStep } from '../agents-ui/AgentSequentialWorkflow.svelte';
 import type { AgentTask } from '../agents-ui/AgentTaskQueue.svelte';
 import type { AgentTool } from '../agents-ui/AgentToolPalette.svelte';
+import type { BlockedItem } from '../agents-ui/blocked-work';
 
 /** Sample data for `AgentArtifact`. */
 export const SAMPLE_ARTIFACT_VERSIONS: ArtifactVersion[] = [
@@ -603,3 +605,90 @@ export const SAMPLE_ARTIFACT_METADATA: ArtifactMetadata = {
 	size: '2.4 KB',
 	schemaJson: SAMPLE_ARTIFACT_SCHEMA_JSON
 };
+
+/** Sample data for `BlockedWorkList`: four stuck items, one with a confirmed danger action, one with no actions. */
+export const SAMPLE_BLOCKED_ITEMS: BlockedItem[] = [
+	{
+		id: 'w-3412',
+		ref: '#3412',
+		title: 'Add rate limiting to the export endpoint',
+		reason: { kind: 'unstarted', label: 'Not started for 40 min', since: 'Ready since 09:10' },
+		actions: [{ id: 'start', label: 'Start now' }]
+	},
+	{
+		id: 'w-3398',
+		ref: '#3398',
+		title: 'Move invoice totals to the new currency helper',
+		reason: { kind: 'blocker-closed', label: 'Its blockers have closed', detail: '#3391 and #3395 merged this morning.' },
+		actions: [
+			{ id: 'release', label: 'Release' },
+			{ id: 'park', label: 'Park it' }
+		]
+	},
+	{
+		id: 'w-3377',
+		ref: '#3377',
+		title: 'Retire the legacy webhook signer',
+		reason: { kind: 'hold', label: 'Held after a failed run', detail: 'The last run failed twice on the same test.' },
+		actions: [
+			{ id: 'retry', label: 'Retry' },
+			{ id: 'discard', label: 'Discard run', tone: 'danger', confirm: 'Discard the failed run and its branch? Its notes are kept, but the work is lost.' }
+		]
+	},
+	{
+		id: 'w-3350',
+		ref: '#3350',
+		title: 'Approve the production migration for team billing',
+		reason: { kind: 'needs-person', label: 'Only you can land this' },
+		actions: [],
+		note: 'Open the pull request on the host to land it.'
+	}
+];
+
+/** The time `SAMPLE_MACHINES` is read at, for `FleetStatus`. */
+export const SAMPLE_FLEET_NOW = '2026-11-11T12:00:00Z';
+
+/** Sample data for `FleetStatus`: a busy devbox that holds the operator, an offline laptop, a stale mini PC. */
+export const SAMPLE_MACHINES: Machine[] = [
+	{
+		id: 'devbox',
+		name: 'devbox',
+		presence: 'online',
+		lastSeen: '2026-11-11T11:59:40Z',
+		slots: { used: 4, total: 6 },
+		badge: 'Operator',
+		flags: [
+			{ id: 'confined', label: 'Confined', ok: true },
+			{ id: 'autostart', label: 'Autostart', ok: true }
+		],
+		work: [
+			{ id: '3412', label: '#3412 Fix sign-in redirect', status: 'running' },
+			{ id: '3420', label: '#3420 Board empty state', status: 'running' },
+			{ id: '3398', label: '#3398 Pairing copy', status: 'reviewing' },
+			{ id: '3431', label: '#3431 Retry the export job', status: 'waiting' }
+		]
+	},
+	{
+		id: 'laptop',
+		name: 'laptop',
+		presence: 'offline',
+		lastSeen: '2026-11-11T09:00:00Z',
+		slots: { used: 0, total: 2 },
+		flags: [
+			{ id: 'confined', label: 'Confinement off', ok: false },
+			{ id: 'autostart', label: 'Autostart', ok: true }
+		],
+		alert: 'Offline for 3 hours. Its queued work waits.'
+	},
+	{
+		id: 'minipc',
+		name: 'mini PC',
+		presence: 'stale',
+		lastSeen: '2026-11-11T11:48:00Z',
+		slots: { used: 0, total: 2 },
+		flags: [
+			{ id: 'confined', label: 'Confined', ok: true },
+			{ id: 'autostart', label: 'Autostart', ok: false }
+		]
+	}
+];

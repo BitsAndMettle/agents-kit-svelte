@@ -230,3 +230,47 @@ export interface RunMark {
 	/** Anything your click handler needs. */
 	data?: unknown;
 }
+
+/** How `MetricTiles` formats a metric's value: plain number, a duration given in seconds, or a percentage from 0 to 100. */
+export type MetricFormat = 'number' | 'duration' | 'percent';
+
+/** One headline number for `MetricTiles`. */
+export interface Metric {
+	id: string;
+	label: string;
+	value: number;
+	/** `number` (default) shows the value as is, `duration` reads it as seconds ("38m"), `percent` as 0 to 100 ("93%"). */
+	format?: MetricFormat;
+	/** Text after the value for `number`, e.g. "/h". Ignored for `duration` and `percent`. */
+	unit?: string;
+	/** The value for the prior period. Shows the change as an arrow and amount. */
+	previous?: number;
+	/** Which direction is good. Colours the change green or red; the change is neutral without it. */
+	better?: 'up' | 'down';
+	/** Recent values, oldest first, drawn as a small trend line. */
+	series?: number[];
+	/** Capacity. Shows "value of max" with a thin bar, e.g. busy slots. */
+	max?: number;
+	/** A short note under the number. */
+	hint?: string;
+}
+/** One child card in a `FeatureProposalCard`. */
+export interface ProposalCard {
+	id: string;
+	title: string;
+	size?: 'S' | 'M' | 'L';
+	/** Ids of earlier cards this one waits for. */
+	dependsOn?: string[];
+	note?: string;
+}
+
+/** What an agent proposes, and what the person sends back after editing it. */
+export interface FeatureProposal {
+	title: string;
+	summary?: string;
+	criteria: string[];
+	cards: ProposalCard[];
+	estimate?: string;
+}
+
+export type ProposalStatus = 'proposed' | 'approving' | 'approved' | 'declined';

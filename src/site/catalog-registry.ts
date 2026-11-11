@@ -20,7 +20,8 @@ export interface CatalogItemMeta {
 }
 
 export const CATALOG_ITEMS: CatalogItemMeta[] = [
-	// 1. beUI Agents (21 components)
+	// 1. beUI Agents (22 components)
+	// 1. beUI Agents (23 components)
 	{
 		slug: 'chat-workbench',
 		name: 'ChatWorkbench',
@@ -279,6 +280,52 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   title="Confirm verification scope before creating PR"
   {questions}
   onSubmit={(answers) => (recorded = answers)}
+/>`
+	},
+	{
+		slug: 'level-dial',
+		name: 'LevelDial',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/LevelDial.svelte',
+		upstreamSource: 'Agents Kit Svelte · beUI Agents',
+		description:
+			'Choose how much an agent may do on its own from ordered levels. Selecting previews the level and what it does or still asks; moving up needs a confirm that names what changes, moving down applies in one press.',
+		usageSnippet: `<script lang="ts">
+  import { LevelDial, type AutonomyLevel } from 'agents-kit-svelte';
+
+  const levels: AutonomyLevel[] = [
+    { id: 'careful', label: 'Careful', summary: 'Asks before anything leaves its branch.', allows: ['Commit to its own branch'], asks: ['Open a pull request', 'Merge'] },
+    { id: 'balanced', label: 'Balanced', summary: 'Opens pull requests itself.', allows: ['Commit to its own branch', 'Open a pull request'], asks: ['Merge'] }
+  ];
+  let value = $state('careful');
+</script>
+
+<LevelDial title="Autonomy" {levels} {value} onChange={(id) => (value = id)} />`
+	},
+	{
+		slug: 'risk-toggle',
+		name: 'RiskToggle',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/RiskToggle.svelte',
+		upstreamSource: 'Agents Kit Svelte · beUI Agents',
+		description:
+			'A switch for a setting that carries risk. Turning it the risky way opens the risk points and a checkbox; the confirm button stays disabled until the person ticks it. The safe direction applies at once.',
+		usageSnippet: `<script lang="ts">
+  import { RiskToggle } from 'agents-kit-svelte';
+
+  let checked = $state(false);
+</script>
+
+<RiskToggle
+  label="Merge protected changes without asking"
+  {checked}
+  scope="devbox"
+  risk={{
+    title: 'Protected files guard releases and secrets',
+    points: ['A bad merge can break every build.', 'Changes go live without a person reading them.'],
+    acknowledge: 'I understand agents can merge protected changes without asking me.'
+  }}
+  onChange={(next) => (checked = next)}
 />`
 	},
 	{
@@ -596,6 +643,95 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   {elapsed}
   bind:expanded
   onSelectFile={(path) => console.log('open', path)}
+/>`
+	},
+
+	{
+		slug: 'action-receipt',
+		name: 'ActionReceipt',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/ActionReceipt.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'One record of something an agent did or refused to do for the person: the verb, what it touched, who did it and when, the run that proposed it, and the reason. Refused reads differently from done, and Undo shows only while it is done. Stacks as rows in an inbox with compact.',
+		usageSnippet: `<script lang="ts">
+  import { ActionReceipt } from 'agents-kit-svelte';
+</script>
+
+<ActionReceipt
+  action="Parked"
+  target={{ label: '#3412 Fix sign-in redirect', id: '3412' }}
+  outcome="done"
+  actor="You"
+  at="2026-11-11T11:59:00Z"
+  run={{ id: 'run-88', label: 'Run 88' }}
+  undoable
+  onUndo={(target) => console.log('unpark', target.id)}
+/>
+
+<ActionReceipt
+  action="Merge"
+  target={{ label: 'PR #212 Add retry to export' }}
+  outcome="refused"
+  reason="merging is not on the operator's list"
+  actor="Operator"
+  compact
+/>`
+	},
+	{
+		slug: 'device-approval',
+		name: 'DeviceApprovalCard',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/DeviceApprovalCard.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'A new device asks to act with the same rights as this one. Shows the device, a large match code read digit by digit to screen readers, what it will be able to do and the time left; Approve stays off until the person confirms the code matches, Deny is always one press, and the card collapses to a one-line outcome.',
+		usageSnippet: `<script lang="ts">
+  import { DeviceApprovalCard } from 'agents-kit-svelte';
+</script>
+
+<DeviceApprovalCard
+  device={{ name: 'Pixel 9', kind: 'phone', platform: 'Android 16', location: 'Berlin, Germany' }}
+  code="482 913"
+  requestedAt="2026-11-11T08:59:30Z"
+  now="2026-11-11T09:00:00Z"
+  expiresAt="2026-11-11T09:04:00Z"
+  grants={['See your agents and their runs', 'Approve or stop work on your behalf']}
+  onApprove={() => console.log('approved')}
+  onDeny={() => console.log('denied')}
+/>`
+	},
+	{
+		slug: 'cited-answer',
+		name: 'CitedAnswer',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/CitedAnswer.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'An agent answers a question on someone’s behalf and shows what it based the answer on: each source as a quote with its location and a check badge (verified, not checked, or quote not found). A mismatch raises a banner and hides Send.',
+		usageSnippet: `<script lang="ts">
+  import { CitedAnswer, type CitedSource } from 'agents-kit-svelte';
+
+  const sources: CitedSource[] = [
+    {
+      id: 'plan-retry',
+      title: 'Run controls plan',
+      location: 'section 3.2',
+      quote: 'Retry is offered on failed runs only.',
+      check: 'verified'
+    }
+  ];
+</script>
+
+<CitedAnswer
+  question="Should the retry button show on cancelled runs?"
+  askedBy="Builder on card #3412"
+  answer="No. The plan limits Retry to failed runs."
+  {sources}
+  status="draft"
+  onSend={() => console.log('send')}
+  onEdit={() => console.log('edit')}
+  onOpenSource={(source) => console.log('open', source.id)}
 />`
 	},
 
@@ -1452,7 +1588,7 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 5. Agents UI Orchestration (11 components)
+	// 5. Agents UI Orchestration (12 components)
 	{
 		slug: 'agent-orchestrator',
 		name: 'AgentOrchestrator',
@@ -1655,6 +1791,37 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 	{
+		slug: 'blocked-work-list',
+		name: 'BlockedWorkList',
+		category: 'Agents UI Orchestration',
+		sveltePath: 'src/lib/agents-ui/BlockedWorkList.svelte',
+		upstreamSource: 'Agents Kit Svelte · Agents UI Orchestration',
+		description:
+			'What is stuck, and what can be done about it. Items are grouped by why they are stuck, and each shows only the actions you allow for it. An action with a confirm sentence asks inline first; busy items show a spinner.',
+		usageSnippet: `<script lang="ts">
+  import { BlockedWorkList, type BlockedItem } from 'agents-kit-svelte';
+
+  let busy: string[] = $state([]);
+  const items: BlockedItem[] = [
+    {
+      id: 'w-1',
+      ref: '#3412',
+      title: 'Add rate limiting to the export endpoint',
+      reason: { kind: 'unstarted', label: 'Not started for 40 min' },
+      actions: [{ id: 'start', label: 'Start now' }]
+    },
+    {
+      id: 'w-2',
+      title: 'Retire the legacy signer',
+      reason: { kind: 'hold', label: 'Held after a failed run' },
+      actions: [{ id: 'discard', label: 'Discard run', tone: 'danger', confirm: 'Discard the failed run?' }]
+    }
+  ];
+</script>
+
+<BlockedWorkList {items} busyIds={busy} onAction={(item, action) => (busy = [...busy, item.id])} />`
+	},
+	{
 		slug: 'agent-artifact',
 		name: 'AgentArtifact',
 		category: 'Agents UI Orchestration',
@@ -1752,6 +1919,46 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   label="Searching the docs"
   showControls
   onVariantChange={(next) => (variant = next)}
+/>`
+	},
+
+	{
+		slug: 'fleet-status',
+		name: 'FleetStatus',
+		category: 'Agents UI Orchestration',
+		sveltePath: 'src/lib/agents-ui/FleetStatus.svelte',
+		upstreamSource: 'Agents Kit Svelte · Operator cards',
+		description:
+			'What is happening on the machines that run agent work: presence, busy slots as a segmented bar, what runs on each machine, warning chips for missing safeguards and the machine the operator lives on. Stacked cards on a phone, dense rows on desktop.',
+		usageSnippet: `<script lang="ts">
+  import { FleetStatus, type Machine } from 'agents-kit-svelte';
+
+  let machines = $state<Machine[]>([
+    {
+      id: 'devbox',
+      name: 'devbox',
+      presence: 'online',
+      slots: { used: 4, total: 6 },
+      badge: 'Operator',
+      flags: [{ id: 'confined', label: 'Confined', ok: true }],
+      work: [{ id: '3412', label: '#3412 Fix sign-in redirect', status: 'running' }]
+    },
+    {
+      id: 'laptop',
+      name: 'laptop',
+      presence: 'offline',
+      lastSeen: '2026-11-11T09:00:00Z',
+      slots: { used: 0, total: 2 },
+      flags: [{ id: 'confined', label: 'Confinement off', ok: false }]
+    }
+  ]);
+</script>
+
+<FleetStatus
+  title="Fleet"
+  {machines}
+  onSelectMachine={(machine) => console.log('open', machine.id)}
+  onSelectWork={(work, machine) => console.log('open', work.id, 'on', machine.id)}
 />`
 	},
 
@@ -2323,6 +2530,54 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
 <ModelPhaseStream title="Model throughput" {phases} {series} {events} />`
 	},
 	{
+		slug: 'metric-tiles',
+		name: 'MetricTiles',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/MetricTiles.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'A row of headline numbers, such as runs and merges per hour, time from ready to merged and busy slots. Each tile can show the change against the prior period (coloured by whether that direction is good), a small trend line, or a capacity bar. Make the tiles buttons to open the detail behind one.',
+		usageSnippet: `<script lang="ts">
+  import { MetricTiles, type Metric } from 'agents-kit-svelte';
+
+  const metrics: Metric[] = [
+    { id: 'merges', label: 'Merges per hour', value: 3.2, unit: '/h', previous: 2.1, better: 'up', series: [1.8, 2.2, 2.6, 3, 3.2] },
+    { id: 'ttm', label: 'Ready to merged', value: 2280, format: 'duration', previous: 3060, better: 'down', hint: 'Median' },
+    { id: 'slots', label: 'Busy slots', value: 4, max: 6 }
+  ];
+</script>
+
+<MetricTiles
+  title="Fleet"
+  period="last 24 hours"
+  {metrics}
+  onSelect={(metric) => console.log('open', metric.id)}
+/>`
+	},
+	{
+		slug: 'presence-banner',
+		name: 'PresenceBanner',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/PresenceBanner.svelte',
+		upstreamSource: 'Agents Kit Svelte · beUI Agents',
+		description:
+			'A slim banner that says whether something you depend on is reachable: online, not responding, offline or reconnecting, with since when, one action such as Move or Retry, and a live region so a change of state is announced. Fits full width at the top of a phone chat.',
+		usageSnippet: `<script lang="ts">
+  import { PresenceBanner } from 'agents-kit-svelte';
+
+  let now = $state(new Date().toISOString());
+</script>
+
+<PresenceBanner
+  state="offline"
+  subject="Operator on devbox"
+  since="2026-11-11T02:10:00Z"
+  {now}
+  action={{ label: 'Move', onAction: () => console.log('move the operator') }}
+  onDismiss={() => console.log('dismissed')}
+/>`
+	},
+	{
 		slug: 'feature-card',
 		name: 'FeatureCard',
 		category: 'Charts & Timelines',
@@ -2353,6 +2608,34 @@ export const CATALOG_ITEMS: CatalogItemMeta[] = [
   {feature}
   onOpen={(f) => console.log('open', f.id)}
   onSelectCards={(state) => console.log('filter cards', state)}
+/>`
+	},
+	{
+		slug: 'feature-proposal',
+		name: 'FeatureProposalCard',
+		category: 'Charts & Timelines',
+		sveltePath: 'src/lib/charts/FeatureProposalCard.svelte',
+		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
+		description:
+			'An agent proposes a new Feature with its child cards, and the person approves it once. Before deciding they can remove or rename a card and write a note for revisions; dependencies show as "after #2" chips. After approval it turns read-only.',
+		usageSnippet: `<script lang="ts">
+  import { FeatureProposalCard, type ProposalCard } from 'agents-kit-svelte';
+
+  const cards: ProposalCard[] = [
+    { id: 'c1', title: 'Store digest preferences', size: 'S' },
+    { id: 'c2', title: 'Build the weekly summary', size: 'M' },
+    { id: 'c3', title: 'Send the digest', size: 'L', dependsOn: ['c1', 'c2'] }
+  ];
+</script>
+
+<FeatureProposalCard
+  title="Weekly digest email"
+  criteria={['At most one digest a week']}
+  {cards}
+  estimate="About 3 hours of agent time"
+  onApprove={(proposal) => console.log('approve', proposal.cards)}
+  onRevise={(note) => console.log('revise', note)}
+  onDecline={() => console.log('decline')}
 />`
 	},
 	{

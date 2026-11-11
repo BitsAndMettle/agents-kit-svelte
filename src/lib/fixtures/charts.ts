@@ -6,7 +6,9 @@
 import type { GitHubIncidentData, GitHubIssueData, GitHubPullRequestData, GitHubReleaseData } from '../types';
 import type {
 	ChartSpec,
+	FeatureProposal,
 	FeatureSummary,
+	Metric,
 	LineageEdge,
 	LineageNode,
 	HandoffLane,
@@ -541,3 +543,25 @@ export const SAMPLE_RUN_MARKS: RunMark[] = [
 	{ id: 'h5', t: 250, label: 'Review approved', kind: 'handoff' },
 	{ id: 'done', t: 282, label: 'Verified: all 4 criteria met', kind: 'done' }
 ];
+
+/** The fleet over the last 24 hours, for `MetricTiles`: 4 of 6 slots busy, merges up, time to merge down. */
+export const SAMPLE_FLEET_METRICS: Metric[] = [
+	{ id: 'runs', label: 'Runs per hour', value: 7.4, unit: '/h', previous: 6.9, better: 'up', series: [5, 6, 6.5, 6, 7, 7.2, 7.4] },
+	{ id: 'merges', label: 'Merges per hour', value: 3.2, unit: '/h', previous: 2.1, better: 'up', series: [1.8, 2.2, 2, 2.6, 2.9, 3, 3.2] },
+	{ id: 'ttm', label: 'Ready to merged', value: 2280, format: 'duration', previous: 3060, better: 'down', series: [3400, 3100, 3000, 2700, 2500, 2400, 2280], hint: 'Median' },
+	{ id: 'slots', label: 'Busy slots', value: 4, max: 6, hint: '2 free' }
+];
+/** A new Feature an agent proposes, for `FeatureProposalCard`: five cards, two with dependencies. */
+export const SAMPLE_PROPOSAL: FeatureProposal = {
+	title: 'Weekly digest email',
+	summary: 'Send each member one email a week with what changed in their projects, with a one-click unsubscribe.',
+	criteria: ['A member gets at most one digest a week', 'Members who unsubscribe stop receiving it within a minute', 'An empty week sends nothing'],
+	estimate: 'About 3 hours of agent time',
+	cards: [
+		{ id: 'c-schema', title: 'Store each member\'s digest preference', size: 'S', note: 'A weekly on/off flag with a default of on.' },
+		{ id: 'c-build', title: 'Build the weekly summary from recent activity', size: 'M' },
+		{ id: 'c-template', title: 'Design the email template', size: 'S' },
+		{ id: 'c-send', title: 'Schedule and send the digest', size: 'L', dependsOn: ['c-schema', 'c-build', 'c-template'], note: 'Skips members with nothing to report.' },
+		{ id: 'c-unsub', title: 'Add one-click unsubscribe', size: 'S', dependsOn: ['c-schema'] }
+	]
+};
