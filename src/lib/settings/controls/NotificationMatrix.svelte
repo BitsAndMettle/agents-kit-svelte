@@ -388,6 +388,11 @@
 	 * Classes per part. `grid` is a table; `list` stacks one block per event with each cell labelled;
 	 * `auto` is the grid that turns into the list below the settings `row` breakpoint.
 	 */
+	/**
+	 * A saving cell's spinner sits just past the cell's content and out of flow (beside the checkbox
+	 * in the grid, after the label in the list), inside the cell's own right room, so no cell moves.
+	 */
+	const SPINNER = 'pointer-events-none absolute top-1/2 left-full ml-1 inline-flex -translate-y-1/2';
 	const GRID = {
 		table: 'w-full border-collapse text-left',
 		thead: '',
@@ -400,8 +405,7 @@
 		cell: 'px-2 py-3 text-center align-top',
 		cellInner: 'relative inline-flex flex-col items-center gap-1',
 		cellLabel: 'sr-only',
-		// Beside the checkbox, out of flow, so the column keeps its width.
-		spinner: 'absolute -right-4 top-0.5 inline-flex'
+		spinner: SPINNER
 	};
 	const LIST = {
 		table: 'block w-full text-left',
@@ -413,10 +417,9 @@
 		row: 'block border-t border-canvas-border py-3 first:border-t-0 first:pt-0',
 		rowHeader: 'block pb-2 text-left font-normal',
 		cell: 'inline-block pr-5 pb-1 align-top',
-		cellInner: 'inline-flex flex-row flex-wrap items-center gap-x-2 gap-y-0.5',
+		cellInner: 'relative inline-flex flex-row flex-wrap items-center gap-x-2 gap-y-0.5',
 		cellLabel: 'text-[13px] text-fg-main',
-		// In flow after the label, so it never covers it.
-		spinner: 'inline-flex'
+		spinner: SPINNER
 	};
 	const AUTO_NARROW = {
 		table: '@max-lg/settings:block',
@@ -430,7 +433,7 @@
 		cell: '@max-lg/settings:inline-block @max-lg/settings:px-0 @max-lg/settings:py-0 @max-lg/settings:pr-5 @max-lg/settings:pb-1 @max-lg/settings:text-left',
 		cellInner: '@max-lg/settings:flex-row @max-lg/settings:flex-wrap @max-lg/settings:gap-x-2 @max-lg/settings:gap-y-0.5',
 		cellLabel: '@max-lg/settings:not-sr-only @max-lg/settings:text-[13px] @max-lg/settings:text-fg-main',
-		spinner: '@max-lg/settings:static'
+		spinner: ''
 	};
 	/**
 	 * Column toggles live in the header. In the list (or the narrow auto) layout the header becomes a

@@ -313,28 +313,36 @@ test.describe('NotificationMatrix', () => {
 		await expect(matrix.getByRole('checkbox', { name: 'Mentions by Push', exact: true })).toBeChecked();
 	});
 
-	test('in a narrow settings container a saving cell shows its spinner after the label, not over it', async ({ page }) => {
-		const section = await openOnClock(page, 'notification-matrix');
-		await page.setViewportSize({ width: 360, height: 900 });
-		const matrix = section.getByTestId('nm-instant');
-		const cell = matrix.getByRole('checkbox', { name: 'Replies by Email', exact: true });
-		// The narrow layout labels each cell.
-		await expect(cell.locator('xpath=ancestor::td[1]').locator('label')).toBeVisible();
-		await cell.focus();
-		await press(page, 'Space');
-		await expect(cell).toHaveAttribute('aria-busy', 'true');
-		const td = cell.locator('xpath=ancestor::td[1]');
-		const label = td.locator('label');
-		const spinner = td.locator('svg.ak-spinner');
-		await expect(label).toBeVisible();
-		await expect(spinner).toBeVisible();
-		const l = (await label.boundingBox())!;
-		const sp = (await spinner.boundingBox())!;
-		const overlaps = l.x < sp.x + sp.width && sp.x < l.x + l.width && l.y < sp.y + sp.height && sp.y < l.y + l.height;
-		expect(overlaps, `label ${JSON.stringify(l)} spinner ${JSON.stringify(sp)}`).toBe(false);
-		await page.clock.runFor(SETTLE);
-		await expect(spinner).toHaveCount(0);
-	});
+	for (const width of [320, 360, 390]) {
+		test(`at ${width}px a saving cell's spinner moves no cell and stays off the label`, async ({ page }) => {
+			const section = await openOnClock(page, 'notification-matrix');
+			await page.setViewportSize({ width, height: 900 });
+			const matrix = section.getByTestId('nm-instant');
+			const cell = matrix.getByRole('checkbox', { name: 'Replies by Email', exact: true });
+			const td = cell.locator('xpath=ancestor::td[1]');
+			const label = td.locator('label');
+			// The narrow layout labels each cell.
+			await expect(label).toBeVisible();
+			await cell.scrollIntoViewIfNeeded();
+			const boxes = () => matrix.locator('td[data-cell-key]').evaluateAll((tds) => tds.map((el) => { const r = el.getBoundingClientRect(); return [el.getAttribute('data-cell-key'), Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; }));
+			const before = await boxes();
+			await cell.click();
+			await expect(cell).toHaveAttribute('aria-busy', 'true');
+			const spinner = td.locator('svg.ak-spinner');
+			await expect(spinner).toBeVisible();
+			expect(await boxes()).toEqual(before);
+			const l = (await label.boundingBox())!;
+			const sp = (await spinner.boundingBox())!;
+			const t = (await td.boundingBox())!;
+			const overlaps = l.x < sp.x + sp.width && sp.x < l.x + l.width && l.y < sp.y + sp.height && sp.y < l.y + l.height;
+			expect(overlaps, `label ${JSON.stringify(l)} spinner ${JSON.stringify(sp)}`).toBe(false);
+			// It sits in the cell's own room, not over a neighbour.
+			expect(sp.x + sp.width).toBeLessThanOrEqual(t.x + t.width + 0.5);
+			await page.clock.runFor(SETTLE);
+			await expect(spinner).toHaveCount(0);
+			expect(await boxes()).toEqual(before);
+		});
+	}
 
 	test('inside a settings form cells are staged and Discard restores them', async ({ page }) => {
 		const section = await openSection(page, 'notification-matrix');
