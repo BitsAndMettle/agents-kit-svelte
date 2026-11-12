@@ -4,7 +4,8 @@
 	public props: a layout with navigation, search and attention; a page with a scope that locks
 	everything when you view it as a viewer; instant controls; a staged SettingsForm with the same
 	controls inside it, a conflict, and a typed-phrase danger action in route mode (`?dialog=`).
-	The fake server answers after 600 ms; "Play a sound" always fails.
+	The fake server answers after 600 ms; "Play a sound" always fails, and dismissing the storage
+	attention item always answers with a conflict.
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
@@ -64,6 +65,7 @@
 	// ---- Fixture harness (not part of the composition) ----
 	let viewer = $state(false);
 	let someoneSavesFirst = $state(false);
+	let rejectRole = $state(false);
 	let log = $state('');
 
 	// ---- Routing: the app's, not the kit's ----
@@ -110,8 +112,10 @@
 			{ id: 'region', tone: 'neutral' as const, label: 'A storage change is waiting', description: 'An administrator has to approve it.', action: { label: 'Open', href: '#region' }, dismissible: true }
 		].filter((item) => !dismissed.includes(item.id))
 	);
-	async function dismiss(id: string): Promise<void> {
+	/** The storage item cannot be dismissed: someone acted on it first (a conflict, not an error). */
+	async function dismiss(id: string): Promise<SettingsResult | void> {
 		await wait();
+		if (id === 'region') return { conflict: { message: 'An administrator answered this a moment ago. Reload to see it.' } };
 		dismissed = [...dismissed, id];
 	}
 
@@ -295,6 +299,7 @@
 		await wait();
 		const name = String(values.workspaceName ?? '').trim();
 		if (!name) return { errors: { workspaceName: 'Enter a workspace name.' } };
+		if (rejectRole) return { errors: { defaultRole: 'Pick a role your plan allows.' } };
 		if (someoneSavesFirst && Number(context.revision) === revision) {
 			someoneSavesFirst = false;
 			revision += 1;
@@ -367,6 +372,7 @@
 		<strong class="font-semibold text-fg-main">Composed settings fixture</strong>
 		<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={viewer} data-testid="as-viewer" /> View as a viewer</label>
 		<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={someoneSavesFirst} data-testid="someone-saves" /> Someone else saves first</label>
+			<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={rejectRole} data-testid="reject-role" /> Reject the default role</label>
 		<span class="ml-auto" aria-live="polite" data-testid="composed-log">{log}</span>
 	</div>
 
@@ -410,7 +416,7 @@
 					groups={[{ id: 'invited', label: 'Invited', description: 'Invites expire after 7 days.' }]}
 					actions={memberActions}
 					onAction={onMemberAction}
-					filter={{ name: 'member' }}
+					filter={{ name: 'member', hidden: { section: 'workspace' } }}
 					addAction={{ label: 'Invite people', href: '?section=members' }}
 					labels={{ current: 'You' }}
 					data-testid="composed-members"
@@ -488,8 +494,8 @@
 								{/snippet}
 							</SettingsRow>
 							<SettingsToggle name="guests" label="Allow guests" description="Members can invite people from outside." defaultChecked={false} />
-							<!-- Not `group`: a group row hides its label id, and staged ChoiceCards then throws reading it. -->
-							<SettingsRow label="Default role" description="What people get when they join." labelFor={false} layout="stacked">
+							<!-- Not `group`: a group row hides its label id, and staged ChoiceCards then throws reading it. `name` describes the radios to the draft and shows its field error. -->
+							<SettingsRow name="defaultRole" label="Default role" description="What people get when they join." labelFor={false} layout="stacked">
 								{#snippet control()}
 									<ChoiceCards name="defaultRole" variant="rows" options={ROLE_OPTIONS} defaultValue="member" readout={roleReadout} />
 								{/snippet}

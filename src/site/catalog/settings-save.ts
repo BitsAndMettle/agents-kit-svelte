@@ -93,7 +93,7 @@ export const SETTINGS_SAVE: CatalogItemMeta[] = [
     detail="Lists now show more rows."
     undoToken={shown}
     currentToken={density.undoToken ?? null}
-    onUndo={(token) => density.undo(token as number).then(() => undefined)}
+    onUndo={async (token) => ((await density.undo(token as number)) ? undefined : { error: density.error ?? "Couldn't undo. Nothing changed." })}
     onDismiss={() => (shown = undefined)}
   />
 {/if}`

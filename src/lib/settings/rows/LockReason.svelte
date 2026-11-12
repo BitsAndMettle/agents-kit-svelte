@@ -27,9 +27,11 @@
 	import { LOCK_ICONS } from '../shared/lock-icons';
 	import { restoreFocus } from '../shared/focus';
 	import { actionButtonProps } from '../shared/recipes';
+	import { getSettingsScope } from '../shared/context';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import type { SettingLock, SettingsHandler } from '../shared/types';
 	import { focusLost } from './helpers';
-	import { HandlerRun } from './run.svelte';
+	import { SettingsHandlerRun } from '../shared/run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'id'> {
 		/** Why something cannot be changed, and an optional way forward (`lock.action`). */
@@ -61,8 +63,11 @@
 	const reasonId = $derived(id ?? `${uid}-reason`);
 	const sentence = $derived(lockReasonText(lock, words));
 	const Icon = $derived(LOCK_ICONS[lock.kind]);
-	const request = new HandlerRun();
-	const action = new HandlerRun();
+	const scope = getSettingsScope();
+	/** The buttons only call back: they wait for the page to be ready. */
+	const ready = new ReadyGate(() => (scope ? scope.ready() : undefined));
+	const request = new SettingsHandlerRun();
+	const action = new SettingsHandlerRun();
 	const actionReasonId = `${uid}-action-reason`;
 	const visible = $derived(variant !== 'hidden');
 	const waiting = $derived(lock.kind === 'awaiting-approval');
@@ -110,7 +115,7 @@
 		<div class="flex flex-wrap items-center gap-2">
 			{#if lock.action}
 				<Button
-					{...actionButtonProps(lock.action, lock.action.unavailable ? actionReasonId : undefined)}
+					{...actionButtonProps(lock.action, lock.action.unavailable ? actionReasonId : undefined, { ready: ready.current })}
 					size="xs"
 					loading={action.pending}
 					onclick={runAction}
@@ -125,7 +130,7 @@
 						<Check class="size-3.5" aria-hidden="true" />{request.notice ?? words.requested}
 					</span>
 				{:else}
-					<Button size="xs" variant="secondary" loading={request.pending} aria-describedby={reasonId} onclick={sendRequest}>
+					<Button size="xs" variant="secondary" loading={request.pending} softDisabled={!ready.current} aria-describedby={reasonId} onclick={sendRequest}>
 						{words.request}
 					</Button>
 				{/if}

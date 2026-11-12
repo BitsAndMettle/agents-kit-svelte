@@ -2,6 +2,9 @@ import { tick, untrack } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
 import { isThenable } from '../../core/promise';
 import { adoptSnapshotAsDefaults, CHANGE_WORDS, diffForm, snapshotForm, undescribedChanges, type ChangeWords, type ControlSnapshot } from './diff';
+import { isDev } from './env';
+import { firstInvalidControl } from './focus';
+import { readResult } from './undo';
 import type { SettingStatus, SettingsChange, SettingsConflict, SettingsFieldDescriptor, SettingsHandler, SettingsResult } from './types';
 
 export { readDefaults, readCurrent, diffForm, describeChanges, adoptCurrentAsDefaults, sameValue, undescribedChanges, CHANGE_WORDS } from './diff';
@@ -46,7 +49,7 @@ export interface SettingsDraftOptions {
 }
 
 function hasFailure(result: void | SettingsResult | undefined): boolean {
-	return Boolean(result && (result.error || result.conflict || Object.values(result.errors ?? {}).some(Boolean)));
+	return !readResult(result).ok;
 }
 
 function valuesOf(data: FormData): SettingsValues {
@@ -71,7 +74,10 @@ function valuesOf(data: FormData): SettingsValues {
  *   stays unsaved.
  * - Only the form's own controls count: an input or change from a control of another form (a
  *   nested dialog's own form) is not an edit.
- * - After a failed submit, focus goes to the first invalid control or `[data-form-error]`.
+ * - After a failed submit, focus goes to the first invalid control (`firstInvalidControl`: a
+ *   group marked invalid gives its checked choice) or `[data-form-error]`.
+ * - `onDirtyChange` hears every change of the change list, and `[]` when the form unmounts (its
+ *   draft is gone), so navigation dots and attention items never outlive the form.
  * - `guard` holds a navigation while dirty: the app calls `guard.request(proceed)` from its
  *   router (SvelteKit `beforeNavigate`), SettingsForm asks, then calls `guard.decide(...)`.
  *
@@ -103,8 +109,14 @@ export class SettingsDraft {
 			const changes = this.changes;
 			untrack(() => this.#options.onDirtyChange()?.(changes));
 		});
-		// Vite (and SvelteKit) set this in development only; elsewhere it is undefined.
-		if (import.meta.env?.DEV) {
+		// Unmounting drops the draft: tell the app nothing is unsaved any more. A controlled list
+		// is the app's own state, so it keeps it.
+		$effect(() => () => {
+			untrack(() => {
+				if (!this.#options.changes()) this.#options.onDirtyChange()?.([]);
+			});
+		});
+		if (isDev()) {
 			const warned = new Set<string>();
 			$effect(() => {
 				void this.#version;
@@ -308,11 +320,33 @@ export class SettingsDraft {
 			return true;
 		}
 		await tick();
-		const target =
-			form.querySelector<HTMLElement>('[aria-invalid="true"]:not([disabled])') ??
-			form.querySelector<HTMLElement>('[data-form-error]');
+		const target = firstInvalidControl(form) ?? form.querySelector<HTMLElement>('[data-form-error]');
 		target?.focus();
 		return false;
+	}
+
+	/**
+	 * Saves for "Save and leave". A save already in flight is waited for, not repeated (a second
+	 * submit while pending is ignored); if edits were made since it was sent, they are saved next.
+	 *
+	 * @returns Whether everything is saved now.
+	 */
+	async #saveForLeave(): Promise<boolean> {
+		if (this.pending) {
+			const inflight = this.#inflight;
+			// Pending from the `pending` prop (SvelteKit enhance): nothing here to wait for.
+			if (!inflight || !(await inflight)) return false;
+			if (this.dirtyCount === 0) return true;
+		}
+		const form = this.#form;
+		this.#inflight = null;
+		if (!form || !this.#options.submit()) {
+			// No handler: a native post would navigate away by itself; keep the person here to save.
+			return false;
+		}
+		form.requestSubmit();
+		const inflight = this.#inflight as Promise<boolean> | null;
+		return inflight ? inflight : false;
 	}
 
 	/** The leave guard. */
@@ -354,15 +388,8 @@ export class SettingsDraft {
 					return;
 				}
 				if (decision === 'save') {
-					const form = draft.#form;
-					draft.#inflight = null;
-					if (!form || !draft.#options.submit()) {
-						// No handler: a native post would navigate away by itself; keep the person here to save.
-						draft.#leaveFailed = true;
-						return;
-					}
-					form.requestSubmit();
-					const saved = draft.#inflight ? await draft.#inflight : false;
+					const saved = await draft.#saveForLeave();
+					if (draft.#proceed !== proceed) return;
 					if (!saved) {
 						draft.#leaveFailed = true;
 						return;

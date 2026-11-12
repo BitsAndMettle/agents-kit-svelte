@@ -32,10 +32,12 @@
 	import { isThenable } from '../../core/promise';
 	import { Alert } from '../../primitives/display';
 	import { Button } from '../../primitives/actions';
-	import { getSettingsDraft } from '../shared/context';
+	import { getSettingsDraft, getSettingsScope } from '../shared/context';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import { nextFocusAfterRemoval, restoreFocus } from '../shared/focus';
 	import { actionButtonProps } from '../shared/recipes';
 	import type { SettingsAction, SettingsHandler, SettingsResult } from '../shared/types';
+	import { readResult } from '../shared/undo';
 	import { isSuperseded } from './helpers';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'hidden'> {
@@ -108,6 +110,9 @@
 
 	/** Inside a SettingsForm the notice must not render a form of its own. */
 	const insideForm = getSettingsDraft() !== undefined;
+	const scope = getSettingsScope();
+	/** Undo without a post, and a callback action, only work once the page is ready. */
+	const ready = new ReadyGate(() => (scope ? scope.ready() : undefined));
 
 	let root = $state<HTMLDivElement | null>(null);
 	let undoing = $state(false);
@@ -120,7 +125,7 @@
 	const canPost = $derived(undoAction !== undefined && !insideForm);
 	const offersUndo = $derived(!finished && (onUndo !== undefined || canPost));
 	const status = $derived(undoing ? text.undoing : finished ? text.undone : '');
-	const secondaryProps = $derived(secondary ? actionButtonProps(secondary, secondaryReasonId) : undefined);
+	const secondaryProps = $derived(secondary ? actionButtonProps(secondary, secondaryReasonId, { ready: ready.current }) : undefined);
 
 	async function undo(event: Event): Promise<void> {
 		if (!onUndo) return;
@@ -139,9 +144,9 @@
 			result = { error: text.undoFailed };
 		}
 		undoing = false;
-		const message = result && (result.error || Object.values(result.errors ?? {}).find(Boolean) || result.conflict?.message);
-		if (message || (result && result.conflict)) {
-			failure = message || text.undoFailed;
+		const outcome = readResult(result);
+		if (!outcome.ok) {
+			failure = outcome.error ?? text.undoFailed;
 			return;
 		}
 		didUndo = true;
@@ -197,7 +202,7 @@
 		type={canPost ? 'submit' : 'button'}
 		size="sm"
 		loading={undoing}
-		softDisabled={superseded}
+		softDisabled={superseded || (!canPost && !ready.current)}
 		aria-describedby={superseded ? reasonId : undefined}
 		onclick={onUndo && !canPost ? undo : undefined}
 	>

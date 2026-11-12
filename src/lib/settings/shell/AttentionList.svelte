@@ -32,7 +32,7 @@
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES } from '../shared/recipes';
 	import type { SettingsIcon } from '../shared/types';
-	import { resultMessage } from './shell';
+	import { readResult } from '../shared/undo';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title'> {
 		/** What needs attention. Your app decides; the count is always `items.length`. With none, the list is `hidden`. */
@@ -104,9 +104,9 @@
 		} finally {
 			pending.delete(item.id);
 		}
-		const message = resultMessage(result);
-		if (message) {
-			failed.set(item.id, message);
+		const outcome = readResult(result);
+		if (!outcome.ok) {
+			failed.set(item.id, outcome.error ?? text.dismissFailed(item.label));
 			return;
 		}
 		await tick();

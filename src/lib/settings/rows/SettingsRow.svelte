@@ -50,7 +50,7 @@
 	import type { SettingLock, SettingsAction, SettingsHandler, SettingStatus } from '../shared/types';
 	import LockReason, { type LockReasonLabels } from './LockReason.svelte';
 	import { splitActions } from './helpers';
-	import { HandlerRun } from './run.svelte';
+	import { SettingsHandlerRun } from '../shared/run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, 'class' | 'children'> {
 		/** Names the setting. With a `control`, it is the control's one `<label>`. */
@@ -185,7 +185,7 @@
 	);
 	const shownStatus = $derived<SettingStatus>(status ?? (errorText ? 'error' : 'idle'));
 	/** The row's own actions: one runs at a time; its failure shows in the alert, its notice in the status. */
-	const actionRun = new HandlerRun();
+	const actionRun = new SettingsHandlerRun();
 	let running = $state.raw<SettingsAction | undefined>(undefined);
 	const actionError = $derived(actionRun.status === 'failed' ? (actionRun.error ?? words.actionFailed) : undefined);
 	const liveText = $derived(
@@ -348,7 +348,7 @@
 				{@render (action as Snippet)()}
 			{/if}
 			{#each split.visible as a, index (index)}
-				<Button {...actionButtonProps(a, a.unavailable ? `${uid}-action-${index}` : undefined)} size="sm" loading={actionRun.pending && running === a} onclick={(event: MouseEvent) => runAction(a, event)}>{a.label}</Button>
+				<Button {...actionButtonProps(a, a.unavailable ? `${uid}-action-${index}` : undefined, { ready: ready.current })} size="sm" loading={actionRun.pending && running === a} onclick={(event: MouseEvent) => runAction(a, event)}>{a.label}</Button>
 			{/each}
 			{#if split.overflow.length}
 				<DropdownMenu items={menuItems} placement="bottom-end">

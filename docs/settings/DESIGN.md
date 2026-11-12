@@ -449,7 +449,7 @@ The shared layer is plain `.ts` and `.svelte.ts` only, with no `.svelte` files, 
 - **Reports.**
   - `onSubmit(values, {changes, revision})`. The app saves with optimistic concurrency and returns `{}`, `{errors}`, `{error}` or `{conflict}`.
   - Without a handler it posts natively, and the server re-renders with new defaults and `result`.
-  - `onDirtyChange` feeds nav dirty dots and AttentionList.
+  - `onDirtyChange` feeds nav dirty dots and AttentionList. It hears `[]` when the form unmounts (unless `changes` is controlled), so dots and items never outlive the form.
   - Discard is a native reset, through SaveBar.
 - **States.** Clean; dirty(n); pending (double submits ignored); saved notice; field errors (focus to the first invalid field); form error; conflict (draft kept); leave pending, saving or failed; controlled versus DOM-diff.
 - **Built from.** FormSubmit, SettingsDraft, Dialog (leave guard), Alert, ConsequenceList-free plain list of changes, `setSettingsDraft`.
@@ -886,8 +886,8 @@ export declare class InstantSetting<T> {
   constructor(opts: InstantOptions<T>);
   readonly current: T;            // optimistic
   readonly status: SettingStatus; readonly error?: string; readonly canUndo: boolean; readonly undoToken?: number;
-  set(v: T): void;                // generation counter: only newest settles; failure reverts to last committed
-  retry(): void; undo(): void; dismissError(): void;
+  set(v: T): Promise<void>;       // generation counter: only newest settles status; a superseded success still moves committed; failure reverts to last committed
+  retry(): Promise<void>; undo(token?: number): Promise<boolean> /* false: nothing current, or the undo failed */; dismissError(): void;
 }
 // --- undo.ts ---
 export declare class UndoSlot<S> { remember(snapshot: S): number; take(token: number): S | null; isCurrent(token: number): boolean; forget(): void }
@@ -937,7 +937,8 @@ export function phrasePattern(phrase: string): string; // escaped regex for nati
 export const SETTINGS_CONTAINER: string;  // '@container/settings' + container-type
 export const CQ: { narrow: string; wide: string }; // one breakpoint set for all groups
 export const RECIPES: { section: string; sectionHeader: string; sectionFooter: string; danger: string; row: string; rowStaged: string; note: string; iconTile: string };
-export function actionButtonProps(a: SettingsAction, reasonId?: string): Record<string, unknown>; // href | softDisabled + aria-describedby | tone
+export function actionButtonProps(a: SettingsAction, reasonId?: string, options?: { ready?: boolean; inForm?: boolean }): SettingsActionButtonProps; // href | intent submit | softDisabled (unavailable, or a callback-only action before ready) | tone
+export function readResult(result: unknown): { ok: true; notice?: string } | { ok: false; error?: string; conflict?: SettingsConflict }; // the one result reader
 
 // --- wiring (controller) ---
 // src/lib/settings/{shell,rows,save,controls,shared}/index.ts, src/lib/settings/index.ts, src/lib/entries/settings.ts,

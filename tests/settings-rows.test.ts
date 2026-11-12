@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { factCopyText, flippedByPerson, formatRequestedAgo, readOutcome, splitActions, withQuery } from '../src/lib/settings/rows/helpers.ts';
+import { factCopyText, flippedByPerson, formatRequestedAgo, splitActions, withQuery } from '../src/lib/settings/rows/helpers.ts';
 import type { SettingsAction } from '../src/lib/settings/shared/types.ts';
 
 const link = (label: string): SettingsAction => ({ label, href: `/${label}` });
@@ -58,17 +58,6 @@ test('formatRequestedAgo reads an injected now and never goes negative', () => {
 	assert.equal(formatRequestedAgo(now - 4 * 86_400_000, now), '4 days ago');
 	assert.equal(formatRequestedAgo('not a time', now), '');
 	assert.equal(formatRequestedAgo(now, Number.NaN), '');
-});
-
-test('readOutcome treats errors, field errors and conflicts as failures and keeps only returned text', () => {
-	assert.deepEqual(readOutcome(undefined), { ok: true });
-	assert.deepEqual(readOutcome({}), { ok: true, notice: undefined });
-	assert.deepEqual(readOutcome({ notice: 'Sent again.' }), { ok: true, notice: 'Sent again.' });
-	assert.deepEqual(readOutcome({ error: 'Offline.' }), { ok: false, error: 'Offline.' });
-	assert.deepEqual(readOutcome({ errors: { reason: 'Too short.' } }), { ok: false, error: 'Too short.' });
-	assert.deepEqual(readOutcome({ conflict: {} }), { ok: false, error: undefined });
-	assert.deepEqual(readOutcome({ conflict: { message: 'Changed elsewhere.' } }), { ok: false, error: 'Changed elsewhere.' });
-	assert.deepEqual(readOutcome({ errors: { reason: undefined } }), { ok: true, notice: undefined });
 });
 
 test("flippedByPerson trusts the browser's record of user interaction and counts any change where it has none", () => {

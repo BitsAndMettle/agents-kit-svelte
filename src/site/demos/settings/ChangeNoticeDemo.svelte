@@ -95,7 +95,7 @@
 				detail={notice.detail}
 				undoToken={notice.token}
 				currentToken={density.undoToken ?? null}
-				onUndo={async (token) => ((await density.undo(token as number)) ? undefined : { error: 'Couldn’t undo: a newer change replaced it.' })}
+				onUndo={async (token) => ((await density.undo(token as number)) ? undefined : { error: density.error ?? 'Couldn’t undo. Nothing changed.' })}
 				onDismiss={() => (notices = notices.filter((n) => n.key !== notice.key))}
 			/>
 		{/each}

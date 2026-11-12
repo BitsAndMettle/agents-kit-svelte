@@ -119,7 +119,7 @@ test.describe('SettingsLayout', () => {
 		await expect(wide.locator('[data-settings-page]')).toBeVisible();
 		const noMatch = section.getByTestId('layout-nomatch-frame');
 		await expect(noMatch.getByText('No settings match “webhooks”.').last()).toBeVisible();
-		await expect(noMatch.getByRole('link', { name: 'Clear filter' })).toHaveAttribute('href', '?section=#settings-layout');
+		await expect(noMatch.getByRole('link', { name: 'Clear filter' })).toHaveAttribute('href', '?#settings-layout');
 		await expect(noMatch.locator('[data-nav-link]')).toHaveCount(0);
 		await close();
 	});

@@ -1,9 +1,40 @@
 /**
- * The rune-free core of the instant model: `UndoSlot` (one-level undo with an ownership token)
- * and `InstantCore` (optimistic value, newest-set-wins, revert on failure). A leaf, so node tests
+ * The rune-free core of the instant model: `readResult` (what a handler's result means, the one
+ * reading every Settings group uses), `UndoSlot` (one-level undo with an ownership token) and
+ * `InstantCore` (optimistic value, newest-set-wins, revert on failure). A leaf, so node tests
  * cover the race and undo rules; `InstantSetting` in `instant.svelte.ts` wraps it in runes.
  */
-import type { SettingStatus, SettingsHandler, SettingsResult } from './types';
+import type { SettingStatus, SettingsConflict, SettingsHandler, SettingsResult } from './types';
+
+/** What a settled handler means for the control that ran it. */
+export type SettingsOutcome = { ok: true; notice?: string } | { ok: false; error?: string; conflict?: SettingsConflict };
+
+function textOf(value: unknown): string | undefined {
+	return typeof value === 'string' && value.trim() !== '' ? value : undefined;
+}
+
+/**
+ * Reads what a settings handler returned, the same way in every group:
+ *
+ * - A failure is a non-empty `error`, any non-empty field in `errors`, or any `conflict` (even
+ *   one without a message). Its `error` is the handler's own text: `error`, else the field
+ *   errors joined, else the conflict's message; undefined when there is none (show the
+ *   component's generic label).
+ * - Anything else (nothing, `{}`, `{notice}`, a value that is not an object) is success.
+ *
+ * A throw or rejection is a failure without text: never pass the thrown value here.
+ */
+export function readResult(result: unknown): SettingsOutcome {
+	if (!result || typeof result !== 'object') return { ok: true };
+	const { error, errors, conflict, notice } = result as SettingsResult;
+	const fieldErrors = errors && typeof errors === 'object' ? Object.values(errors).filter((m): m is string => textOf(m) !== undefined) : [];
+	if (textOf(error) === undefined && !fieldErrors.length && !conflict) return textOf(notice) !== undefined ? { ok: true, notice } : { ok: true };
+	const message = textOf(error) ?? (fieldErrors.length ? fieldErrors.join(' ') : undefined) ?? textOf(conflict?.message);
+	const outcome: { ok: false; error?: string; conflict?: SettingsConflict } = { ok: false };
+	if (message !== undefined) outcome.error = message;
+	if (conflict) outcome.conflict = conflict;
+	return outcome;
+}
 
 /**
  * One-level undo with an ownership token. `remember` stores a snapshot and returns a token; only
@@ -85,14 +116,6 @@ function thenable(value: unknown): value is PromiseLike<unknown> {
 	return typeof (value as PromiseLike<unknown> | null | undefined)?.then === 'function';
 }
 
-function failureText(result: SettingsResult): string | undefined {
-	return result.error || Object.values(result.errors ?? {}).find(Boolean) || result.conflict?.message || undefined;
-}
-
-function isFailure(result: void | SettingsResult): result is SettingsResult {
-	return Boolean(result && (result.error || result.conflict || Object.values(result.errors ?? {}).some(Boolean)));
-}
-
 /**
  * The instant change model without runes:
  *
@@ -105,6 +128,9 @@ function isFailure(result: void | SettingsResult): result is SettingsResult {
  * - Success commits, shows `saved` for `savedForMs`, then `idle`, and (when `undoable`) remembers
  *   the previous committed value in one `UndoSlot`. Any later `set` supersedes that token.
  * - `undo()` commits the remembered value through the undo handler and creates no new undo point.
+ * - A superseded change that succeeds still moves `committed` (unless a newer change already
+ *   settled), so a later failure reverts to what the handler last accepted, never to a value it
+ *   no longer has.
  */
 export class InstantCore<T> {
 	#options: InstantCoreOptions<T>;
@@ -113,6 +139,8 @@ export class InstantCore<T> {
 	#status: SettingStatus = 'idle';
 	#error: string | undefined;
 	#generation = 0;
+	/** The generation `#committed` came from, so an older success never overwrites a newer one. */
+	#committedGeneration = 0;
 	#attempt: { value: T; undo: boolean } | null = null;
 	#slot = new UndoSlot<T>();
 	#timer: ReturnType<typeof setTimeout> | undefined;
@@ -137,26 +165,26 @@ export class InstantCore<T> {
 
 	/** Applies `value` optimistically and commits it. Resolves once this set has settled (or been superseded). */
 	set(value: T): Promise<void> {
-		return this.#run(value, false);
+		return this.#run(value, false).then(() => undefined);
 	}
 
 	/** Runs the failed change again. Does nothing unless the status is `error`. */
 	retry(): Promise<void> {
 		if (this.#status !== 'error' || !this.#attempt) return Promise.resolve();
-		return this.#run(this.#attempt.value, this.#attempt.undo);
+		return this.#run(this.#attempt.value, this.#attempt.undo).then(() => undefined);
 	}
 
 	/**
 	 * Reverses the last successful change. With a `token`, only while that token still owns the
-	 * undo slot, so a stale notice cannot undo a newer change. Resolves once the undo settled;
-	 * false when there was nothing (or nothing current) to undo.
+	 * undo slot, so a stale notice cannot undo a newer change. Resolves once the undo settled:
+	 * true when it was undone; false when there was nothing (or nothing current) to undo, or when
+	 * the undo itself failed (status `error`; `error` holds the handler's message if it gave one).
 	 */
 	async undo(token?: number): Promise<boolean> {
 		const owner = token ?? this.#slot.token;
 		if (this.#status === 'pending' || owner === undefined || !this.#slot.isCurrent(owner)) return false;
 		const value = this.#slot.take(owner) as T;
-		await this.#run(value, true);
-		return true;
+		return this.#run(value, true);
 	}
 
 	/** True while `token` still owns the undo slot. */
@@ -182,6 +210,7 @@ export class InstantCore<T> {
 		this.#generation++;
 		this.#clearTimer();
 		this.#slot.forget();
+		this.#committedGeneration = this.#generation;
 		this.#current = value;
 		this.#committed = value;
 		this.#status = 'idle';
@@ -198,7 +227,8 @@ export class InstantCore<T> {
 		return this.#options.equals ? this.#options.equals(a, b) : Object.is(a, b);
 	}
 
-	#run(value: T, isUndo: boolean): Promise<void> {
+	/** Resolves true when this change succeeded (even if a newer one superseded it), false when it failed. */
+	#run(value: T, isUndo: boolean): Promise<boolean> {
 		const generation = ++this.#generation;
 		const before = this.#committed;
 		this.#clearTimer();
@@ -212,13 +242,9 @@ export class InstantCore<T> {
 		try {
 			outcome = handler?.(value);
 		} catch {
-			this.#settle(generation, value, before, isUndo, { rejected: true });
-			return Promise.resolve();
+			return Promise.resolve(this.#settle(generation, value, before, isUndo, { rejected: true }));
 		}
-		if (!thenable(outcome)) {
-			this.#settle(generation, value, before, isUndo, { result: outcome });
-			return Promise.resolve();
-		}
+		if (!thenable(outcome)) return Promise.resolve(this.#settle(generation, value, before, isUndo, { result: outcome }));
 		this.#emit();
 		return Promise.resolve(outcome).then(
 			(result) => this.#settle(generation, value, before, isUndo, { result }),
@@ -226,15 +252,28 @@ export class InstantCore<T> {
 		);
 	}
 
-	#settle(generation: number, value: T, before: T, isUndo: boolean, outcome: Outcome): void {
-		if (generation !== this.#generation) return;
-		if (outcome.rejected || isFailure(outcome.result)) {
+	/** @returns True when the change succeeded. */
+	#settle(generation: number, value: T, before: T, isUndo: boolean, outcome: Outcome): boolean {
+		const read: SettingsOutcome = outcome.rejected ? { ok: false } : readResult(outcome.result);
+		if (generation !== this.#generation) {
+			// Superseded: the newest change owns the status, but the handler did accept this value.
+			if (read.ok && generation > this.#committedGeneration) {
+				this.#committedGeneration = generation;
+				this.#committed = value;
+				// Nothing newer is waiting (it already failed and reverted): show what is saved now.
+				if (this.#status !== 'pending') this.#current = value;
+				this.#emit();
+			}
+			return read.ok;
+		}
+		if (!read.ok) {
 			this.#current = this.#committed;
 			this.#status = 'error';
-			this.#error = outcome.result ? failureText(outcome.result) : undefined;
+			this.#error = read.error;
 			this.#emit();
-			return;
+			return false;
 		}
+		this.#committedGeneration = generation;
 		this.#committed = value;
 		this.#current = value;
 		this.#status = 'saved';
@@ -249,6 +288,7 @@ export class InstantCore<T> {
 			this.#emit();
 		}, ms);
 		this.#emit();
+		return true;
 	}
 
 	#clearTimer(): void {

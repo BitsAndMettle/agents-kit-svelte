@@ -59,19 +59,38 @@ export interface SettingsActionButtonProps {
 	'aria-describedby'?: string;
 }
 
+/** Where an action button stands, for `actionButtonProps`. */
+export interface SettingsActionButtonOptions {
+	/**
+	 * False until the page is interactive (a `ReadyGate`, or `getSettingsScope()?.ready()`).
+	 * Default true. Pass it from every component: a handler-only action does nothing before then.
+	 */
+	ready?: boolean;
+	/**
+	 * Whether the button sits in a form that posts its `intent` (its own, or the SettingsForm it is
+	 * inside). Default true. False makes an `intent` action a handler action: without a form there
+	 * is nothing to post.
+	 */
+	inForm?: boolean;
+}
+
 /**
  * Turns a `SettingsAction` into `Button` props, so every group renders actions the same way:
  *
  * - `href` makes a link (with `target`/`rel` when `external`).
- * - `intent` without `href` makes a submit button posting `name="intent" value={intent}`.
+ * - `intent` inside a form makes a submit button posting `name="intent" value={intent}`, which
+ *   works without JavaScript.
  * - `unavailable` drops the link and makes it `softDisabled` (focusable, announced as unavailable),
  *   described by `reasonId`, which must point at the visible reason text. Never a dead `<a>`.
+ * - Anything else only works through `onSelect`: a `type="button"`, `softDisabled` until `ready`
+ *   (it would do nothing without JavaScript, and a click before hydration would be lost), and
+ *   for good when there is no `onSelect` to call. That includes an `intent` outside a form.
  * - `tone` picks the variant.
  *
  * `onSelect` is not included: wire `onclick` yourself so the button can show `loading` while a
  * returned promise settles (`isThenable`).
  */
-export function actionButtonProps(action: SettingsAction, reasonId?: string): SettingsActionButtonProps {
+export function actionButtonProps(action: SettingsAction, reasonId?: string, options: SettingsActionButtonOptions = {}): SettingsActionButtonProps {
 	const variant = action.tone === 'danger' ? 'danger' : action.tone === 'accent' ? 'accent' : 'secondary';
 	const props: SettingsActionButtonProps = { variant };
 	if (action.ariaLabel) props['aria-label'] = action.ariaLabel;
@@ -89,12 +108,13 @@ export function actionButtonProps(action: SettingsAction, reasonId?: string): Se
 		}
 		return props;
 	}
-	if (action.intent !== undefined) {
+	if (action.intent !== undefined && options.inForm !== false) {
 		props.type = 'submit';
 		props.name = 'intent';
 		props.value = action.intent;
 		return props;
 	}
 	props.type = 'button';
+	if (options.ready === false || action.onSelect === undefined) props.softDisabled = true;
 	return props;
 }

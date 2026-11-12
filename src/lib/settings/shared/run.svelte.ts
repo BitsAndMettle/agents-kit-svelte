@@ -1,23 +1,24 @@
 import { isThenable } from '../../core/promise';
-import type { SettingsHandler } from '../shared/types';
-import { readOutcome } from './helpers';
+import type { SettingsHandler } from './types';
+import { readResult, type SettingsOutcome } from './undo';
 
 /** Where one button's callback stands. */
-export type RunStatus = 'idle' | 'pending' | 'done' | 'failed';
+export type SettingsRunStatus = 'idle' | 'pending' | 'done' | 'failed';
 
 /**
- * Runs one intent callback (`onRequest`, `onResend`, an action's `onSelect`) for the button that
- * owns it: `pending` while a returned promise is open, then `done` or `failed`. While pending, a
- * second run is ignored, not queued. A rejection or throw keeps no thrown text (`error` stays
- * undefined: show the component's generic label). Construct it while a component initialises.
+ * Runs one intent callback (`onRequest`, `onResend`, an action's `onSelect`, a dismiss) for the
+ * button that owns it: `pending` while a returned promise is open, then `done` or `failed`, read
+ * with `readResult` (so `{error}`, `{errors}` and `{conflict}` all fail). While pending, a second
+ * run is ignored, not queued. A rejection or throw keeps no thrown text (`error` stays undefined:
+ * show the component's generic label). Construct it while a component initialises.
  */
-export class HandlerRun {
-	#status = $state<RunStatus>('idle');
+export class SettingsHandlerRun {
+	#status = $state<SettingsRunStatus>('idle');
 	#error = $state<string | undefined>(undefined);
 	#notice = $state<string | undefined>(undefined);
 	#generation = 0;
 
-	get status(): RunStatus {
+	get status(): SettingsRunStatus {
 		return this.#status;
 	}
 
@@ -51,11 +52,11 @@ export class HandlerRun {
 		} catch {
 			return this.#settle(generation, { ok: false });
 		}
-		if (!isThenable(result)) return this.#settle(generation, readOutcome(result as never));
+		if (!isThenable(result)) return this.#settle(generation, readResult(result));
 		this.#status = 'pending';
 		try {
 			const settled = await result;
-			return this.#settle(generation, readOutcome(settled as never));
+			return this.#settle(generation, readResult(settled));
 		} catch {
 			return this.#settle(generation, { ok: false });
 		}
@@ -69,7 +70,7 @@ export class HandlerRun {
 		this.#notice = undefined;
 	}
 
-	#settle(generation: number, outcome: ReturnType<typeof readOutcome>): boolean {
+	#settle(generation: number, outcome: SettingsOutcome): boolean {
 		if (generation !== this.#generation) return false;
 		if (outcome.ok) {
 			this.#status = 'done';

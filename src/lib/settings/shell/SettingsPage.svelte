@@ -48,7 +48,8 @@
 	import { actionButtonProps, RECIPES } from '../shared/recipes';
 	import type { SettingsIcon } from '../shared/types';
 	import { insideSettingsLayout } from './layout-context';
-	import { coveringLock, resultMessage } from './shell';
+	import { readResult } from '../shared/undo';
+	import { coveringLock } from './shell';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'title'> {
 		/** The page heading. */
@@ -153,7 +154,8 @@
 		} finally {
 			busy[index] = false;
 		}
-		failures[index] = resultMessage(result);
+		const outcome = readResult(result);
+		failures[index] = outcome.ok ? undefined : (outcome.error ?? text.actionFailed);
 	}
 
 	function select(event: MouseEvent, index: number, action: SettingsAction): void {
@@ -176,7 +178,7 @@
 {#snippet scopeButtonList()}
 	{#each scopeActions as action, index (index)}
 		{@const reason = `${id}-action-${index}`}
-		<Button size="sm" {...actionButtonProps(action, reason)} loading={busy[index] ?? false} onclick={action.onSelect ? (event: MouseEvent) => select(event, index, action) : undefined}>{action.label}</Button>
+		<Button size="sm" {...actionButtonProps(action, reason, { ready: pageScope.ready() })} loading={busy[index] ?? false} onclick={action.onSelect ? (event: MouseEvent) => select(event, index, action) : undefined}>{action.label}</Button>
 		{#if action.unavailable}<span id={reason} class="text-xs text-fg-light">{action.unavailable}</span>{/if}
 	{/each}
 {/snippet}

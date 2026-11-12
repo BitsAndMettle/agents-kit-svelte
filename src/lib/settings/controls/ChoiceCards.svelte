@@ -40,6 +40,7 @@
 		type SettingLock,
 		type SettingsHandler
 	} from '../shared';
+	import { isDev } from '../shared/env';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'defaultValue'> {
 		options: ChoiceOption[];
@@ -125,7 +126,7 @@
 	const draft = getSettingsDraft();
 	const ready = new ReadyGate();
 
-	if (draft && untrack(() => onCommit) && import.meta.env?.DEV) {
+	if (draft && untrack(() => onCommit) && isDev()) {
 		console.warn(`ChoiceCards "${untrack(() => name)}": onCommit is ignored inside a SettingsForm; the form's Save commits it.`);
 	}
 
@@ -397,7 +398,7 @@
 		<span class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
 			{@render lockNote(groupLock, lockId)}
 			{#if groupLock.action}
-				<Button size="xs" {...actionButtonProps(groupLock.action)} onclick={groupLock.action.onSelect && !groupLock.action.unavailable ? () => groupLock?.action?.onSelect?.() : undefined}>{groupLock.action.label}</Button>
+				<Button size="xs" {...actionButtonProps(groupLock.action, undefined, { ready: ready.current })} onclick={groupLock.action.onSelect && !groupLock.action.unavailable ? () => groupLock?.action?.onSelect?.() : undefined}>{groupLock.action.label}</Button>
 			{/if}
 		</span>
 	{/if}

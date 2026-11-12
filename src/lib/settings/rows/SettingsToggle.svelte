@@ -26,6 +26,7 @@
 	import type { FieldControlAttrs } from '../../primitives/form/field';
 	import { cn } from '../../ui/cn';
 	import { getSettingsDraft, getSettingsScope } from '../shared/context';
+	import { isDev } from '../shared/env';
 	import { restoreFocus } from '../shared/focus';
 	import { InstantSetting } from '../shared/instant.svelte';
 	import { pickLock } from '../shared/lock';
@@ -123,7 +124,7 @@
 	/** The value the toggle starts from: the saved value. */
 	const start = untrack(() => checked ?? defaultChecked ?? false);
 
-	if (draft && import.meta.env?.DEV && untrack(() => onCommit)) {
+	if (draft && isDev() && untrack(() => onCommit)) {
 		console.warn(`SettingsToggle "${untrack(() => label)}": onCommit is ignored inside a SettingsForm; the form saves it.`);
 	}
 

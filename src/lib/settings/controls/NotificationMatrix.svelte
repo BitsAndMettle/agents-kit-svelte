@@ -81,6 +81,7 @@
 		type SettingLock,
 		type SettingsHandler
 	} from '../shared';
+	import { isDev } from '../shared/env';
 	import { groupMatrixEvents, matrixCellKey, matrixColumnState, parseMatrixCellKey, toggleMatrixColumn } from './matrix';
 	import { idPart } from './ids';
 
@@ -167,7 +168,7 @@
 	// The cells are their own controls: a surrounding row's Field must not hand them its id or label.
 	setFieldContext(createFieldState({ id: `${uid}-cells`, group: () => true }));
 
-	if (draft && untrack(() => onCellCommit) && import.meta.env?.DEV) {
+	if (draft && untrack(() => onCellCommit) && isDev()) {
 		console.warn('NotificationMatrix: onCellCommit is ignored inside a SettingsForm; the form\'s Save commits the cells.');
 	}
 
