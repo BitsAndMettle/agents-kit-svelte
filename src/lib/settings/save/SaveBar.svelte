@@ -45,8 +45,11 @@
 
 	export type SaveBarLayout = 'footer' | 'sticky' | 'floating';
 
-	/** Room kept per scroller for the bars covering it (several bars can share one page). */
-	const ROOMS = new WeakMap<HTMLElement, ScrollRoom>();
+	/**
+	 * Room kept per scroller for the bars covering it (several bars can share one page), with the
+	 * scroller's own inline values from before the first bar, put back once the last bar hides.
+	 */
+	const ROOMS = new WeakMap<HTMLElement, { room: ScrollRoom; padding: string; space: string }>();
 	/** The CSS variable a covered scroller gets: the room its tallest covering bar needs. */
 	const BAR_SPACE = '--ak-settings-bar-space';
 
@@ -253,10 +256,11 @@
 		if (!root || !visible || layout === 'footer') return;
 		const bar = root;
 		const scroller = scrollerOf(bar);
-		const room = ROOMS.get(scroller) ?? new ScrollRoom();
-		ROOMS.set(scroller, room);
+		// The first bar on a scroller records its own values; later bars share them.
+		const before = ROOMS.get(scroller) ?? { room: new ScrollRoom(), padding: scroller.style.scrollPaddingBottom, space: scroller.style.getPropertyValue(BAR_SPACE) };
+		ROOMS.set(scroller, before);
+		const { room } = before;
 		const key = Symbol('save-bar');
-		const before = { padding: scroller.style.scrollPaddingBottom, space: scroller.style.getPropertyValue(BAR_SPACE) };
 		const apply = (px: number) => {
 			scroller.style.setProperty(BAR_SPACE, `${px}px`);
 			scroller.style.scrollPaddingBottom = `var(${BAR_SPACE})`;
@@ -277,6 +281,7 @@
 			observer.disconnect();
 			const left = room.set(key, undefined);
 			if (!room.empty) return apply(left);
+			ROOMS.delete(scroller);
 			scroller.style.scrollPaddingBottom = before.padding;
 			if (before.space) scroller.style.setProperty(BAR_SPACE, before.space);
 			else scroller.style.removeProperty(BAR_SPACE);

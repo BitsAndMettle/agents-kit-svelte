@@ -2,11 +2,12 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Archive, CloudOff, CreditCard, Trash2, UserMinus } from '@lucide/svelte';
+	import { Archive, CloudOff, CreditCard, Crown, Trash2, UserMinus } from '@lucide/svelte';
 	import { ConsequenceDialog, type ConsequenceConfirmContext } from '$lib/settings/save';
 	import { SettingsRow, SettingsSection } from '$lib/settings/rows';
 	import { rememberOpener, RECIPES, SETTINGS_CONTAINER, type ConsequenceGroup, type ReassignSpec, type SettingLock, type SettingsResult } from '$lib/settings/shared';
 	import { Button } from '$lib/primitives/actions';
+	import { Input } from '$lib/primitives/form';
 	import { cn } from '$lib/ui/cn';
 	import { buttonClass } from '$lib/ui/styles';
 
@@ -86,6 +87,8 @@
 	/** "View as a viewer" locks the Ownership section: its dialogs still open, but can't confirm. */
 	let viewer = $state(false);
 	const VIEWER_LOCK: SettingLock = { kind: 'permission', reason: 'Only the team owner can archive the team or hand over billing.' };
+	/** One row is always locked: the dialog behind it opens, but its phrase and Confirm stay off. */
+	const TRANSFER_LOCK: SettingLock = { kind: 'permission', reason: 'Only the current owner can transfer the team.' };
 
 	let disconnectOpen = $state(false);
 	let removeOpen = $state(false);
@@ -224,6 +227,36 @@
 					{/snippet}
 					{#snippet identity()}
 						<span class="font-medium">Billing contact</span> <span class="text-fg-light">· you · invoices monthly</span>
+					{/snippet}
+					<div class="grid gap-1.5">
+						<label for="cdd-handover-note" class="text-xs font-medium text-fg-main">Note for the new contact</label>
+						<Input id="cdd-handover-note" name="note" placeholder="Optional" autocomplete="off" />
+					</div>
+				</ConsequenceDialog>
+			{/snippet}
+		</SettingsRow>
+		<SettingsRow label="Transfer ownership" description="Make someone else the team owner." lock={TRANSFER_LOCK}>
+			{#snippet control()}
+				<ConsequenceDialog
+					title="Transfer Northwind Studio?"
+					description="The new owner can delete the team and change billing."
+					icon={Crown}
+					consequences={[
+						{ tone: 'warn', label: 'You become an admin' },
+						{ tone: 'ok', label: 'Your documents stay yours' }
+					]}
+					confirmPhrase="Transfer"
+					confirmLabel="Transfer team"
+					reversible={false}
+					action="/settings-demo/transfer"
+					intent="transfer"
+					onConfirm={(context) => run('Team transferred', context)}
+				>
+					{#snippet trigger(part)}
+						<button {...part} class={buttonClass('secondary', 'sm')}>Transfer…</button>
+					{/snippet}
+					{#snippet identity()}
+						<span class="font-medium">Northwind Studio</span> <span class="text-fg-light">· owned by Ada Park</span>
 					{/snippet}
 				</ConsequenceDialog>
 			{/snippet}

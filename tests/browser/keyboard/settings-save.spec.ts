@@ -335,13 +335,16 @@ test.describe('SettingsForm', () => {
 	});
 });
 
+/** The save-bar demo's first form; a second one ("Push settings") shares its scrolling frame. */
+const notifications = (section: Locator) => section.locator('form[aria-label="Notification settings"]');
+
 test.describe('SaveBar', () => {
 	test('lists changes with an impact line; a failed save is an alert that takes focus; Discard restores', async ({ page }) => {
 		const section = await openOnClock(page, 'save-bar');
 		await section.getByRole('combobox', { name: 'Next save' }).selectOption('error');
 		const mentions = section.getByRole('switch', { name: 'Mentions' });
 		await mentions.click();
-		const bar = section.locator('[data-layout="sticky"]');
+		const bar = notifications(section).locator('[data-layout="sticky"]');
 		await expect(bar).toContainText('1 unsaved change');
 		await expect(bar.getByRole('list', { name: 'Unsaved changes' })).toContainText('Mentions');
 		await expect(bar.getByRole('list', { name: 'Unsaved changes' })).toContainText('Off');
@@ -367,7 +370,7 @@ test.describe('SaveBar', () => {
 		for (const name of ['Mentions', 'Assigned to you', 'Comments on your work', 'Invites accepted']) {
 			await section.getByRole('switch', { name }).click();
 		}
-		const bar = section.locator('[data-layout="sticky"]');
+		const bar = notifications(section).locator('[data-layout="sticky"]');
 		await expect(bar).toContainText('4 unsaved changes');
 		await expect(bar.getByRole('listitem')).toHaveCount(4);
 		await expect(bar.getByRole('listitem').last()).toHaveText('+1 more');
@@ -381,7 +384,7 @@ test.describe('SaveBar', () => {
 	test('footer layout always shows, with Save disabled while clean; floating is fixed to its frame', async ({ page }) => {
 		const section = await openSection(page, 'save-bar');
 		await section.getByRole('button', { name: 'Footer' }).click();
-		const footer = section.locator('[data-layout="footer"]');
+		const footer = notifications(section).locator('[data-layout="footer"]');
 		await expect(footer).toContainText('No unsaved changes');
 		await expect(footer.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 		await section.getByRole('switch', { name: 'Mentions' }).click();
@@ -398,7 +401,7 @@ test.describe('SaveBar', () => {
 
 	test('without JavaScript the bar shows and Discard resets the form natively', async ({ browser }) => {
 		const { section, close } = await openWithoutJs(browser, 'save-bar');
-		const bar = section.locator('[data-layout="sticky"]');
+		const bar = notifications(section).locator('[data-layout="sticky"]');
 		await expect(bar.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 		const mentions = section.getByRole('switch', { name: 'Mentions' });
 		await mentions.click();
@@ -978,7 +981,7 @@ test.describe('Red-team fixes: SettingsForm owns Enter, and Save never carries a
 			const section = await openSection(page, 'save-bar');
 			await section.getByRole('group', { name: 'Bar layout' }).getByRole('button', { name: layout }).click();
 			await section.getByRole('switch', { name: 'Mentions' }).click();
-			const bar = section.locator(`[data-layout="${layout.toLowerCase()}"]`);
+			const bar = notifications(section).locator(`[data-layout="${layout.toLowerCase()}"]`);
 			await expect(bar).toContainText('1 unsaved change');
 			const target = section.getByRole('switch', { name: 'Weekly digest' });
 			const previous = section.getByRole('switch', { name: 'Invites accepted' });
@@ -1093,5 +1096,122 @@ test.describe('Red-team fixes: locks, outcomes and announcements', () => {
 		await notice.getByRole('button', { name: 'Use for the whole team' }).click();
 		await page.clock.runFor(SETTLE);
 		await expect(notice.getByRole('alert')).toHaveText('Only admins can set the team’s density.');
+	});
+});
+
+test.describe('Verifier fixes: Enter, row locks, unavailable confirms and shared scroll room', () => {
+	test('Enter in an unedited field saves nothing; once a field changes it saves', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		const form = section.locator('form[aria-label="General settings"]');
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await expect(form.locator('[data-settings-default]')).toBeDisabled();
+		await pauseClock(page);
+		await team.press('Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('sf-log')).toHaveText('');
+		await expect(form.locator('input[name="revision"]')).toHaveValue('7');
+
+		await team.fill('Northwind Design');
+		await expect(form.locator('[data-settings-default]')).toBeEnabled();
+		await team.press('Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 8: Team name → Northwind Design');
+	});
+
+	test('a locked SettingsRow around a ConsequenceDialog turns off its phrase and Confirm and runs nothing', async ({ page }) => {
+		const section = await openOnClock(page, 'consequence-dialog');
+		await section.getByRole('button', { name: 'Transfer…' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Transfer Northwind Studio?' });
+		const reason = 'This is locked here, so it can’t be confirmed.';
+		await expect(dialog.getByText(reason)).toBeVisible();
+		const phrase = dialog.getByRole('textbox', { name: 'Type “Transfer” to confirm' });
+		await expect(phrase).toBeDisabled();
+		await expect(phrase).toHaveAccessibleDescription(reason);
+		const confirm = dialog.getByRole('button', { name: 'Transfer team' });
+		await expect(confirm).toBeDisabled();
+		await expect(confirm).toHaveAccessibleDescription(reason);
+		await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+		await pauseClock(page);
+		await dialog.locator('form').evaluate((form) => (form as HTMLFormElement).requestSubmit());
+		await page.clock.runFor(SETTLE);
+		await expect(dialog).toBeVisible();
+		await expect(section.getByTestId('cdd-status')).toHaveText('');
+	});
+
+	for (const blocked of ['confirmUnavailable', 'a covering lock'] as const) {
+		test(`Enter in a dialog's own text field posts and runs nothing under ${blocked}`, async ({ page }) => {
+			const section = await openOnClock(page, 'consequence-dialog');
+			if (blocked === 'a covering lock') await section.getByRole('checkbox', { name: 'View as a viewer' }).check();
+			let posted = false;
+			await page.route('**/settings-demo/billing', async (route) => {
+				posted = true;
+				await route.fulfill({ status: 200, contentType: 'text/html', body: '<p>posted</p>' });
+			});
+			await section.getByRole('button', { name: 'Hand over…' }).click();
+			const dialog = page.getByRole('dialog', { name: 'Hand over billing?' });
+			const note = dialog.getByRole('textbox', { name: 'Note for the new contact' });
+			await note.fill('Invoices go to finance now');
+			const submits = () => page.evaluate(() => (window as unknown as { submits: number }).submits);
+			await page.evaluate(() => {
+				(window as unknown as { submits: number }).submits = 0;
+				window.addEventListener('submit', () => (window as unknown as { submits: number }).submits++, { capture: true });
+			});
+			await pauseClock(page);
+			// The form's default button is disabled, so Enter never submits it.
+			await note.press('Enter');
+			expect(await submits()).toBe(0);
+			// A submit that bypasses the buttons (a script, an extension) is stopped by the dialog.
+			await dialog.locator('form').evaluate((form) => (form as HTMLFormElement).requestSubmit());
+			expect(await submits()).toBe(1);
+			await page.clock.runFor(SETTLE);
+			await expect(dialog).toBeVisible();
+			await expect(note).toHaveValue('Invoices go to finance now');
+			await expect(section.getByTestId('cdd-status')).toHaveText('');
+			expect(posted).toBe(false);
+		});
+	}
+
+	test('without JavaScript Enter in the field of an unavailable dialog posts nothing', async ({ browser }) => {
+		const { page, close } = await openWithoutJs(browser, 'consequence-dialog');
+		let posted = false;
+		await page.route('**/settings-demo/billing', async (route) => {
+			posted = true;
+			await route.fulfill({ status: 200, contentType: 'text/html', body: '<p>posted</p>' });
+		});
+		// Without JavaScript the trigger cannot open it; the closed dialog's form is still in the page.
+		const form = page.locator('form[action="/settings-demo/billing"]');
+		const note = form.locator('input[name="note"]');
+		await note.evaluate((el) => {
+			(el.closest('dialog') as HTMLDialogElement).setAttribute('open', '');
+		});
+		await note.fill('Invoices go to finance now');
+		await note.press('Enter');
+		expect(posted).toBe(false);
+		await expect(note).toHaveValue('Invoices go to finance now');
+		// Its disabled default button stops Enter, and no intent would ride along anyway.
+		await expect(form.locator('[data-consequence-default]')).toBeDisabled();
+		await expect(form.locator('input[name="intent"]')).toHaveCount(0);
+		await close();
+	});
+
+	test('two forms with sticky bars on one scroller put its own scroll room back once both bars hide', async ({ page }) => {
+		const section = await openSection(page, 'save-bar');
+		const scroller = section.locator('.overflow-y-auto').first();
+		const room = () => scroller.evaluate((el) => [el.style.scrollPaddingBottom, el.style.getPropertyValue('--ak-settings-bar-space')]);
+		expect(await room()).toEqual(['', '']);
+		const first = notifications(section).locator('[data-layout="sticky"]');
+		const second = section.getByTestId('sbd-push-bar');
+		await section.getByRole('switch', { name: 'Mentions' }).click();
+		await expect(first).toContainText('1 unsaved change');
+		await section.getByRole('switch', { name: 'Direct messages' }).click();
+		await expect(second).toContainText('1 unsaved change');
+		expect((await room())[0]).toBe('var(--ak-settings-bar-space)');
+
+		await first.getByRole('button', { name: 'Discard' }).click();
+		await expect(first.getByRole('button', { name: 'Discard' })).toHaveCount(0);
+		expect((await room())[1]).toMatch(/^\d+px$/);
+		await second.getByRole('button', { name: 'Discard' }).click();
+		await expect(second.getByRole('button', { name: 'Discard' })).toHaveCount(0);
+		await expect.poll(room).toEqual(['', '']);
 	});
 });

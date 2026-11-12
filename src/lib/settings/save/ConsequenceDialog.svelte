@@ -15,10 +15,12 @@
 	surrounding form, so check `intent` before acting on them. There, form attributes and
 	`enhance` belong on the SettingsForm: other attributes are not applied (development warns once).
 
-	A lock covering it (a SettingsPage scope or SettingsSection lock) disables the phrase, the
-	choices and Confirm, shows the lock's reason in the dialog and describes them with it; it never
-	calls `onConfirm` or posts then. `confirmUnavailable` does the same for a reason of your own,
-	keeping Confirm focusable.
+	A lock covering it (a SettingsPage scope or SettingsSection lock, or a locked or disabled
+	SettingsRow or Field around it) disables the phrase, the choices and Confirm, shows the lock's
+	reason in the dialog (`labels.locked` for a row's or field's) and describes them with it; it
+	never calls `onConfirm` or posts then. `confirmUnavailable` does the same for a reason of your
+	own, keeping Confirm focusable: a disabled default button stops Enter in a field from posting,
+	and no `intent` is posted without JavaScript.
 -->
 <script lang="ts" module>
 	/** Every word ConsequenceDialog shows or announces. */
@@ -40,6 +42,8 @@
 		whatHappens: string;
 		/** Heading of a flat list's `ok` items, when it has effects too. */
 		whatStays: string;
+		/** Why Confirm is off when the SettingsRow or Field around the dialog is locked or disabled (a section or page lock shows its own reason). */
+		locked: string;
 	}
 
 	/** What `onConfirm` receives. */
@@ -60,7 +64,7 @@
 	import type { Part, ChangeReason } from '../../headless/runtime/parts';
 	import { Alert } from '../../primitives/display';
 	import { Button } from '../../primitives/actions';
-	import { Input, NativeSelect, setFieldContext, type FieldState } from '../../primitives/form';
+	import { getFieldContext, Input, NativeSelect, setFieldContext, type FieldState } from '../../primitives/form';
 	import { FormSubmit } from '../../primitives/form/submit.svelte';
 	import { Dialog } from '../../primitives/overlays';
 	import { matchesPhrase, phrasePattern, type PhraseOptions } from '../shared/confirm';
@@ -185,11 +189,13 @@
 		replacementFor: (label) => `New owner for ${label}`,
 		whatHappens: 'What happens',
 		whatStays: 'What stays',
+		locked: 'This is locked here, so it can’t be confirmed.',
 		...labels
 	});
 
 	// The dialog is a field scope of its own: a row (or Field) around its trigger must not name or
-	// describe the phrase and the choices inside.
+	// describe the phrase and the choices inside. Its lock still covers them: read it first.
+	const outerField = getFieldContext();
 	setFieldContext(undefined as unknown as FieldState);
 
 	/** Inside a SettingsForm: no `<form>` of its own in the markup (forms never nest). */
@@ -283,10 +289,16 @@
 	/** A lock covering the dialog (page scope or section). Nothing inside can change then. */
 	const scope = getSettingsScope();
 	const lock = $derived(scope?.lock?.lock);
+	/** A locked SettingsRow (or a disabled Field) around the dialog: its lock object is the row's own, so only "disabled" is known. */
+	const fieldLocked = $derived(Boolean(outerField?.disabled));
+	/** Anything covering the dialog that switches its controls off. */
+	const covered = $derived(Boolean(lock) || fieldLocked);
 	/** Why Confirm cannot run: the covering lock's reason, else `confirmUnavailable`. */
-	const blockedReason = $derived(lock ? lockReasonText(lock) : confirmUnavailable || undefined);
+	const blockedReason = $derived(lock ? lockReasonText(lock) : fieldLocked ? text.locked : confirmUnavailable || undefined);
 	/** Attributes for a control the lock switches off: `disabled`, described by the reason shown in the dialog. */
-	const locked = $derived(lockAttrs(lock, blockedId));
+	const locked = $derived(lock ? lockAttrs(lock, blockedId) : fieldLocked ? { disabled: true as const, 'aria-describedby': blockedId } : {});
+	/** Confirm is a plain button while only `confirmUnavailable` holds it (focusable, posts nothing); a lock disables the submit itself. */
+	const unavailableOnly = $derived(Boolean(confirmUnavailable) && !covered);
 
 	/** No confirm while locked or unavailable, whichever button or key submitted. */
 	function onsubmit(event: SubmitEvent): void {
@@ -373,12 +385,12 @@
 	{/if}
 	<!-- Inside a SettingsForm the intent rides on this button, so only Confirm posts it. Off while the dialog is closed without JavaScript, so it is never the form's default button. -->
 	<Button
-		type={confirmUnavailable && !lock ? 'button' : 'submit'}
+		type={unavailableOnly ? 'button' : 'submit'}
 		form={inDraft && !ownForm ? undefined : formId}
 		formaction={inDraft && !ownForm ? action : undefined}
 		formmethod={inDraft && !ownForm ? 'post' : undefined}
-		name={inDraft && intent !== undefined ? 'intent' : undefined}
-		value={inDraft && intent !== undefined ? intent : undefined}
+		name={inDraft && intent !== undefined && !unavailableOnly ? 'intent' : undefined}
+		value={inDraft && intent !== undefined && !unavailableOnly ? intent : undefined}
 		variant={tone === 'danger' ? 'danger' : 'accent'}
 		loading={busy}
 		disabled={off}
@@ -412,7 +424,7 @@
 >
 	{#if inDraft}
 		<!-- Forms never nest: a fieldset (off while closed) whose controls join the own form once it exists. Attributes meant for a form are not applied here. -->
-		<fieldset bind:this={body} disabled={off || Boolean(lock)} {@attach joinOwnForm} oninput={submit.oninput} class={cn(SETTINGS_CONTAINER, 'm-0 grid min-w-0 gap-4 border-0 p-0')}>
+		<fieldset bind:this={body} disabled={off || covered} {@attach joinOwnForm} oninput={submit.oninput} class={cn(SETTINGS_CONTAINER, 'm-0 grid min-w-0 gap-4 border-0 p-0')}>
 			{@render fields()}
 		</fieldset>
 	{:else}
@@ -423,7 +435,11 @@
 </Dialog>
 
 {#snippet fields()}
-		{#if intent !== undefined && !inDraft}<input type="hidden" name="intent" value={intent} />{/if}
+		{#if unavailableOnly}
+			<!-- Confirm is a plain button now, so this disabled submit is the form's default button: Enter in a field posts nothing. -->
+			<button type="submit" disabled hidden aria-hidden="true" data-consequence-default></button>
+		{/if}
+		{#if intent !== undefined && !inDraft && !unavailableOnly}<input type="hidden" name="intent" value={intent} />{/if}
 		{#each Object.entries(hidden ?? {}) as [name, value] (name)}
 			<input type="hidden" {name} {value} />
 		{/each}
@@ -472,7 +488,7 @@
 								value={reassignValue[dependent.id]}
 								defaultValue={defaults[dependent.id]}
 								onValueChange={(value) => (reassigned = { ...reassigned, [dependent.id]: value })}
-								disabled={busy || Boolean(lock)}
+								disabled={busy || covered}
 								size="sm"
 								class="@lg/settings:w-48"
 							/>

@@ -5,7 +5,8 @@
 	Dirty state is the DOM diff against the server-rendered defaults (or a controlled `changes`
 	list). It posts the revision, runs `onSubmit` (or posts natively), keeps the draft on a
 	conflict, and holds a navigation while dirty with a small leave dialog. It owns implicit
-	submission: Enter in a field always saves, even when an intent or danger button comes first.
+	submission: Enter in a field saves, even when an intent or danger button comes first, and does
+	nothing while a SaveBar's Save would be off (hydrated, nothing unsaved, no failure to retry).
 -->
 <script lang="ts" module>
 	/** Every word SettingsForm shows or announces. */
@@ -43,6 +44,7 @@
 	import { Dialog } from '../../primitives/overlays';
 	import { SettingsDraft, type SettingsSubmitHandler } from '../shared/staged.svelte';
 	import { setSettingsDraft } from '../shared/context';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import type { SettingsChange, SettingsFieldDescriptor, SettingsResult } from '../shared/types';
 	import { SaveBarPresence, setSaveBarPresence } from './presence.svelte';
 
@@ -142,6 +144,10 @@
 		controller = draft;
 	});
 
+	/** The default button follows SaveBar's Save: on before hydration (native post), else only with something to save or retry. */
+	const ready = new ReadyGate();
+	const canSave = $derived(!ready.current || draft.dirtyCount > 0 || draft.status === 'error' || draft.status === 'conflict');
+
 	/** After "Save and leave" failed, where focus goes once the dialog closes: the invalid field, else the error. */
 	function failedLeaveTarget(): HTMLElement | null {
 		if (!draft.guard.failed || !ref) return null;
@@ -165,8 +171,8 @@
 <svelte:window onbeforeunload={draft.guard.beforeunload} />
 
 <form {...rest} bind:this={ref} method="post" {action} {@attach draft.attach} onsubmit={draft.onsubmit} aria-busy={draft.pending || undefined} class={cn('min-w-0', className)}>
-	<!-- The form's default button (the first submit in it): Enter in a field saves, with or without JavaScript, never an intent or danger button further down. -->
-	<button type="submit" tabindex="-1" aria-hidden="true" data-settings-default class="sr-only"></button>
+	<!-- The form's default button (the first submit in it): Enter in a field saves, with or without JavaScript, never an intent or danger button further down. Disabled, it makes Enter do nothing. -->
+	<button type="submit" tabindex="-1" aria-hidden="true" data-settings-default disabled={!canSave} class="sr-only"></button>
 	{#if revision !== undefined}
 		<input type="hidden" name={revisionName} value={String(revision)} />
 	{/if}
