@@ -145,7 +145,7 @@ export const PRIMITIVES_FORM: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/form/NativeSelect.svelte',
 		upstreamSource: SOURCE,
 		description:
-			"The browser's own select in the kit look, with a chevron, an optional placeholder, options or option groups from data, or your own `<option>` children. Keeps native keyboard, typeahead and mobile pickers.",
+			"The browser's own select in the kit look, with a chevron, an optional placeholder, options or option groups from data, or your own `<option>` children. Keeps native keyboard, typeahead and mobile pickers. `variant=\"pill\"` draws a compact chip as wide as the chosen option (a role in a list row, a filter), with the native select laid over it so the picker and form post stay native.",
 		usageSnippet: `<script lang="ts">
   import { Field, NativeSelect } from 'agents-kit-svelte';
 
