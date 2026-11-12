@@ -7,7 +7,7 @@
 export type * from './types';
 export { SettingsDraft } from './staged.svelte';
 export type { SettingsDraftOptions, SettingsSubmitContext, SettingsSubmitHandler, SettingsValues } from './staged.svelte';
-export { readDefaults, readCurrent, diffForm, describeChanges, adoptCurrentAsDefaults, sameValue, CHANGE_WORDS } from './diff';
+export { readDefaults, readCurrent, diffForm, describeChanges, adoptCurrentAsDefaults, sameValue, undescribedChanges, CHANGE_WORDS } from './diff';
 export type { ChangeWords, ControlLike, FormLike, OptionLike, FieldReading } from './diff';
 export { InstantSetting } from './instant.svelte';
 export type { InstantOptions } from './instant.svelte';

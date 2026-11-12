@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix, relative } from 'node:path';
 import test from 'node:test';
-import { adoptCurrentAsDefaults, describeChanges, diffForm, readCurrent, readDefaults, sameValue, type ControlLike, type OptionLike } from '../src/lib/settings/shared/diff.ts';
+import { adoptCurrentAsDefaults, describeChanges, diffForm, readCurrent, readDefaults, sameValue, undescribedChanges, type ControlLike, type OptionLike } from '../src/lib/settings/shared/diff.ts';
 import { InstantCore, UndoSlot, type InstantSnapshot } from '../src/lib/settings/shared/undo.ts';
 import { LOCK_LABELS, LOCK_PRECEDENCE, lockAttrs, lockReasonText, pickLock } from '../src/lib/settings/shared/lock.ts';
 import { matchesPhrase, phrasePattern } from '../src/lib/settings/shared/confirm.ts';
@@ -99,6 +99,12 @@ test('diffForm lists described fields that changed, with option and label text, 
 		{ name: 'teamName', label: 'Team name', from: '“Northwind Studio”', to: '“Northwind Design”' },
 		{ name: 'digest', label: 'Email digest', from: 'Yes', to: 'No' }
 	]);
+});
+
+test('undescribedChanges names changed controls that no field describes', () => {
+	const f = form(text('teamName', 'New', 'Old'), text('forgot', 'a', 'b'), text('clean', 'same'), box('alsoForgot', 'true', true, false));
+	assert.deepEqual(undescribedChanges(f, SAMPLE_SETTINGS_FIELDS), ['forgot', 'alsoForgot']);
+	assert.deepEqual(undescribedChanges(f, [...SAMPLE_SETTINGS_FIELDS, { name: 'forgot', label: 'Forgot' }, { name: 'alsoForgot', label: 'Also' }]), []);
 });
 
 test('diffForm sees radio changes by label and ignores list order', () => {
@@ -234,6 +240,34 @@ test('the undo token is superseded by a later set, and undo creates no undo poin
 	assert.equal(instance.snapshot.canUndo, false);
 	assert.equal(await instance.undo(), false);
 	instance.dispose();
+});
+
+test('a failed or same-value later set still supersedes the undo token', async () => {
+	for (const later of [5, 2]) {
+		const undone: number[] = [];
+		const instance = new InstantCore<number>({
+			initial: 1,
+			commit: () => (v) => (v === 5 ? { error: 'No' } : undefined),
+			undo: () => (v) => {
+				undone.push(v);
+			},
+			savedForMs: () => 5
+		});
+		await instance.set(2);
+		const token = instance.snapshot.undoToken;
+		assert.equal(instance.isCurrent(token), true);
+		await instance.set(later);
+		// The failure reverted to 2 (or the same value saved again): nothing is undoable any more.
+		assert.equal(instance.snapshot.committed, 2);
+		assert.equal(instance.isCurrent(token), false, `after set(${later})`);
+		assert.equal(instance.snapshot.undoToken, undefined);
+		assert.equal(instance.snapshot.canUndo, false);
+		assert.equal(await instance.undo(token), false);
+		assert.equal(await instance.undo(), false);
+		assert.deepEqual(undone, []);
+		assert.equal(instance.snapshot.current, 2);
+		instance.dispose();
+	}
 });
 
 test('sync adopts an outside value unless a change is pending', async () => {
@@ -449,29 +483,76 @@ function files(dir: string): string[] {
 }
 const sources = files(settingsDir).map((path) => ({ rel: relative(process.cwd(), path).replace(/\\/g, '/'), source: readFileSync(path, 'utf8') }));
 
+const GROUPS = ['shell', 'rows', 'save', 'controls'];
+
+/** Import targets in a group file that reach another group: directly, or through a barrel that re-exports every group. */
+function crossGroupImports(rel: string, source: string): string[] {
+	const own = GROUPS.find((g) => rel.startsWith(`src/lib/settings/${g}/`));
+	if (!own) return [];
+	const bad: string[] = [];
+	for (const [, , target] of source.matchAll(/(?:from|import)\s*\(?\s*(['"])([^'"]+)\1/g)) {
+		if (target === 'agents-kit-svelte' || target.startsWith('agents-kit-svelte/')) {
+			bad.push(target);
+			continue;
+		}
+		let resolved: string;
+		if (target.startsWith('.')) resolved = posix.normalize(posix.join(posix.dirname(rel), target));
+		else if (target === '$lib' || target.startsWith('$lib/')) resolved = 'src/lib' + target.slice('$lib'.length);
+		else continue;
+		resolved = resolved.replace(/\/$/, '').replace(/\.(?:svelte\.)?[jt]s$/, '').replace(/\/index$/, '');
+		const barrels = ['src/lib', 'src/lib/settings', 'src/lib/entries/settings'];
+		const other = GROUPS.find((g) => g !== own && (resolved === `src/lib/settings/${g}` || resolved.startsWith(`src/lib/settings/${g}/`)));
+		if (other || barrels.includes(resolved)) bad.push(target);
+	}
+	return bad;
+}
+
+test('the cross-group import check also rejects barrels and package paths', () => {
+	const rel = 'src/lib/settings/save/SaveBar.svelte';
+	const allowedSource = [`import { RECIPES } from '../shared/recipes';`, `import Button from '../../primitives/actions/Button.svelte';`, `import { x } from './local';`].join('\n');
+	assert.deepEqual(crossGroupImports(rel, allowedSource), []);
+	for (const target of ['..', '../', '../index', '../index.ts', '../rows', '../rows/SettingsRow.svelte', '$lib/settings', '$lib/settings/rows', '$lib/entries/settings', '$lib', '../..', 'agents-kit-svelte/settings', 'agents-kit-svelte']) {
+		assert.deepEqual(crossGroupImports(rel, `import { SettingsRow } from '${target}';`), [target], target);
+	}
+	assert.deepEqual(crossGroupImports(rel, `const m = import('../rows/SettingsRow.svelte');`), ['../rows/SettingsRow.svelte']);
+	// A file outside the groups (the shared layer, the root index) is not checked.
+	assert.deepEqual(crossGroupImports('src/lib/settings/index.ts', `export * from './rows';`), []);
+});
+
 test('the shared layer has no .svelte files and groups never import another group', () => {
-	const groups = ['shell', 'rows', 'save', 'controls'];
 	for (const { rel, source } of sources) {
 		assert.ok(!(rel.startsWith('src/lib/settings/shared/') && rel.endsWith('.svelte')), `${rel}: the shared layer is .ts and .svelte.ts only`);
-		const own = groups.find((g) => rel.startsWith(`src/lib/settings/${g}/`));
-		if (!own) continue;
-		for (const [, target] of source.matchAll(/from ['"](\.{1,2}\/[^'"]+)['"]/g)) {
-			const resolved = posix.normalize(posix.join(posix.dirname(rel), target));
-			for (const other of groups.filter((g) => g !== own)) {
-				assert.ok(!resolved.startsWith(`src/lib/settings/${other}/`) && resolved !== `src/lib/settings/${other}`, `${rel} imports ${target} from the ${other} group`);
-			}
-		}
+		assert.deepEqual(crossGroupImports(rel, source), [], `${rel} imports another settings group (directly or through a barrel)`);
 	}
 });
 
-test('settings components use container queries from CQ only, never viewport breakpoints or hex colours', () => {
+/** Problems with layout and colour in one settings source: viewport breakpoints, non-CQ container queries, hex colours. */
+function lookProblems(source: string): string[] {
 	const allowed = new Set(Object.values(CQ).flatMap((v) => [v, v.replace('@', '@max-')]));
-	for (const { rel, source } of sources.filter((s) => s.rel.endsWith('.svelte') || s.rel.includes('/shared/recipes'))) {
-		for (const [, variant] of source.matchAll(/(@(?:max-)?[\w[\]-]+\/settings):/g)) {
-			assert.ok(allowed.has(variant), `${rel} uses ${variant}; use the CQ breakpoints (${[...allowed].join(', ')})`);
-		}
-		assert.doesNotMatch(source, /(?<=["'`\s{])(?:max-)?(?:sm|md|lg|xl|2xl):[a-z[-]/, `${rel} uses a viewport breakpoint; use container queries`);
-		assert.doesNotMatch(source, /@media\s*\((?:min|max)-width/, `${rel} uses a viewport media query`);
-		assert.doesNotMatch(source, /(?:^|[\s:"'=(])#[0-9a-fA-F]{3,8}\b/, `${rel} hard-codes a hex colour`);
+	const problems: string[] = [];
+	for (const [, variant] of source.matchAll(/(@(?:max-)?[\w[\]-]+\/settings):/g)) {
+		if (!allowed.has(variant)) problems.push(`uses ${variant}; use the CQ breakpoints (${[...allowed].join(', ')})`);
+	}
+	if (/(?<=["'`\s{])(?:max-)?(?:sm|md|lg|xl|2xl):[a-z[-]/.test(source)) problems.push('uses a viewport breakpoint; use container queries');
+	if (/@media\s*\((?:min|max)-width/.test(source)) problems.push('uses a viewport media query');
+	// Fragment links (`href="#add"`, `closeHref: '#feed'`) are not colours.
+	const withoutLinks = source.replace(/\w*[Hh]ref\s*[:=]\s*\{?\s*(['"`])[^'"`]*\1/g, '');
+	if (/(?:^|[\s:"'`=(,[])#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b/.test(withoutLinks)) problems.push('hard-codes a hex colour');
+	return problems;
+}
+
+test('the look check flags breakpoints and hex colours, not fragment links', () => {
+	assert.deepEqual(lookProblems(`<a href="#add">Add</a> <Button href={'#feed'} /> const link = { closeHref: '#face' };`), []);
+	assert.deepEqual(lookProblems(`class="@lg/settings:flex @max-3xl/settings:grid"`), []);
+	assert.equal(lookProblems(`export const METER = 'text-[#fafafa]';`).length, 1);
+	assert.equal(lookProblems(`const fill = "#0a0a0a";`).length, 1);
+	assert.equal(lookProblems(`export const WIDE = 'md:grid';`).length, 1);
+	assert.equal(lookProblems(`export const WIDE = '@md/settings:grid';`).length, 1);
+});
+
+test('settings sources use container queries from CQ only, never viewport breakpoints or hex colours', () => {
+	// Every .svelte and .ts file in the collection: a group's own class-constant siblings count too.
+	for (const { rel, source } of sources.filter((s) => /\.(?:svelte|ts)$/.test(s.rel))) {
+		assert.deepEqual(lookProblems(source), [], rel);
 	}
 });

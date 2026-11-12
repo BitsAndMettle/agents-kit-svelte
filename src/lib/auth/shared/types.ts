@@ -5,11 +5,12 @@ import type { FormResult, FormSubmitContext, FormSubmitHandler } from '../../pri
 /**
  * What an auth handler can hand back after a submit: the kit-wide `FormResult`. `error` is shown
  * once, above the form, and announced; `errors` lands on the named fields. Return nothing on success.
+ * An interface, not an alias, so apps can still augment it.
  */
-export type AuthResult<F extends string = string> = FormResult<F>;
+export interface AuthResult<F extends string = string> extends FormResult<F> {}
 
 /** Everything a submit handler gets beside the typed values: the kit-wide `FormSubmitContext`. */
-export type AuthSubmitContext = FormSubmitContext;
+export interface AuthSubmitContext extends FormSubmitContext {}
 
 /**
  * A component's submit callback: the kit-wide `FormSubmitHandler`. Return (or resolve to) an

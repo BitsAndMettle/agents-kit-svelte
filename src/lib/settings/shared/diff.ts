@@ -150,7 +150,7 @@ export function sameValue(a: string | string[], b: string | string[]): boolean {
  * The described fields whose current value differs from their default, in `fields` order. Text
  * comes from the field's `format`, else option text (selects), label text (radios, checkbox
  * groups), `words.on`/`words.off` (a lone checkbox) or the value. Controls not named in `fields`
- * never count.
+ * never count (`undescribedChanges` lists them).
  *
  * @param form - The `<form>` (or a plain object shaped like one).
  * @param fields - Name, label and optional `format` of each staged field.
@@ -172,6 +172,23 @@ export function diffForm(form: FormLike, fields: readonly SettingsFieldDescripto
 		});
 	}
 	return changes;
+}
+
+/**
+ * Named controls whose value changed but that no field describes, so they never count as dirty.
+ * SettingsDraft warns about these in development: a control that forgot `register` would
+ * otherwise leave the form clean and its edit unguarded.
+ */
+export function undescribedChanges(form: FormLike, fields: readonly SettingsFieldDescriptor[]): string[] {
+	const described = new Set(fields.map((f) => f.name));
+	const saved = read(form, 'default', CHANGE_WORDS);
+	const now = read(form, 'current', CHANGE_WORDS);
+	const names: string[] = [];
+	for (const [name, after] of now) {
+		const before = saved.get(name);
+		if (!described.has(name) && before && !sameValue(before.raw, after.raw)) names.push(name);
+	}
+	return names;
 }
 
 function toRaw(value: unknown): string | string[] {

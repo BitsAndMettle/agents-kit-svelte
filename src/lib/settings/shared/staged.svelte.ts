@@ -1,10 +1,10 @@
 import { tick, untrack } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
 import { isThenable } from '../../core/promise';
-import { adoptCurrentAsDefaults, CHANGE_WORDS, diffForm, type ChangeWords } from './diff';
+import { adoptCurrentAsDefaults, CHANGE_WORDS, diffForm, undescribedChanges, type ChangeWords } from './diff';
 import type { SettingStatus, SettingsChange, SettingsConflict, SettingsFieldDescriptor, SettingsHandler, SettingsResult } from './types';
 
-export { readDefaults, readCurrent, diffForm, describeChanges, adoptCurrentAsDefaults, sameValue, CHANGE_WORDS } from './diff';
+export { readDefaults, readCurrent, diffForm, describeChanges, adoptCurrentAsDefaults, sameValue, undescribedChanges, CHANGE_WORDS } from './diff';
 export type { ChangeWords, ControlLike, FormLike, OptionLike, FieldReading } from './diff';
 
 /** What a staged submit handler gets beside the values. */
@@ -100,6 +100,20 @@ export class SettingsDraft {
 			const changes = this.changes;
 			untrack(() => this.#options.onDirtyChange()?.(changes));
 		});
+		// Vite (and SvelteKit) set this in development only; elsewhere it is undefined.
+		if (import.meta.env?.DEV) {
+			const warned = new Set<string>();
+			$effect(() => {
+				void this.#version;
+				const form = this.#form;
+				if (!form || this.#options.changes()) return;
+				for (const name of undescribedChanges(form, this.fields)) {
+					if (warned.has(name)) continue;
+					warned.add(name);
+					console.warn(`SettingsForm: "${name}" changed but no field describes it, so it does not count as unsaved. Pass it in \`fields\` or register it (a SettingsRow with \`name\`).`);
+				}
+			});
+		}
 	}
 
 	/** Every staged field: the form's descriptors, then the rows' registered ones (first name wins). */
@@ -176,9 +190,10 @@ export class SettingsDraft {
 	 * @returns A function that removes it again (call it on unmount).
 	 */
 	register(field: SettingsFieldDescriptor): () => void {
-		this.#registered = [...this.#registered, field];
+		// Rows call this from an effect: read without tracking, or the effect would re-run itself.
+		untrack(() => (this.#registered = [...this.#registered, field]));
 		return () => {
-			this.#registered = this.#registered.filter((f) => f !== field);
+			untrack(() => (this.#registered = this.#registered.filter((f) => f !== field)));
 		};
 	}
 
@@ -205,7 +220,8 @@ export class SettingsDraft {
 		form.addEventListener('input', edited);
 		form.addEventListener('change', edited);
 		form.addEventListener('reset', reset);
-		this.#version++;
+		// Svelte runs an attachment inside an effect: bump without reading, or it would re-run itself.
+		untrack(() => this.#version++);
 		return () => {
 			form.removeEventListener('input', edited);
 			form.removeEventListener('change', edited);
