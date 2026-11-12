@@ -63,6 +63,8 @@
 		control?: Snippet<[FieldControlAttrs]>;
 		/** Id the control takes (default generated). Set it here, not on the control. */
 		controlId?: string;
+		/** The label is the control's `<label for>` (default). Set false for a control a `<label>` cannot name, such as a link: the label is then plain text, and the control spreads only the argument's `aria-describedby` so the description still describes it. */
+		labelFor?: boolean;
 		/** The control is several inputs (a RadioGroup, checkboxes): the right side becomes one group (a `<fieldset>`) named by the label and described by the description, status and lock reason. A lock disables everything in it. A kit RadioGroup inside takes no second name from the row. */
 		group?: boolean;
 		/** A read-only value shown instead of a control. */
@@ -116,6 +118,7 @@
 		name,
 		control,
 		controlId,
+		labelFor = true,
 		group = false,
 		value,
 		mono = false,
@@ -272,7 +275,8 @@
 {#snippet controlArea()}
 	{#if control && hideControl}
 		<div class={HIDDEN_COPY_CLASS}>{@render controlBody(control)}</div>
-		<Badge tone="neutral" variant="outline" size="lg" aria-hidden="true">{effectiveLock?.badge}</Badge>
+		<!-- Exposed either way: the copy may show itself (HIDDEN_COPY_CLASS), and CSS cannot toggle aria-hidden. -->
+		<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>
 	{:else if control}
 		{@render controlBody(control)}
 		{#if badgeOnly}<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>{/if}
@@ -294,7 +298,7 @@
 		{#if leading}<div class="shrink-0 pt-0.5">{@render leading()}</div>{/if}
 		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-				{#if control && !group}
+				{#if control && !group && labelFor}
 					<label id={labelId} for={field.controlId} class="text-[13px] leading-5 font-medium text-fg-main">{@render text(label)}{#if required}<span aria-hidden="true" class="text-status-danger"> *</span>{/if}</label>
 				{:else}
 					<span id={labelId} class="text-[13px] leading-5 font-medium text-fg-main">{@render text(label)}</span>

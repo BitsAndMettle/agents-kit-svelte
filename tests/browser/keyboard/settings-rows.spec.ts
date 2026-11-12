@@ -765,12 +765,36 @@ test.describe('Group rows', () => {
 		expect(hiddenStops).toEqual([]);
 	});
 
+	test('a link control (labelFor false) has a plain-text label, takes the description, and no label points at a missing id', async ({ page, browser, baseURL }) => {
+		const check = async (scope: Page) => {
+			const link = scope.getByTestId('section-managed').getByRole('link', { name: 'See the list of authenticator apps' });
+			await expect(link).toHaveAccessibleDescription(/^Only these apps can give sign-in codes\./);
+			const row = rowOf(link);
+			await expect(row.locator('label')).toHaveCount(0);
+			await expect(row.getByText('Authenticator apps', { exact: true })).toBeVisible();
+			const dangling = await scope.locator('#settings-section label[for]').evaluateAll((labels) =>
+				labels.filter((l) => !document.getElementById((l as HTMLLabelElement).htmlFor)).map((l) => l.textContent)
+			);
+			expect(dangling).toEqual([]);
+		};
+		await openSection(page, 'settings-section');
+		await check(page);
+		const noJs = await noJsPage(browser, baseURL);
+		try {
+			await check(noJs.page);
+		} finally {
+			await noJs.close();
+		}
+	});
+
 	test('under a badge lock a control that stays focusable (a link) is shown beside the badge, with and without JavaScript', async ({ page, browser, baseURL }) => {
 		const linkStaysVisible = async (scope: Page) => {
 			const link = scope.getByTestId('section-managed').getByRole('link', { name: 'See the list of authenticator apps' });
 			await expect(link).toBeVisible();
 			expect(await clippedAway(link)).toBe(false);
 			await expect(rowOf(link).getByText('Set by IT')).toBeVisible();
+			// The visible badge is announced too, not only drawn.
+			expect(await rowOf(link).ariaSnapshot()).toContain('Set by IT');
 		};
 		await openSection(page, 'settings-section');
 		await linkStaysVisible(page);
