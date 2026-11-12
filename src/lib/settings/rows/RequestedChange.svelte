@@ -75,9 +75,9 @@
 		onCancelRequest?: SettingsHandler<[]>;
 		/** Sends the request again. It never changes `status`. */
 		onResend?: SettingsHandler<[]>;
-		/** No-JavaScript path: Cancel and Send again post `intent=cancel|resend` to this URL. Inside a SettingsForm they post the outer form there (`formaction`), so that form's fields go along. */
+		/** No-JavaScript path: Cancel and Send again post `intent=cancel|resend` in the body to this URL. Inside a SettingsForm they post the outer form there (`formaction`), so that form's fields go along; with JavaScript and no handler they post this row's intent alone. */
 		action?: string;
-		/** Extra fields for that post (a request id): hidden inputs in the row's own form, or the `action` URL's query inside a SettingsForm. */
+		/** Extra fields for that post (a request id). They always travel in the `action` URL's query, never the body, with or without JavaScript and inside a SettingsForm or not: the server reads them from `url.searchParams`. */
 		hidden?: Record<string, string>;
 		labels?: Partial<RequestedChangeLabels>;
 		class?: string;
@@ -160,9 +160,9 @@
 		if (!handler) {
 			// No handler: the button posts its intent natively. Inside a SettingsForm that post would
 			// go through the form's own submit handler (as if Save), so post this row's fields alone.
-			if (formAction !== undefined && action !== undefined) {
+			if (formAction !== undefined) {
 				event.preventDefault();
-				postAlone(action, which);
+				postAlone(formAction, which);
 			}
 			return;
 		}
@@ -172,33 +172,29 @@
 		void (which === 'cancel' ? cancel : resend).run(handler);
 	}
 
-	/** The same post the row's own form makes (`hidden` fields, then the intent), from a form of its own. */
+	/** The same post the row's own form makes (`hidden` fields in the URL's query, the intent in the body), from a form of its own. */
 	function postAlone(url: string, intent: 'cancel' | 'resend'): void {
 		const form = document.createElement('form');
 		form.method = 'post';
 		form.action = url;
 		form.hidden = true;
-		for (const [key, value] of [...Object.entries(hidden ?? {}), ['intent', intent]]) {
-			const input = document.createElement('input');
-			input.type = 'hidden';
-			input.name = key;
-			input.value = value;
-			form.append(input);
-		}
+		const input = document.createElement('input');
+		input.type = 'hidden';
+		input.name = 'intent';
+		input.value = intent;
+		form.append(input);
 		document.body.append(form);
 		form.submit();
 	}
 
 	/** Submit buttons need a form: their own, or (inside a SettingsForm) the outer one via `formaction`. */
 	const buttonType = $derived<'submit' | 'button'>(action !== undefined ? 'submit' : 'button');
-	/** Inside someone else's form the hidden fields cannot travel as inputs (they would post with its Save too), so they go in the URL. */
-	const formAction = $derived(!ownForm && action !== undefined ? withQuery(action, hidden) : undefined);
+	/** Where the buttons post: `action` with the `hidden` fields in its query. Inside someone else's form they could not travel as inputs (they would post with its Save too), so every path puts them in the URL. */
+	const postUrl = $derived(action !== undefined ? withQuery(action, hidden) : undefined);
+	const formAction = $derived(!ownForm ? postUrl : undefined);
 </script>
 
 {#snippet buttons()}
-	{#if ownForm && hidden}
-		{#each Object.entries(hidden) as [key, value] (key)}<input type="hidden" name={key} {value} />{/each}
-	{/if}
 	{#if onResend || action !== undefined}
 		<Button
 			type={buttonType}
@@ -267,7 +263,7 @@
 	</div>
 	{#if showButtons}
 		{#if ownForm}
-			<form method="post" {action} class="flex shrink-0 flex-wrap items-center gap-2" aria-labelledby="{uid}-label">
+			<form method="post" action={postUrl} class="flex shrink-0 flex-wrap items-center gap-2" aria-labelledby="{uid}-label">
 				{@render buttons()}
 			</form>
 		{:else}

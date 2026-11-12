@@ -87,3 +87,17 @@ export function focusLost(): boolean {
 	const active = document.activeElement;
 	return !active || active === document.body;
 }
+
+/**
+ * True when a person changed this checkbox (clicked it, its label, or pressed Space), not the
+ * browser restoring form state or a script. Reads the browser's own record of user interaction
+ * (`:user-valid` / `:user-invalid`); where that is not supported, any difference counts, which
+ * `autocomplete="off"` keeps honest by stopping restoration. Call it in the browser only.
+ */
+export function flippedByPerson(input: HTMLInputElement): boolean {
+	try {
+		return input.matches(':user-valid, :user-invalid');
+	} catch {
+		return true;
+	}
+}

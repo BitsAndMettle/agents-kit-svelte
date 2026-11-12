@@ -130,7 +130,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/RequestedChange.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A change that waits for approval elsewhere (on a device, by an admin, at a provider): the value in effect against the value asked for, who it waits on, how long ago it was asked (with an injected now) and optional instructions. It offers Send again (onResend) and Cancel request (onCancelRequest), or posts intent=resend|cancel to action without JavaScript (with hidden fields; inside a SettingsForm they ride in the query of action, and with JavaScript the row posts them alone). It never shows success on click: approved, declined and expired appear only when your app passes a new status.',
+			'A change that waits for approval elsewhere (on a device, by an admin, at a provider): the value in effect against the value asked for, who it waits on, how long ago it was asked (with an injected now) and optional instructions. It offers Send again (onResend) and Cancel request (onCancelRequest), or posts intent=resend|cancel to action without JavaScript (hidden fields always ride in the query of action, so read them from url.searchParams; inside a SettingsForm without JavaScript the fields of the outer form go along, and with JavaScript the row posts its intent alone). It never shows success on click: approved, declined and expired appear only when your app passes a new status.',
 		usageSnippet: `<script lang="ts">
   import { RequestedChange, SettingsSection } from 'agents-kit-svelte/settings';
 

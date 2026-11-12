@@ -416,14 +416,16 @@ test.describe('RequestedChange', () => {
 		await expect(section.getByTestId('requested-cancels')).toHaveText('1');
 	});
 
-	test('with JavaScript off, the buttons post their intent', async ({ browser, baseURL }) => {
+	test('with JavaScript off, the buttons post their intent; the request id rides in the query', async ({ browser, baseURL }) => {
 		const { page, close } = await noJsPage(browser, baseURL);
-		await page.route('**/settings-demo/requests', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>posted</p>' }));
+		await stubPosts(page, '/settings-demo/requests');
 		const row = page.getByTestId('requested-nojs');
 		await expect(row).toContainText('sent 4 days ago');
-		const request = page.waitForRequest((r) => r.url().endsWith('/settings-demo/requests') && r.method() === 'POST');
+		const request = page.waitForRequest((r) => new URL(r.url()).pathname === '/settings-demo/requests' && r.method() === 'POST');
 		await row.getByRole('button', { name: 'Send again for Billing access' }).click();
-		expect((await request).postData()).toBe('request=rq_4815&intent=resend');
+		const sent = await request;
+		expect(new URL(sent.url()).search).toBe('?request=rq_4815');
+		expect(sent.postData()).toBe('intent=resend');
 		await close();
 	});
 });
@@ -594,6 +596,39 @@ test.describe('Focus and hydration', () => {
 		await expect(box.getByRole('button', { name: 'Apply' })).toHaveCount(1);
 	});
 
+	test('a state the browser restores on Back is not committed; the switch shows the saved value', async ({ page }) => {
+		const section = await openSection(page, 'settings-toggle');
+		const motion = section.getByTestId('toggle-nojs').getByRole('switch', { name: 'Reduce motion' });
+		await expect(motion).toHaveAttribute('autocomplete', 'off');
+		await motion.click();
+		await expect(page.getByTestId('toggle-motion-bound')).toHaveText('off');
+		await page.goto('/?away=1');
+		await page.goBack();
+		await expect(page.getByRole('button', { name: 'Toggle global color theme' })).toBeEnabled({ timeout: 45000 });
+		// The server renders it on; nothing was flipped on this page, so nothing is saved.
+		await expect(motion).toBeChecked();
+		await expect(rowOf(motion).getByRole('status')).toHaveText('');
+		await expect(page.getByTestId('toggle-motion-bound')).toHaveText('on');
+	});
+
+	test('a switch changed before hydration by a script, not a person, is put back and not committed', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		let release: () => void = () => undefined;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		await page.route('**/_app/immutable/**/*.js', async (route) => {
+			await held;
+			await route.continue();
+		});
+		await page.goto('/', { waitUntil: 'domcontentloaded' });
+		const motion = page.getByTestId('toggle-nojs').getByRole('switch', { name: 'Reduce motion' });
+		await motion.evaluate((node: HTMLInputElement) => (node.checked = false));
+		release();
+		await expect(page.getByRole('button', { name: 'Toggle global color theme' })).toBeEnabled({ timeout: 45000 });
+		await expect(motion).toBeChecked();
+		await expect(rowOf(motion).getByRole('status')).toHaveText('');
+		await expect(page.getByTestId('toggle-motion-bound')).toHaveText('on');
+	});
+
 	test('Undo and Retry hand focus to their switch when they leave', async ({ page }) => {
 		const section = await openOnClock(page, 'settings-toggle');
 		const instant = section.getByTestId('toggle-instant');
@@ -635,6 +670,8 @@ test.describe('Focus and hydration', () => {
 		const sent = ok.locator('[tabindex="-1"]');
 		await expect(sent).toHaveText('Request sent');
 		await expect(sent).toBeFocused();
+		// Reached by keyboard, it shows where focus went.
+		await expect(sent).toHaveCSS('outline-style', 'solid');
 	});
 
 	test("with a handler, a submit of the toggle's own form is not posted", async ({ page }) => {
@@ -659,6 +696,47 @@ test.describe('Focus and hydration', () => {
 		await expect(two).toBeChecked();
 		await expect(two).toHaveAccessibleDescription(/A code from your phone.*Managed by an administrator\./);
 		await expect(box.getByText('Always on')).toBeVisible();
+	});
+});
+
+test.describe('Group rows', () => {
+	test('a group row is one group named by its label; a RadioGroup inside is not named a second time', async ({ page }) => {
+		const section = await openSection(page, 'settings-section');
+		const box = section.getByTestId('section-group');
+		const group = box.getByRole('group', { name: 'Density' });
+		await expect(group).toHaveAccessibleDescription('How much space lists leave between rows.');
+		const radios = group.getByRole('radiogroup');
+		await expect(radios).toHaveCount(1);
+		await expect(radios).toHaveAccessibleName('');
+		const comfortable = group.getByRole('radio', { name: 'Comfortable' });
+		await expect(comfortable).toBeChecked();
+		await comfortable.focus();
+		await press(page, 'ArrowRight');
+		await expect(group.getByRole('radio', { name: 'Spacious' })).toBeChecked();
+	});
+
+	test('under a badge lock a group row shows its controls disabled, never an invisible tab stop', async ({ page }) => {
+		const section = await openSection(page, 'settings-section');
+		const box = section.getByTestId('section-managed');
+		const group = box.getByRole('group', { name: 'Session length' });
+		await expect(group).toHaveAccessibleDescription(/How long you stay signed in.*Managed by an administrator\./);
+		const radio = group.getByRole('radio', { name: '8 hours' });
+		await expect(radio).toBeDisabled();
+		expect((await group.boundingBox())?.width ?? 0).toBeGreaterThan(100);
+		// The single switch still hides behind the badge, disabled, so it takes no focus either.
+		const remember = box.getByRole('switch', { name: 'Remember this device' });
+		await expect(remember).toBeDisabled();
+		await expect(box.getByText('Set by IT')).toHaveCount(2);
+		const hiddenStops = await box.evaluate((node) =>
+			[...node.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
+				.filter((el) => el.tabIndex >= 0 && !(el as HTMLInputElement).disabled && el.getAttribute('type') !== 'hidden')
+				.filter((el) => {
+					const rect = el.getBoundingClientRect();
+					return rect.width < 4 || rect.height < 4;
+				})
+				.map((el) => el.outerHTML.slice(0, 80))
+		);
+		expect(hiddenStops).toEqual([]);
 	});
 });
 
@@ -687,13 +765,13 @@ test.describe('RequestedChange in a form', () => {
 		await close();
 	});
 
-	test('inside a staged form with JavaScript, Send again posts its own fields, not the form', async ({ page }) => {
+	test('inside a staged form with JavaScript, Send again posts its intent alone, with the request id in the query as without JavaScript', async ({ page }) => {
 		const section = await openSection(page, 'settings-row');
 		await stubPosts(page, '/settings-demo/requests');
 		const request = page.waitForRequest((r) => new URL(r.url()).pathname === '/settings-demo/requests' && r.method() === 'POST');
 		await section.getByTestId('row-owner-request').getByRole('button', { name: 'Send again for Team owner' }).click();
 		const sent = await request;
-		expect(new URL(sent.url()).search).toBe('');
-		expect(sent.postData()).toBe('request=rq_2207&intent=resend');
+		expect(new URL(sent.url()).search).toBe('?request=rq_2207');
+		expect(sent.postData()).toBe('intent=resend');
 	});
 });

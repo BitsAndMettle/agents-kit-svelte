@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { factCopyText, formatRequestedAgo, readOutcome, splitActions, withQuery } from '../src/lib/settings/rows/helpers.ts';
+import { factCopyText, flippedByPerson, formatRequestedAgo, readOutcome, splitActions, withQuery } from '../src/lib/settings/rows/helpers.ts';
 import type { SettingsAction } from '../src/lib/settings/shared/types.ts';
 
 const link = (label: string): SettingsAction => ({ label, href: `/${label}` });
@@ -69,4 +69,18 @@ test('readOutcome treats errors, field errors and conflicts as failures and keep
 	assert.deepEqual(readOutcome({ conflict: {} }), { ok: false, error: undefined });
 	assert.deepEqual(readOutcome({ conflict: { message: 'Changed elsewhere.' } }), { ok: false, error: 'Changed elsewhere.' });
 	assert.deepEqual(readOutcome({ errors: { reason: undefined } }), { ok: true, notice: undefined });
+});
+
+test("flippedByPerson trusts the browser's record of user interaction and counts any change where it has none", () => {
+	const input = (matches: (selector: string) => boolean) => ({ matches }) as unknown as HTMLInputElement;
+	assert.equal(flippedByPerson(input((s) => s === ':user-valid, :user-invalid')), true);
+	assert.equal(flippedByPerson(input(() => false)), false);
+	assert.equal(
+		flippedByPerson(
+			input(() => {
+				throw new SyntaxError('unsupported selector');
+			})
+		),
+		true
+	);
 });

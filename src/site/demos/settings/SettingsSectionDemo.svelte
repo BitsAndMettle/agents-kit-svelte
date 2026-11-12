@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
 	import { Button } from '$lib/primitives/actions';
+	import { RadioGroup } from '$lib/primitives/form';
 	import { SettingsRow, SettingsSection, SettingsToggle } from '$lib/settings/rows';
 	import type { SettingsResult } from '$lib/settings/shared';
 
@@ -10,6 +11,17 @@
 	const apps: string[] = [];
 	let resets = $state(0);
 	let signOuts = $state(0);
+	let density = $state('comfortable');
+	const DENSITY = [
+		{ value: 'compact', label: 'Compact' },
+		{ value: 'comfortable', label: 'Comfortable' },
+		{ value: 'spacious', label: 'Spacious' }
+	];
+	const SESSION = [
+		{ value: '8h', label: '8 hours' },
+		{ value: '24h', label: '1 day' },
+		{ value: '7d', label: '7 days' }
+	];
 </script>
 
 <div class="flex max-w-3xl flex-col gap-6">
@@ -54,6 +66,28 @@
 	>
 		<SettingsToggle label="Pay yearly" description="Two months free, billed once a year." checked={false} onCommit={save} />
 		<SettingsRow label="Billing contact" value="finance@northwind.example" />
+	</SettingsSection>
+
+	<SettingsSection data-testid="section-group" title="Appearance" description="How lists look for you on this device.">
+		<SettingsRow label="Density" description="How much space lists leave between rows." group>
+			{#snippet control()}
+				<RadioGroup options={DENSITY} bind:value={density} orientation="horizontal" />
+			{/snippet}
+		</SettingsRow>
+	</SettingsSection>
+
+	<SettingsSection
+		data-testid="section-managed"
+		title="Sign-in"
+		description="Your organisation sets these for everyone."
+		lock={{ kind: 'managed', source: 'Set by Northwind IT', badge: 'Set by IT' }}
+	>
+		<SettingsToggle label="Remember this device" description="Skip two-step sign-in here for 30 days." checked={true} onCommit={save} />
+		<SettingsRow label="Session length" description="How long you stay signed in without using the app." group>
+			{#snippet control()}
+				<RadioGroup options={SESSION} defaultValue="8h" orientation="horizontal" />
+			{/snippet}
+		</SettingsRow>
 	</SettingsSection>
 
 	<SettingsSection data-testid="section-columns" title="Notifications" description="Choose where each kind of message reaches you." layout="columns">

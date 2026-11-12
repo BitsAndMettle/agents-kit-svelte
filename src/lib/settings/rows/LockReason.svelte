@@ -121,7 +121,7 @@
 			{/if}
 			{#if onRequest}
 				{#if request.status === 'done'}
-					<span bind:this={sent} tabindex="-1" class={cn('inline-flex items-center gap-1 text-xs font-medium outline-none', STATUS_TEXT_CLASS.success)}>
+					<span bind:this={sent} tabindex="-1" class={cn('inline-flex items-center gap-1 rounded-control text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary/70', STATUS_TEXT_CLASS.success)}>
 						<Check class="size-3.5" aria-hidden="true" />{request.notice ?? words.requested}
 					</span>
 				{:else}

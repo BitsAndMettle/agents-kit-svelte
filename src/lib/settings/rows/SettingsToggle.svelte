@@ -31,7 +31,7 @@
 	import { pickLock } from '../shared/lock';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import type { SettingLock, SettingsHandler } from '../shared/types';
-	import { focusLost } from './helpers';
+	import { flippedByPerson, focusLost } from './helpers';
 	import type { LockReasonLabels } from './LockReason.svelte';
 	import SettingsRow from './SettingsRow.svelte';
 
@@ -146,14 +146,19 @@
 	});
 
 	// A switch flipped before hydration (the no-JS form makes it live early) keeps its new state in
-	// the DOM, but nothing saw the change: commit it once, as soon as the input is bound.
+	// the DOM, but nothing saw the change: commit it once, as soon as the input is bound. Only a
+	// person's flip counts. `autocomplete="off"` stops the browser restoring an old state on Back or
+	// reload, and `flippedByPerson` checks the browser saw a real activation, so restored state never
+	// reaches `onCommit` with nobody touching the page: the switch goes back to the saved state.
 	let reconciled = false;
 	$effect(() => {
 		const node = ref;
 		if (reconciled || !node || !instant) return;
 		reconciled = true;
 		untrack(() => {
-			if (node.checked !== instant.current) change(node.checked);
+			if (node.checked === instant.current) return;
+			if (flippedByPerson(node)) change(node.checked);
+			else node.checked = instant.current;
 		});
 	});
 
@@ -218,9 +223,9 @@
 			</span>
 		{/if}
 		{#if draft}
-			<Switch {...rest} bind:ref {name} value="true" defaultChecked={start} disabled={disabled || undefined} />
+			<Switch autocomplete="off" {...rest} bind:ref {name} value="true" defaultChecked={start} disabled={disabled || undefined} />
 		{:else}
-			<Switch {...rest} bind:ref {name} value="true" checked={current} disabled={disabled || notReady || undefined} onCheckedChange={change} />
+			<Switch autocomplete="off" {...rest} bind:ref {name} value="true" checked={current} disabled={disabled || notReady || undefined} onCheckedChange={change} />
 		{/if}
 	</span>
 {/snippet}
@@ -228,7 +233,7 @@
 {#snippet control(attrs: FieldControlAttrs)}
 	{#if effectiveLock?.badge}
 		<!-- A badge ("Always on") stands in for the switch: the row hides this disabled input visually and draws the badge, so assistive technology still meets the switch and its state. -->
-		<input {...rest} {...attrs} bind:this={ref} type="checkbox" role="switch" checked={current} disabled />
+		<input {...rest} {...attrs} bind:this={ref} type="checkbox" role="switch" checked={current} disabled autocomplete="off" />
 	{:else if ownForm}
 		<form method="post" {action} onsubmit={submit} class="flex items-center gap-2">
 			{#each Object.entries(hidden ?? {}) as [key, value] (key)}<input type="hidden" name={key} {value} />{/each}

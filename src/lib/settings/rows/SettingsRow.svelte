@@ -1,4 +1,7 @@
 <script lang="ts" module>
+	/** What can take focus with Tab: a control the badge must not hide. */
+	const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
 	/** Words of a SettingsRow. */
 	export interface SettingsRowLabels {
 		/** Tag on a row with an unsaved change. */
@@ -29,7 +32,7 @@
 	import { Button } from '../../primitives/actions';
 	import { Badge, Spinner } from '../../primitives/display';
 	import { DANGER_TEXT } from '../../primitives/form/classes';
-	import { createFieldState, fieldControlAttrs, setFieldContext, type FieldControlAttrs } from '../../primitives/form/field';
+	import { createFieldState, fieldControlAttrs, setFieldContext, type FieldControlAttrs, type FieldState } from '../../primitives/form/field';
 	import { DropdownMenu } from '../../primitives/menus';
 	import type { MenuEntry } from '../../primitives/menus/types';
 	import { cn } from '../../ui/cn';
@@ -54,7 +57,7 @@
 		control?: Snippet<[FieldControlAttrs]>;
 		/** Id the control takes (default generated). Set it here, not on the control. */
 		controlId?: string;
-		/** The control is several inputs (radios, checkboxes): the right side becomes a group named by the label. */
+		/** The control is several inputs (a RadioGroup, checkboxes): the right side becomes one group (a `<fieldset>`) named by the label and described by the description, status and lock reason. A lock disables everything in it. A kit RadioGroup inside takes no second name from the row. */
 		group?: boolean;
 		/** A read-only value shown instead of a control. */
 		value?: string | Snippet;
@@ -196,7 +199,14 @@
 		group: () => group,
 		describedBy: () => [isDirty ? changeId : undefined, isDirty && impact ? impactId : undefined, liveText ? statusId : undefined, lockReasonId]
 	});
-	setFieldContext(field);
+	// In a group row the fieldset is the one group the label names, so the control gets no label id:
+	// a RadioGroup would otherwise name itself by it too ("Size, group" then "Size, radio group").
+	// The rest of the field state is the row's own, read through the prototype.
+	setFieldContext(
+		Object.create(field, {
+			labelId: { enumerable: true, get: () => (group ? undefined : field.labelId) }
+		}) as FieldState
+	);
 	const attrs = $derived(fieldControlAttrs(field));
 	const groupDescribedBy = $derived(
 		group ? [field.descriptionId, ...(field.describedBy ?? []), field.errorId].filter(Boolean).join(' ') || undefined : undefined
@@ -237,6 +247,17 @@
 	);
 	/** A lock badge ("Always on") replaces what the row shows. A control stays in the page, visually hidden and disabled, so assistive technology meets the same switch either way. */
 	const badgeOnly = $derived(Boolean(effectiveLock?.badge));
+	/**
+	 * Only a single disabled native control (a switch, a checkbox) hides behind the badge: it cannot
+	 * take focus. A group, or a control that stays focusable while disabled (a RadioGroup's
+	 * aria-disabled radios), shows disabled beside the badge instead, so no tab stop is invisible.
+	 */
+	let hiddenFocusable = $state(false);
+	const hideControl = $derived(badgeOnly && !group && !hiddenFocusable);
+	let hiddenCopy = $state<HTMLElement | null>(null);
+	$effect(() => {
+		if (hiddenCopy?.querySelector(FOCUSABLE)) hiddenFocusable = true;
+	});
 </script>
 
 {#snippet text(content: string | Snippet)}
@@ -245,18 +266,19 @@
 
 {#snippet controlBody(draw: Snippet<[FieldControlAttrs]>)}
 	{#if group}
-		<div role="group" aria-labelledby={labelId} aria-describedby={groupDescribedBy} class="min-w-0">{@render draw(attrs)}</div>
+		<fieldset aria-labelledby={labelId} aria-describedby={groupDescribedBy} disabled={Boolean(effectiveLock) || undefined} class="m-0 min-w-0 border-0 p-0">{@render draw(attrs)}</fieldset>
 	{:else}
 		{@render draw(attrs)}
 	{/if}
 {/snippet}
 
 {#snippet controlArea()}
-	{#if control && badgeOnly}
-		<div class="sr-only">{@render controlBody(control)}</div>
+	{#if control && hideControl}
+		<div bind:this={hiddenCopy} class="sr-only">{@render controlBody(control)}</div>
 		<Badge tone="neutral" variant="outline" size="lg" aria-hidden="true">{effectiveLock?.badge}</Badge>
 	{:else if control}
 		{@render controlBody(control)}
+		{#if badgeOnly}<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>{/if}
 	{:else if badgeOnly}
 		<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>
 	{:else if value !== undefined}
