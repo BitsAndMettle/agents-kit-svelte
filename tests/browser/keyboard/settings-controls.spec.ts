@@ -1064,3 +1064,56 @@ test.describe('Layout and forced colours', () => {
 		await context.close();
 	});
 });
+
+test.describe('Final fixes: a lock shows its way forward', () => {
+	test('a ChoiceCards lock action loads while it runs, ignores clicks meanwhile, and shows its failure', async ({ page }) => {
+		await page.clock.install();
+		await openFixture(page);
+		await page.clock.pauseAt(new Date(Date.now() + 5000));
+		const section = page.getByTestId('lock-actions');
+		const upgrade = section.getByRole('button', { name: 'Upgrade' });
+		await upgrade.scrollIntoViewIfNeeded();
+		await expect(upgrade).toHaveAccessibleDescription(/Density needs the larger plan\./);
+		await upgrade.click();
+		await expect(upgrade).toHaveAttribute('aria-busy', 'true');
+		await upgrade.click({ force: true });
+		await upgrade.click({ force: true });
+		await page.clock.runFor(400);
+		await expect(section.getByRole('alert').filter({ hasText: 'Billing is down. Try later.' })).toBeVisible();
+		await expect(section.getByTestId('upgrade-calls')).toHaveText('1');
+	});
+
+	test('an option lock, a matrix lock and a locked list item each show their way forward', async ({ page }) => {
+		await openFixture(page);
+		const section = page.getByTestId('lock-actions');
+		await expect(section.getByRole('link', { name: 'See plans for Large' })).toHaveAttribute('href', '?plans=large');
+		await expect(section.getByRole('link', { name: 'See plans for Large' })).toHaveAccessibleDescription(/Large needs the larger plan\./);
+		const plans = section.getByRole('link', { name: 'See plans', exact: true });
+		await expect(plans).toHaveAttribute('href', '?plans=text');
+		await expect(plans).toHaveAccessibleDescription(/Text alerts need the larger plan\./);
+		const ask = section.getByRole('button', { name: 'Ask an admin' });
+		await expect(ask).toHaveAccessibleDescription(/Only admins can change Ada\./);
+		await ask.click();
+		await expect(section.getByRole('alert').filter({ hasText: 'No admin is around.' })).toBeVisible();
+	});
+});
+
+test.describe('Final fixes: an instant choice in a row', () => {
+	for (const width of [1440, 393]) {
+		test(`at ${width}px the rows below an instant ChoiceCards move once, not again when Saving gives way to Saved`, async ({ page }) => {
+			await page.clock.install();
+			await openComposed(page, width);
+			const density = page.getByRole('radiogroup', { name: 'Density' });
+			const next = density.locator('xpath=ancestor::li[1]/following-sibling::li[1]');
+			await density.scrollIntoViewIfNeeded();
+			const top = async () => (await next.boundingBox())!.y + (await page.evaluate(() => window.scrollY));
+			await page.clock.pauseAt(new Date(Date.now() + 5000));
+			await density.getByText('Spacious').click();
+			await expect(density.getByRole('status')).toHaveText('Saving…');
+			const pending = await top();
+			await page.clock.runFor(SETTLE);
+			await expect(density.getByRole('status')).toHaveText('Saved');
+			expect(Math.abs((await top()) - pending)).toBeLessThan(0.5);
+		});
+	}
+});

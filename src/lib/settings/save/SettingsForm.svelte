@@ -15,6 +15,8 @@
 		genericError: string;
 		/** Announced after a save when no SaveBar is inside the form. */
 		saved: string;
+		/** Shown when a save came back with a conflict without a message, when no SaveBar is inside the form. */
+		conflict: string;
 		leaveTitle: string;
 		leaveDescription: (count: number) => string;
 		/** Names the list of what would be lost. */
@@ -109,6 +111,7 @@
 	const text = $derived<SettingsFormLabels>({
 		genericError: "Couldn't save. Your changes are still here.",
 		saved: 'Changes saved.',
+		conflict: 'Someone else saved these settings while you were editing. Your changes are kept.',
 		leaveTitle: 'Leave without saving?',
 		leaveDescription: (n) => (n === 1 ? 'You have 1 unsaved change. It will be lost if you leave.' : `You have ${n} unsaved changes. They will be lost if you leave.`),
 		changesList: 'Unsaved changes',
@@ -155,6 +158,9 @@
 		return firstInvalidControl(ref) ?? ref.querySelector<HTMLElement>('[data-form-error]');
 	}
 
+	/** With no SaveBar inside, the form shows its own failure: the error, else a conflict's message. */
+	const ownError = $derived(draft.status === 'conflict' ? (draft.conflict?.message?.trim() || draft.error || text.conflict) : draft.error);
+
 	let leaving = $state(false);
 
 	async function decide(decision: 'save' | 'leave' | 'stay'): Promise<void> {
@@ -185,8 +191,8 @@
 
 	{#if !presence.present}
 		<!-- No SaveBar inside: the form shows its own outcome. -->
-		{#if draft.error}
-			<Alert tone="danger" live data-form-error tabindex={-1} description={draft.error} class="mt-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/40" />
+		{#if ownError}
+			<Alert tone="danger" live data-form-error tabindex={-1} description={ownError} class="mt-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/40" />
 		{/if}
 		<p role="status" class="sr-only">{draft.status === 'saved' ? (draft.notice ?? text.saved) : ''}</p>
 	{/if}
@@ -199,7 +205,7 @@
 		dismiss={{ escape: () => !leaving, outside: () => !leaving }}
 		title={text.leaveTitle}
 		description={text.leaveDescription(draft.dirtyCount)}
-		size="sm"
+		size="md"
 		narrow="sheet"
 		returnFocus={failedLeaveTarget}
 	>
@@ -219,11 +225,14 @@
 			<Alert tone="danger" live description={text.leaveFailed} class="mt-3" />
 		{/if}
 		{#snippet footer()}
-			<Button variant="ghost" disabled={leaving} onclick={() => decide('stay')}>{text.stay}</Button>
-			<Button variant="danger" disabled={leaving} onclick={() => decide('leave')}>{text.leave}</Button>
-			{#if onSubmit}
-				<Button variant="primary" loading={leaving} onclick={() => decide('save')}>{text.saveAndLeave}</Button>
-			{/if}
+			<!-- Where the three do not fit on one line, the primary action wraps onto the top line, not alone at the bottom. -->
+			<div class="flex grow flex-wrap-reverse items-center justify-end gap-2">
+				<Button variant="ghost" disabled={leaving} onclick={() => decide('stay')}>{text.stay}</Button>
+				<Button variant="danger" disabled={leaving} onclick={() => decide('leave')}>{text.leave}</Button>
+				{#if onSubmit}
+					<Button variant="primary" loading={leaving} onclick={() => decide('save')}>{text.saveAndLeave}</Button>
+				{/if}
+			</div>
 		{/snippet}
 	</Dialog>
 </form>

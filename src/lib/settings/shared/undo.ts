@@ -41,18 +41,25 @@ export function readResult(result: unknown): SettingsOutcome {
  * only `error` and `errors`: a failure keeps its field errors, and gets a form-level `error` (the
  * handler's own text, else `generic`) whenever no field error would show, so a `{conflict}`
  * fails there too. Success is `undefined`.
+ *
+ * `shown`: the field names the component draws an error for. A field error for any other name
+ * would be shown nowhere, so it joins the form-level error instead. Omit it to keep every field.
  */
-export function toFormResult(result: unknown, generic: string): { error?: string; errors?: Record<string, string> } | undefined {
+export function toFormResult(result: unknown, generic: string, shown?: readonly string[]): { error?: string; errors?: Record<string, string> } | undefined {
 	const outcome = readResult(result);
 	if (outcome.ok) return undefined;
 	const { error, errors } = result as SettingsResult;
 	const fields: Record<string, string> = {};
+	const unshown: string[] = [];
 	for (const [name, message] of Object.entries(errors && typeof errors === 'object' ? errors : {})) {
 		const text = textOf(message);
-		if (text !== undefined) fields[name] = text;
+		if (text === undefined) continue;
+		if (shown && !shown.includes(name)) unshown.push(text);
+		else fields[name] = text;
 	}
 	const hasFields = Object.keys(fields).length > 0;
-	const formError = textOf(error) ?? (hasFields ? undefined : (outcome.error ?? generic));
+	const own = [textOf(error), ...unshown].filter((t): t is string => t !== undefined).join(' ') || undefined;
+	const formError = own ?? (hasFields ? undefined : (outcome.error ?? generic));
 	return { ...(formError !== undefined ? { error: formError } : {}), ...(hasFields ? { errors: fields } : {}) };
 }
 

@@ -1216,3 +1216,86 @@ test.describe('Verifier fixes: Enter, row locks, unavailable confirms and shared
 		await expect.poll(room).toEqual(['', '']);
 	});
 });
+
+/** Opens the save fixture once it is interactive (a clean form's default button is off once hydrated). */
+async function openSaveFixture(page: Page): Promise<void> {
+	await page.goto('/fixtures/settings-save/');
+	await expect(page.getByTestId('form-conflict').locator('[data-settings-default]')).toBeDisabled({ timeout: 45000 });
+}
+
+test.describe('Final fixes: every failure is shown', () => {
+	test('a SettingsForm with no SaveBar shows a conflict from its handler, announced and focused', async ({ page }) => {
+		await openSaveFixture(page);
+		const form = page.getByTestId('form-conflict');
+		await form.getByRole('textbox', { name: 'Name one' }).fill('B');
+		await form.getByRole('button', { name: 'Save name' }).click();
+		const error = form.locator('[data-form-error]');
+		await expect(error).toHaveText('Someone else renamed this a moment ago. Your change is kept.');
+		await expect(error).toHaveAttribute('role', 'alert');
+		await expect(error).toBeFocused();
+		// The draft is kept.
+		await expect(form.getByRole('textbox', { name: 'Name one' })).toHaveValue('B');
+	});
+
+	test('a SettingsForm with no SaveBar shows a conflict handed back as its result, with and without JavaScript', async ({ page, browser }) => {
+		await openSaveFixture(page);
+		await expect(page.getByTestId('form-round-trip').locator('[data-form-error]')).toHaveText('The server saw a newer revision.');
+		const context = await browser.newContext({ javaScriptEnabled: false });
+		const plain = await context.newPage();
+		await plain.goto('/fixtures/settings-save/');
+		await expect(plain.getByTestId('form-round-trip').locator('[data-form-error]')).toHaveText('The server saw a newer revision.');
+		await context.close();
+	});
+
+	for (const where of ['on its own', 'inside a SettingsForm'] as const) {
+		test(`a ConsequenceDialog ${where} shows the field errors of a confirm on their fields and focuses the first`, async ({ page }) => {
+			await openSaveFixture(page);
+			const nested = where === 'inside a SettingsForm';
+			await page.getByRole('button', { name: nested ? 'Open nested field errors' : 'Open field errors' }).click();
+			const dialog = page.getByRole('dialog', { name: nested ? 'Remove nested report?' : 'Remove report?' });
+			const phrase = dialog.getByRole('textbox', { name: 'Type “report” to confirm' });
+			await phrase.fill('report');
+			await dialog.getByRole('button', { name: nested ? 'Remove nested report' : 'Remove report' }).click();
+			await expect(phrase).toHaveAttribute('aria-invalid', 'true');
+			await expect(phrase).toHaveAccessibleDescription('That name was changed; type the new one.');
+			const owner = dialog.getByRole('combobox', { name: 'New owner for Weekly report' });
+			await expect(owner).toHaveAttribute('aria-invalid', 'true');
+			await expect(owner).toHaveAccessibleDescription('Pick someone who is still a member.');
+			// A field the dialog does not draw: its error joins the alert, so it is never lost.
+			await expect(dialog.locator('[data-form-error]')).toHaveText('Say why.');
+			// The first invalid field in the dialog (the owner select comes before the phrase).
+			await expect(owner).toBeFocused();
+			await expect(dialog).toBeVisible();
+			// Editing the phrase hides its error and keeps focus where the person types.
+			await phrase.press('End');
+			await page.keyboard.type('s');
+			await expect(phrase).not.toHaveAttribute('aria-invalid', 'true');
+			await expect(phrase).toBeFocused();
+		});
+	}
+
+	test('a ConsequenceDialog confirm that answers with a conflict shows it and stays open; the next try closes it', async ({ page }) => {
+		await page.clock.install();
+		await openSaveFixture(page);
+		await pauseClock(page);
+		await page.getByRole('button', { name: 'Open conflict once' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Remove thing?' });
+		const confirm = dialog.getByRole('button', { name: 'Remove thing' });
+		await confirm.click();
+		await page.clock.runFor(SETTLE);
+		const error = dialog.locator('[data-form-error]');
+		await expect(error).toHaveText('Someone else removed it first. Reload to see it.');
+		await expect(error).toBeFocused();
+		await expect(dialog).toBeVisible();
+		await confirm.click();
+		await page.clock.runFor(SETTLE);
+		await expect(page.getByTestId('confirms')).toHaveText('2');
+		await expect(dialog).toHaveCount(0);
+	});
+
+	test('a ConsequenceDialog shows a conflict handed back as its result', async ({ page }) => {
+		await openSaveFixture(page);
+		await page.getByRole('button', { name: 'Open round trip' }).click();
+		await expect(page.getByRole('dialog', { name: 'Remove it?' }).locator('[data-form-error]')).toHaveText('Someone else removed it first.');
+	});
+});

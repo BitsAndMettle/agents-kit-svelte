@@ -89,6 +89,15 @@ export function nextFocusAfterRemoval(list: HTMLElement, removedIndex: number, f
 	return item.matches(FOCUSABLE) ? item : (item.querySelector<HTMLElement>(FOCUSABLE) ?? fallback);
 }
 
+/**
+ * True when nobody holds focus any more: it fell back to the page, or its element was removed or
+ * disabled (the browser has not moved it yet). Call it in the browser only.
+ */
+export function focusLost(): boolean {
+	const active = document.activeElement as HTMLElement | null;
+	return !active || active === document.body || !active.isConnected || active.matches(':disabled');
+}
+
 /** Elements that take focus themselves. */
 const CONTROL = 'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]';
 

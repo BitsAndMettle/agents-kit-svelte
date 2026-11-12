@@ -53,6 +53,8 @@
 		/** A failed instant change, reverted: names the cell. */
 		failed: (cell: string) => string;
 		undo: string;
+		/** Shown when the lock's way forward (`lock.action`) fails without a message of its own. */
+		lockActionFailed: string;
 	}
 
 	export type NotificationMatrixLayout = 'auto' | 'grid' | 'list';
@@ -77,8 +79,11 @@
 		pickLock,
 		ReadyGate,
 		RECIPES,
+		actionButtonProps,
+		SettingsHandlerRun,
 		type InstantSnapshot,
 		type SettingLock,
+		type SettingsAction,
 		type SettingsHandler
 	} from '../shared';
 	import { isDev } from '../shared/env';
@@ -155,6 +160,7 @@
 		saved: 'Saved',
 		failed: (cell) => `Couldn't save ${cell}. Changed back.`,
 		undo: 'Undo',
+		lockActionFailed: "Couldn't do that. Try again.",
 		...labels
 	});
 
@@ -179,6 +185,15 @@
 	const groupLock = $derived(pickLock(lock, scope?.lock?.lock));
 	const ownLock = $derived(groupLock !== undefined && groupLock === lock);
 	const groupReasonId = $derived(groupLock ? (ownLock ? lockId : scope?.lock?.reasonId) : undefined);
+
+	/** The lock's way forward (`lock.action`): loading while it runs, its failure shown under the reason. */
+	const lockRun = new SettingsHandlerRun();
+	function runLockAction(action: SettingsAction, event: MouseEvent): void {
+		if (!action.onSelect || action.unavailable) return;
+		void lockRun.run(action.onSelect);
+		// A promise means the callback handles it: a link with one does not also navigate.
+		if (lockRun.pending) event.preventDefault();
+	}
 
 	// ---- Instant mode: one InstantCore per cell, created on first change. ----
 	const instant = !draft && Boolean(untrack(() => onCellCommit));
@@ -594,6 +609,15 @@
 	{#if groupLock && ownLock}
 		{@const LockIcon = LOCK_ICONS[groupLock.kind]}
 		<p id={lockId} class={cn(RECIPES.note, 'm-0')} data-lock={groupLock.kind}><span aria-hidden="true" class="contents"><LockIcon /></span><span>{lockReasonText(groupLock)}</span></p>
+		{#if groupLock.action}
+			{@const act = groupLock.action}
+			{@const props = actionButtonProps(act, act.unavailable ? `${lockId}-unavailable` : undefined, { ready: ready.current })}
+			<span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+				<Button size="xs" {...props} aria-describedby={[props['aria-describedby'], lockId].filter(Boolean).join(' ')} loading={lockRun.pending} onclick={(event: MouseEvent) => runLockAction(act, event)}>{act.label}</Button>
+				{#if act.unavailable}<span id="{lockId}-unavailable" class="text-xs leading-5 text-fg-light">{act.unavailable}</span>{/if}
+				{#if lockRun.status === 'failed'}<span role="alert" class={cn('basis-full text-xs leading-5 font-medium', DANGER_TEXT)}>{lockRun.error ?? text.lockActionFailed}</span>{/if}
+			</span>
+		{/if}
 	{/if}
 
 	{#if draft}

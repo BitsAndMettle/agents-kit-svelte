@@ -19,18 +19,17 @@
 	import { tick } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { Button } from '../../primitives/actions';
-	import { isThenable } from '../../core/promise';
 	import { DANGER_TEXT } from '../../primitives/form/classes';
 	import { cn } from '../../ui/cn';
 	import { STATUS_TEXT_CLASS } from '../../ui/styles';
 	import { getSettingsDraft, getSettingsScope } from '../shared/context';
 	import { LOCK_LABELS, lockReasonText } from '../shared/lock';
 	import { LOCK_ICONS } from '../shared/lock-icons';
-	import { restoreFocus } from '../shared/focus';
+	import { focusLost, restoreFocus } from '../shared/focus';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { actionButtonProps } from '../shared/recipes';
 	import type { SettingLock, SettingsHandler } from '../shared/types';
-	import { focusLost, postIntent } from './helpers';
+	import { postIntent } from './helpers';
 	import { SettingsHandlerRun } from '../shared/run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'id'> {
@@ -114,12 +113,11 @@
 
 	function runAction(event: MouseEvent): void {
 		const select = lock.action?.onSelect;
-		if (!select) return;
-		const result = select();
-		if (isThenable(result)) {
-			event.preventDefault();
-			void action.run(() => result as Promise<void>);
-		}
+		if (!select || lock.action?.unavailable) return;
+		// A returned `{error}` shows too, not only a rejected promise.
+		void action.run(select);
+		// A promise means the callback handles it: a link with one does not also navigate.
+		if (action.pending) event.preventDefault();
 	}
 </script>
 
@@ -166,7 +164,7 @@
 			{/if}
 			{#if requestable}
 				{#if request.status === 'done'}
-					<span bind:this={sent} tabindex="-1" class={cn('inline-flex items-center gap-1 rounded-control text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary/70', STATUS_TEXT_CLASS.success)}>
+					<span bind:this={sent} tabindex="-1" class={cn('inline-flex min-h-6 items-center gap-1 rounded-control text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary/70', STATUS_TEXT_CLASS.success)}>
 						<Check class="size-3.5" aria-hidden="true" />{request.notice ?? words.requested}
 					</span>
 				{:else if ownRequestForm}

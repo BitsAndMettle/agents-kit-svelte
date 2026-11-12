@@ -21,6 +21,14 @@
 	never calls `onConfirm` or posts then. `confirmUnavailable` does the same for a reason of your
 	own, keeping Confirm focusable: a disabled default button stops Enter in a field from posting,
 	and no `intent` is posted without JavaScript.
+
+	A failure (from `onConfirm` or the `result` of a round trip) is read the settings way: `{error}`
+	and `{conflict}` show as the dialog's alert, a field error for `confirm` or a reassign select
+	shows on that field, and any other field error joins the alert.
+
+	Without JavaScript inside a SettingsForm, Enter in the typed phrase submits the page form's Save
+	(its first submit button), not Confirm: that post carries the phrase but no `intent`. Act on the
+	phrase only when `intent` says so.
 -->
 <script lang="ts" module>
 	/** Every word ConsequenceDialog shows or announces. */
@@ -63,6 +71,7 @@
 	import { cn } from '../../ui/cn';
 	import type { Part, ChangeReason } from '../../headless/runtime/parts';
 	import { Alert } from '../../primitives/display';
+	import { DANGER_TEXT } from '../../primitives/form/classes';
 	import { Button } from '../../primitives/actions';
 	import { getFieldContext, Input, NativeSelect, setFieldContext, type FieldState } from '../../primitives/form';
 	import { isThenable } from '../../core/promise';
@@ -72,7 +81,7 @@
 	import { getSettingsDraft, getSettingsScope } from '../shared/context';
 	import { isDev } from '../shared/env';
 	import { lockAttrs, lockReasonText } from '../shared/lock';
-	import { openerFor } from '../shared/focus';
+	import { firstInvalidControl, focusLost, openerFor } from '../shared/focus';
 	import { toFormResult } from '../shared/undo';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES, SETTINGS_CONTAINER } from '../shared/recipes';
@@ -222,11 +231,15 @@
 	const phraseId = `${id}-phrase`;
 	const mismatchId = `${id}-mismatch`;
 	const summaryId = `${id}-summary`;
+	const phraseErrorId = `${id}-phrase-error`;
+	const reassignErrorId = (index: number) => `${id}-reassign-${index}-error`;
 
 	let typed = $state('');
 	let phraseInput = $state<HTMLInputElement | null>(null);
 	let cancelRef = $state<HTMLElement | null>(null);
 	let reassigned = $state<Record<string, string>>({});
+	/** Where focus was when Confirm submitted, until the failure (if any) is shown. */
+	let submittedFrom: { active: Element | null; submitter: HTMLElement | null } | null = null;
 
 	const defaults = $derived(reassign ? reassignDefaults(reassign) : {});
 	const reassignValue = $derived({ ...defaults, ...reassigned });
@@ -244,6 +257,11 @@
 		!groups && consequences && consequences.length > 0 && !isGroupList(consequences) ? (consequences as ConsequenceItem[]) : undefined
 	);
 
+	/** The fields this dialog draws an error for; any other field error joins the alert. */
+	const shownFields = $derived([...(confirmPhrase ? ['confirm'] : []), ...(reassign ? reassign.dependents.map((d) => reassignFieldName(reassign, d.id)) : [])]);
+	/** The round trip's result, read the settings way (a conflict fails too). */
+	const roundTrip = $derived(toFormResult(result, text.failed, shownFields));
+
 	const submit = new FormSubmit<ConsequenceConfirmContext>({
 		handler: () =>
 			onConfirm &&
@@ -252,7 +270,8 @@
 				if (confirmPhrase && !matchesPhrase(values.typed ?? '', confirmPhrase, phraseOptions)) return { error: text.phraseMismatch };
 				// FormSubmit reads only `error` and `errors`: read the result the settings way, so a `{conflict}` fails too.
 				const result = onConfirm(values);
-				return isThenable(result) ? Promise.resolve(result).then((settled) => toFormResult(settled, text.failed)) : toFormResult(result, text.failed);
+				const read = (settled: unknown) => toFormResult(settled, text.failed, shownFields);
+				return isThenable(result) ? Promise.resolve(result).then(read) : read(result);
 			}),
 		read: (data) => ({
 			typed: confirmPhrase ? String(data.get('confirm') ?? '') : undefined,
@@ -260,8 +279,8 @@
 			data
 		}),
 		pending: () => pending,
-		error: () => result?.error,
-		errors: () => result?.errors,
+		error: () => roundTrip?.error,
+		errors: () => roundTrip?.errors,
 		genericError: () => text.failed,
 		onSuccess: () => {
 			if (closeHref === undefined) open = false;
@@ -282,6 +301,7 @@
 		untrack(() => {
 			if (now && !wasOpen) {
 				submit.clear();
+				submittedFrom = null;
 				typed = '';
 				reassigned = {};
 			}
@@ -312,6 +332,7 @@
 			event.stopImmediatePropagation();
 			return;
 		}
+		if (!submit.pending) submittedFrom = { active: document.activeElement, submitter: event.submitter };
 		submit.onsubmit(event);
 	}
 
@@ -354,11 +375,23 @@
 		return () => observer.disconnect();
 	};
 
-	// The own form is outside the dialog, so FormSubmit cannot find the error to focus: do it here.
+	const phraseError = $derived(confirmPhrase ? submit.fieldError('confirm') : undefined);
+	/** Every failure shown in the dialog, so a new one moves focus. */
+	const shownFailure = $derived([submit.error, ...shownFields.map((name) => submit.fieldError(name))].filter(Boolean).join('|'));
+
+	// The own form is outside the dialog, so FormSubmit cannot find what to focus: do it here, once
+	// per submit (a field error clearing as the person edits it is not a new failure), and only
+	// while focus is still where the submit left it.
 	let body = $state<HTMLElement | null>(null);
 	$effect(() => {
-		if (!inDraft || !submit.error || !body) return;
-		untrack(() => body?.querySelector<HTMLElement>('[data-form-error]')?.focus());
+		if (!inDraft || !shownFailure || !body) return;
+		untrack(() => {
+			const from = submittedFrom;
+			submittedFrom = null;
+			const active = document.activeElement;
+			if (!from || (!focusLost() && active !== from.active && active !== from.submitter)) return;
+			(firstInvalidControl(body!) ?? body?.querySelector<HTMLElement>('[data-form-error]'))?.focus();
+		});
 	});
 	const footnoteText = $derived(typeof footnote === 'string' ? footnote : reversible === undefined ? undefined : reversible ? text.reversible : text.irreversible);
 	const FILLED: Record<'danger' | 'accent', string> = {
@@ -477,7 +510,8 @@
 				{#if reassign.description}<p id={`${prefix}-description`} class="m-0 mt-0.5 text-xs leading-5 text-fg-light">{reassign.description}</p>{/if}
 				<ul role="list" class="m-0 mt-2 grid list-none gap-0 overflow-hidden rounded-control border border-card-border p-0">
 					{#each reassign.dependents as dependent, index (dependent.id)}
-						<li class="flex min-w-0 flex-col gap-2 border-t border-canvas-border px-3 py-2.5 first:border-t-0 @lg/settings:flex-row @lg/settings:items-center @lg/settings:justify-between">
+						{@const fieldError = submit.fieldError(reassignFieldName(reassign, dependent.id))}
+						<li class="flex min-w-0 flex-col gap-2 border-t border-canvas-border px-3 py-2.5 first:border-t-0 @lg/settings:flex-row @lg/settings:flex-wrap @lg/settings:items-center @lg/settings:justify-between">
 							<div class="min-w-0">
 								<p class="m-0 flex flex-wrap items-center gap-1.5 text-[13px] font-medium text-fg-main">
 									{dependent.label}
@@ -494,9 +528,12 @@
 								defaultValue={defaults[dependent.id]}
 								onValueChange={(value) => (reassigned = { ...reassigned, [dependent.id]: value })}
 								disabled={busy || covered}
+								invalid={Boolean(fieldError)}
+								aria-describedby={fieldError ? reassignErrorId(index) : undefined}
 								size="sm"
 								class="@lg/settings:w-48"
 							/>
+							{#if fieldError}<p id={reassignErrorId(index)} class={cn('m-0 basis-full text-xs leading-5 font-medium', DANGER_TEXT)}>{fieldError}</p>{/if}
 						</li>
 					{/each}
 				</ul>
@@ -520,13 +557,15 @@
 					autocomplete="off"
 					spellcheck={false}
 					autocapitalize="off"
-					aria-describedby={blockedReason !== undefined ? blockedId : matched ? undefined : mismatchId}
+					aria-describedby={blockedReason !== undefined ? blockedId : phraseError ? phraseErrorId : matched ? undefined : mismatchId}
+					invalid={Boolean(phraseError)}
 					value={typed}
 					onValueChange={(value) => (typed = value)}
 					disabled={busy || blockedReason !== undefined}
 					data-locked={lock?.kind}
 				/>
 				<p id={mismatchId} hidden={matched || blockedReason !== undefined} class="m-0 text-xs text-fg-light">{text.phraseMismatch}</p>
+				{#if phraseError}<p id={phraseErrorId} class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT)}>{phraseError}</p>{/if}
 			</div>
 		{/if}
 

@@ -11,7 +11,7 @@ export const SETTINGS_CONTROLS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/controls/ChoiceCards.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'One choice from a few, drawn as cards (with an optional preview, icon, badge and Current / Changed caption), rows, a segmented control, or `auto` (cards that turn segmented in a narrow settings container). Native radios, so arrow keys and form posts work without JavaScript. It reports each choice through onValueChange; with onCommit it saves instantly (saving, saved, Undo, and a revert with "Couldn\'t save. Changed back." on failure), and inside a SettingsForm it is staged and saved with the form. A locked option or group shows its reason as text. Your app saves the value.',
+			'One choice from a few, drawn as cards (with an optional preview, icon, badge and Current / Changed caption), rows, a segmented control, or `auto` (cards that turn segmented in a narrow settings container). Native radios, so arrow keys and form posts work without JavaScript. It reports each choice through onValueChange; with onCommit it saves instantly (saving, saved, Undo, and a revert with "Couldn\'t save. Changed back." on failure), and inside a SettingsForm it is staged and saved with the form. A locked option or group shows its reason as text, and its way forward (lock.action) as a link or a button that loads and shows its failure. Your app saves the value.',
 		usageSnippet: `<script lang="ts">
   import { ChoiceCards, type ChoiceOption } from 'agents-kit-svelte/settings';
 

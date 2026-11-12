@@ -366,6 +366,10 @@ test('toFormResult: what FormSubmit shows for a settings result; a conflict fail
 	assert.deepEqual(toFormResult({ error: 'Offline.', errors: { name: 'Too long.' } }, 'Failed.'), { error: 'Offline.', errors: { name: 'Too long.' } });
 	assert.deepEqual(toFormResult({ conflict: { message: 'Changed elsewhere.' } }, 'Failed.'), { error: 'Changed elsewhere.' });
 	assert.deepEqual(toFormResult({ conflict: {} }, 'Failed.'), { error: 'Failed.' });
+	// A field error for a name the component does not draw joins the form error, so it is never lost.
+	assert.deepEqual(toFormResult({ errors: { confirm: 'Wrong.', reason: 'Say why.' } }, 'Failed.', ['confirm']), { error: 'Say why.', errors: { confirm: 'Wrong.' } });
+	assert.deepEqual(toFormResult({ error: 'Offline.', errors: { reason: 'Say why.' } }, 'Failed.', []), { error: 'Offline. Say why.' });
+	assert.deepEqual(toFormResult({ errors: { confirm: 'Wrong.' } }, 'Failed.', ['confirm']), { errors: { confirm: 'Wrong.' } });
 });
 
 test('UndoSlot hands a snapshot back once, to its own token only', () => {
@@ -636,6 +640,10 @@ const RESULT_READERS = ['readResult', 'toFormResult', 'SettingsHandlerRun', 'Ins
  */
 function handRolledReader(rel: string, source: string): string | undefined {
 	if (!GROUPS.some((g) => rel.startsWith(`src/lib/settings/${g}/`)) || !rel.endsWith('.svelte')) return undefined;
+	// A `result` prop (a native round trip) read field by field: a `{conflict}` would show nothing.
+	if (/\bresult\?:\s*SettingsResult\b/.test(source) && /\bresult\??\.(error|errors|conflict)\b/.test(source)) return rel;
+	// An arrow that only calls an action's `onSelect` throws its result (and its promise) away.
+	if (/=>\s*[\w?.!]*\.onSelect\??\.?\(\)\s*[}),;:]/.test(source)) return rel;
 	const handlers = [...source.matchAll(/(\w+)\??:\s*SettingsHandler</g)].map(([, name]) => name);
 	const runsHandler = handlers.some((name) => {
 		const uses = [...source.matchAll(new RegExp(`(?<![\\w.'"])${name}\\b(?!\\??:)`, 'g'))].length;
@@ -663,6 +671,16 @@ ${props}const o = readResult(await onRequest?.());`), undefined);
 	assert.equal(handRolledReader(rel, `import { SettingsHandlerRun } from '../shared/run.svelte';
 void run.run(action.onSelect);`), undefined);
 	assert.equal(handRolledReader('src/lib/settings/shared/run.svelte.ts', `const r = await onSelect(); r.error;`), undefined);
+	// Importing a reader for something else does not excuse a callback whose result is dropped,
+	// nor a `result` prop read by hand.
+	assert.equal(handRolledReader(rel, `import { InstantSetting } from '../shared';
+<Button onclick={() => lock?.action?.onSelect?.()}>Go</Button>`), rel);
+	assert.equal(handRolledReader(rel, `import { toFormResult } from '../shared/undo';
+interface Props { result?: SettingsResult; }
+const submit = new FormSubmit({ error: () => result?.error });`), rel);
+	assert.equal(handRolledReader(rel, `import { toFormResult } from '../shared/undo';
+interface Props { result?: SettingsResult; }
+const read = $derived(toFormResult(result, 'Failed.'));`), undefined);
 });
 
 test('every settings component that runs a callback reads its result through the shared layer (readResult and friends)', () => {

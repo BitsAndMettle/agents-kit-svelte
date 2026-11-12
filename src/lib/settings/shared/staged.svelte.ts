@@ -3,7 +3,7 @@ import type { Attachment } from 'svelte/attachments';
 import { isThenable } from '../../core/promise';
 import { adoptSnapshotAsDefaults, CHANGE_WORDS, diffForm, snapshotForm, undescribedChanges, type ChangeWords, type ControlSnapshot } from './diff';
 import { isDev } from './env';
-import { firstInvalidControl } from './focus';
+import { firstInvalidControl, focusLost, restoreFocus } from './focus';
 import { readResult } from './undo';
 import type { SettingStatus, SettingsChange, SettingsConflict, SettingsFieldDescriptor, SettingsHandler, SettingsResult } from './types';
 
@@ -52,6 +52,13 @@ function hasFailure(result: void | SettingsResult | undefined): boolean {
 	return !readResult(result).ok;
 }
 
+/** The form's own named fields, in page order: where focus goes when nothing better is left. */
+function firstFields(form: HTMLFormElement): HTMLElement[] {
+	return Array.from(form.elements).filter(
+		(el): el is HTMLElement => el instanceof HTMLElement && el.matches('input:not([type="hidden"]), select, textarea') && Boolean((el as HTMLInputElement).name)
+	);
+}
+
 function valuesOf(data: FormData): SettingsValues {
 	const values: SettingsValues = {};
 	for (const name of new Set(data.keys())) {
@@ -75,7 +82,14 @@ function valuesOf(data: FormData): SettingsValues {
  * - Only the form's own controls count: an input or change from a control of another form (a
  *   nested dialog's own form) is not an edit.
  * - After a failed submit, focus goes to the first invalid control (`firstInvalidControl`: a
- *   group marked invalid gives its checked choice) or `[data-form-error]`.
+ *   group marked invalid gives its checked choice) or `[data-form-error]`, but only while it is
+ *   still where the submit left it (or lost): someone typing elsewhere meanwhile keeps their
+ *   place, and the alert is announced. After a successful one that took the focused control
+ *   away (a conflict review), focus goes to the last edited control, else the first field.
+ * - A lock that switches controls off (or on) re-reads the change list: a disabled control
+ *   neither posts nor counts as unsaved.
+ * - A held navigation whose changes are all saved meanwhile (the save in flight landed) goes
+ *   ahead: there is nothing left to lose.
  * - `onDirtyChange` hears every change of the change list, and `[]` when the form unmounts (its
  *   draft is gone), so navigation dots and attention items never outlive the form.
  * - `guard` holds a navigation while dirty: the app calls `guard.request(proceed)` from its
@@ -114,6 +128,17 @@ export class SettingsDraft {
 		$effect(() => () => {
 			untrack(() => {
 				if (!this.#options.changes()) this.#options.onDirtyChange()?.([]);
+			});
+		});
+		// The save in flight landed while the leave dialog was open: nothing is left to lose, so go.
+		$effect(() => {
+			if (!this.#proceed || this.dirtyCount > 0) return;
+			untrack(() => {
+				const proceed = this.#proceed;
+				if (!proceed) return;
+				this.#proceed = null;
+				this.#leaving = true;
+				proceed();
 			});
 		});
 		if (isDev()) {
@@ -237,12 +262,19 @@ export class SettingsDraft {
 		form.addEventListener('input', edited);
 		form.addEventListener('change', edited);
 		form.addEventListener('reset', reset);
+		// A lock (a disabled fieldset or control) fires no input event, but a disabled control
+		// neither posts nor counts as unsaved: re-read the change list when one is switched.
+		const switched = new MutationObserver((records) => {
+			if (records.some((r) => r.target instanceof Element && r.target.matches('input, select, textarea, fieldset'))) this.#version++;
+		});
+		switched.observe(form, { subtree: true, attributes: true, attributeFilter: ['disabled'] });
 		// Svelte runs an attachment inside an effect: bump without reading, or it would re-run itself.
 		untrack(() => this.#version++);
 		return () => {
 			form.removeEventListener('input', edited);
 			form.removeEventListener('change', edited);
 			form.removeEventListener('reset', reset);
+			switched.disconnect();
 			if (this.#form === form) this.#form = null;
 		};
 	};
@@ -268,6 +300,8 @@ export class SettingsDraft {
 		const form = event.currentTarget as HTMLFormElement;
 		const data = new FormData(form, event.submitter);
 		const submitted = snapshotForm(form);
+		// Where focus was when the save went out: a failure moves it only if it is still there.
+		const focusedAt = { submitter: event.submitter, active: document.activeElement };
 		const context: SettingsSubmitContext = { changes: this.changes, revision: this.#options.revision(), data, event };
 		this.#handled = true;
 		this.#result = undefined;
@@ -275,17 +309,17 @@ export class SettingsDraft {
 		try {
 			outcome = handler(valuesOf(data), context);
 		} catch {
-			this.#inflight = this.#finish(form, submitted, { error: this.#options.genericError() });
+			this.#inflight = this.#finish(form, submitted, focusedAt, { error: this.#options.genericError() });
 			return;
 		}
 		if (!isThenable(outcome)) {
-			this.#inflight = this.#finish(form, submitted, outcome);
+			this.#inflight = this.#finish(form, submitted, focusedAt, outcome);
 			return;
 		}
 		this.#running = true;
 		this.#inflight = Promise.resolve(outcome).then(
-			(result) => (generation === this.#generation ? this.#finish(form, submitted, result) : false),
-			() => (generation === this.#generation ? this.#finish(form, submitted, { error: this.#options.genericError() }) : false)
+			(result) => (generation === this.#generation ? this.#finish(form, submitted, focusedAt, result) : false),
+			() => (generation === this.#generation ? this.#finish(form, submitted, focusedAt, { error: this.#options.genericError() }) : false)
 		);
 	};
 
@@ -309,17 +343,33 @@ export class SettingsDraft {
 		return this.#lastEdited?.isConnected ? this.#lastEdited : null;
 	}
 
-	/** `submitted`: the controls' values when the save was submitted, which become the saved ones on success. */
-	async #finish(form: HTMLFormElement, submitted: readonly ControlSnapshot[], result: void | SettingsResult): Promise<boolean> {
+	/**
+	 * `submitted`: the controls' values when the save was submitted, which become the saved ones on
+	 * success. `focusedAt`: the submitter and the focused element then.
+	 */
+	async #finish(
+		form: HTMLFormElement,
+		submitted: readonly ControlSnapshot[],
+		focusedAt: { submitter: HTMLElement | null; active: Element | null },
+		result: void | SettingsResult
+	): Promise<boolean> {
 		this.#running = false;
 		this.#result = result || undefined;
 		if (!hasFailure(result)) {
 			adoptSnapshotAsDefaults(submitted);
 			this.#saved = true;
 			this.#version++;
+			await tick();
+			// The save took the focused control away with what it settled (Enter in a conflict review
+			// that closed): back to the fields. A button that only went off is SaveBar's to handle.
+			const gone = focusedAt.active instanceof HTMLElement && !focusedAt.active.isConnected;
+			if (gone && form.isConnected && focusLost()) restoreFocus(this.lastEdited(), ...firstFields(form));
 			return true;
 		}
 		await tick();
+		const active = document.activeElement;
+		// Someone who moved on to another control while the save ran keeps their place: the alert is announced.
+		if (!focusLost() && active !== focusedAt.active && active !== focusedAt.submitter) return false;
 		const target = firstInvalidControl(form) ?? form.querySelector<HTMLElement>('[data-form-error]');
 		target?.focus();
 		return false;

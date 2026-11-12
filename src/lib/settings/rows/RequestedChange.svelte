@@ -221,7 +221,7 @@
 	{/if}
 {/snippet}
 
-<li {...rest} data-status={status} aria-busy={cancel.pending || resend.pending ? 'true' : undefined} class={cn(RECIPES.row, '@lg/settings:items-start', className)}>
+<li {...rest} data-status={status} aria-busy={cancel.pending || resend.pending ? 'true' : undefined} class={cn(RECIPES.row, '@lg/settings:flex-wrap @lg/settings:items-start @lg/settings:gap-y-2', className)}>
 	<div class="flex min-w-0 flex-1 flex-col gap-1">
 		<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
 			<span id="{uid}-label" class="text-[13px] leading-5 font-medium text-fg-main">{label}</span>
@@ -250,8 +250,6 @@
 				{status === 'approved' ? words.approvedLine(effective) : status === 'declined' ? words.declinedLine(effective, requested) : words.expiredLine(effective)}
 			</p>
 		{/if}
-		{#if resend.status === 'done' && awaiting}<p aria-hidden="true" class="m-0 text-xs leading-5 text-fg-light">{resend.notice ?? words.resent}</p>{/if}
-		<div role="alert" class={cn('text-xs leading-5 font-medium', DANGER_TEXT)}>{#if failure}<p class="m-0">{failure}</p>{/if}</div>
 	</div>
 	{#if showButtons}
 		{#if ownForm}
@@ -262,5 +260,7 @@
 			<div class="flex shrink-0 flex-wrap items-center gap-2">{@render buttons()}</div>
 		{/if}
 	{/if}
+	<!-- After the buttons, on a line of its own: coming or going it never moves them, stacked or beside the text. On one line, so `:empty` meets no whitespace; empty, it is visually hidden, so its alert stays a live region. -->
+	<div class="flex min-w-0 basis-full flex-col [&:not(:has(>:not(:empty)))]:sr-only">{#if resend.status === 'done' && awaiting}<p aria-hidden="true" class="m-0 text-xs leading-5 text-fg-light">{resend.notice ?? words.resent}</p>{/if}<div role="alert" class={cn('text-xs leading-5 font-medium empty:sr-only', DANGER_TEXT)}>{#if failure}<p class="m-0">{failure}</p>{/if}</div></div>
 	<span role="status" class="sr-only">{live}</span>
 </li>

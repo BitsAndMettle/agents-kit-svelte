@@ -12,6 +12,8 @@
 		/** Shown when an instant change failed and was reverted, unless the handler returned its own message. */
 		failed: string;
 		undo: string;
+		/** Shown when a lock's way forward (`lock.action`) fails without a message of its own. */
+		lockActionFailed: string;
 	}
 
 	export type ChoiceCardsVariant = 'cards' | 'rows' | 'segmented' | 'auto';
@@ -36,8 +38,10 @@
 		pickLock,
 		ReadyGate,
 		RECIPES,
+		SettingsHandlerRun,
 		type ChoiceOption,
 		type SettingLock,
+		type SettingsAction,
 		type SettingsHandler
 	} from '../shared';
 	import { isDev } from '../shared/env';
@@ -114,6 +118,7 @@
 		saved: 'Saved',
 		failed: "Couldn't save. Changed back.",
 		undo: 'Undo',
+		lockActionFailed: "Couldn't do that. Try again.",
 		...labels
 	});
 
@@ -211,6 +216,17 @@
 		value = next;
 	}
 
+	/** A lock's way forward (the group's or an option's): one runs at a time; its failure shows beside it. */
+	const lockRun = new SettingsHandlerRun();
+	let lockRunKey = $state<string | undefined>(undefined);
+	function runLockAction(key: string, action: SettingsAction, event: MouseEvent): void {
+		if (!action.onSelect || action.unavailable || lockRun.pending) return;
+		lockRunKey = key;
+		void lockRun.run(action.onSelect);
+		// A promise means the callback handles it: a link with one does not also navigate.
+		if (lockRun.pending) event.preventDefault();
+	}
+
 	let undoTo: string | null = null;
 	/**
 	 * Undo hides its own button (a pending change offers none), so focus goes first to the radio the
@@ -297,6 +313,18 @@
 		'm-0 mt-0.5 size-4 shrink-0 cursor-pointer appearance-none rounded-full border border-fg-light/60 bg-card-bg transition-[border-color,border-width] checked:border-[5px] checked:border-accent-primary disabled:cursor-not-allowed focus-visible:outline-none';
 </script>
 
+<!-- A lock's way forward: a link, an intent or a callback (loading while it runs, its failure shown here). -->
+{#snippet lockAction(l: SettingLock, key: string, noteId: string)}
+	{#if l.action}
+		{@const act = l.action}
+		{@const reasonId = `${uid}-${key}-unavailable`}
+		{@const props = actionButtonProps(act, act.unavailable ? reasonId : undefined, { ready: ready.current })}
+		<Button size="xs" {...props} aria-describedby={[props['aria-describedby'], noteId].filter(Boolean).join(' ')} loading={lockRun.pending && lockRunKey === key} onclick={(event: MouseEvent) => runLockAction(key, act, event)}>{act.label}</Button>
+		{#if act.unavailable}<span id={reasonId} class="text-xs leading-5 text-fg-light">{act.unavailable}</span>{/if}
+		{#if lockRun.status === 'failed' && lockRunKey === key}<span role="alert" class={cn('basis-full text-xs leading-5 font-medium', DANGER_TEXT)}>{lockRun.error ?? text.lockActionFailed}</span>{/if}
+	{/if}
+{/snippet}
+
 {#snippet lockNote(l: SettingLock, id: string, prefix?: string)}
 	{@const Icon = LOCK_ICONS[l.kind]}
 	<span id={id} class={cn(RECIPES.note, 'text-left')} data-lock={l.kind}>
@@ -376,10 +404,16 @@
 		{/each}
 	</div>
 
-	{#if notesBelow && options.some((o) => o.lock)}
+	<!-- Option lock notes sit here in the segmented looks, and any option lock's way forward always does: a button never goes inside an option's label. -->
+	{#if options.some((o) => o.lock && (notesBelow || o.lock.action))}
 		<span class="flex flex-col gap-1">
 			{#each options as option, index (option.value)}
-				{#if option.lock}{@render lockNote(option.lock, ids(index).lock, option.label)}{/if}
+				{#if option.lock && (notesBelow || option.lock.action)}
+					<span class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+						{#if notesBelow}{@render lockNote(option.lock, ids(index).lock, option.label)}{/if}
+						{@render lockAction(option.lock, `o${index}`, ids(index).lock)}
+					</span>
+				{/if}
 			{/each}
 		</span>
 	{/if}
@@ -398,15 +432,13 @@
 	{#if groupLock && ownLock}
 		<span class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
 			{@render lockNote(groupLock, lockId)}
-			{#if groupLock.action}
-				<Button size="xs" {...actionButtonProps(groupLock.action, undefined, { ready: ready.current })} onclick={groupLock.action.onSelect && !groupLock.action.unavailable ? () => groupLock?.action?.onSelect?.() : undefined}>{groupLock.action.label}</Button>
-			{/if}
+			{@render lockAction(groupLock, 'group', lockId)}
 		</span>
 	{/if}
 
 	{#if instant}
 		<!-- With nothing to say the line takes no room (its status stays in the page to announce); it shows while saving, once saved and while Undo is offered. -->
-		<div class={cn('flex flex-wrap items-center gap-x-2 gap-y-1', status !== 'pending' && status !== 'saved' && !instant.canUndo && 'sr-only')} data-instant-status="">
+		<div class={cn('flex flex-wrap items-center gap-x-2 gap-y-1', status !== 'pending' && status !== 'saved' && !instant.canUndo ? 'sr-only' : 'min-h-6')} data-instant-status="">
 			<p id={statusId} role="status" class="m-0 inline-flex items-center gap-1.5 text-xs leading-5 text-fg-light [&_svg]:size-3.5">
 				{#if status === 'pending'}<Spinner size="xs" decorative />{text.saving}{:else if status === 'saved'}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
 			</p>

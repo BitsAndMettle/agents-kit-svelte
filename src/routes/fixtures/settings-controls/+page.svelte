@@ -8,6 +8,8 @@
 	- A SettingsForm whose save returns field errors for a staged matrix and a selection list.
 	- Actions that report failures, bulk actions with a link and a reason, a row status that changes,
 	  and a GET filter that keeps the page's other query parameters.
+	- Locks with a way forward (`lock.action`): a ChoiceCards group lock whose callback fails, an
+	  option lock and a matrix lock with links, and a locked list item whose callback fails.
 -->
 <script lang="ts">
 	import { Bell, Mail, Smartphone } from '@lucide/svelte';
@@ -69,6 +71,18 @@
 	async function addFeed(): Promise<SettingsResult> {
 		await wait();
 		return { error: 'Feeds are full.' };
+	}
+
+	// ---- Locks with a way forward. ----
+	let upgradeCalls = $state(0);
+	async function upgrade(): Promise<SettingsResult> {
+		upgradeCalls++;
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		return { error: 'Billing is down. Try later.' };
+	}
+	async function askAdmin(): Promise<SettingsResult> {
+		await wait();
+		return { error: 'No admin is around.' };
 	}
 </script>
 
@@ -135,5 +149,14 @@
 		/>
 		<button type="button" onclick={breakFeed}>Break audit feed</button>
 		<p data-testid="bulk-log">{bulkLog}</p>
+	</section>
+
+	<section data-testid="lock-actions" class="@container/settings flex flex-col gap-4">
+		<h2 class="m-0 text-base font-semibold">Lock actions</h2>
+		<ChoiceCards name="locked-density" aria-label="Locked density" variant="segmented" options={[{ value: 'a', label: 'Compact' }, { value: 'b', label: 'Roomy' }]} defaultValue="a" lock={{ kind: 'plan', reason: 'Density needs the larger plan.', action: { label: 'Upgrade', onSelect: upgrade } }} />
+		<p data-testid="upgrade-calls">{upgradeCalls}</p>
+		<ChoiceCards name="option-lock" aria-label="Seat plan" options={[{ value: 'small', label: 'Small' }, { value: 'large', label: 'Large', lock: { kind: 'plan', reason: 'Large needs the larger plan.', action: { label: 'See plans for Large', href: '?plans=large' } } }]} defaultValue="small" />
+		<NotificationMatrix events={events.slice(0, 1)} channels={channels.slice(0, 2)} defaultValue={[]} lock={{ kind: 'plan', reason: 'Text alerts need the larger plan.', action: { label: 'See plans', href: '?plans=text' } }} labels={{ caption: 'Locked matrix' }} />
+		<SettingsItemList title="Locked people" items={[{ id: 'l1', label: 'Ada Park', lock: { kind: 'permission', reason: 'Only admins can change Ada.', action: { label: 'Ask an admin', onSelect: askAdmin } } }]} />
 	</section>
 </main>

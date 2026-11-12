@@ -1072,9 +1072,10 @@ test.describe('Row layout', () => {
 	});
 
 	// Ordinary labels, not just a short one (renamed in place, as an app's own words would be). The
-	// status line (Saving, Saved, Undo, Changed back) is the row's last line, so nothing on it moves
-	// the switch: beside the label (1440, 412, 393) or wrapped under it (360, 320), through a save,
-	// its Undo, and both clearing. The rows below move only when the line comes and goes.
+	// status line (Saved, Undo, Changed back) is the row's last line, so nothing on it moves the
+	// switch: beside the label (1440, 412, 393) or wrapped under it (360, 320), through a save, its
+	// Undo, and both clearing. Saving takes no room: the rows below stay put until the save lands
+	// and Undo needs a line, and come back once it goes.
 	for (const width of [1440, 412, 393, 360, 320]) {
 		for (const text of ['Compact lists', 'Show line numbers in diffs', 'Email me when a run finishes', 'Compact lists in every project view']) {
 			test(`at ${width}px a save and its Undo never move the switch or rewrap the label, label "${text}"`, async ({ page }) => {
@@ -1094,12 +1095,15 @@ test.describe('Row layout', () => {
 				const undo = row.getByRole('button', { name: /^Undo/ });
 				const next = row.locator('xpath=following-sibling::li[1]');
 				// In page coordinates: clicking Undo may scroll it into view.
+				const line = row.locator('[data-row-status-line]');
 				const where = async () => {
-					const [own, box, below] = [await compact.boundingBox(), await label.boundingBox(), await next.boundingBox()];
+					const [own, box, below, status] = [await compact.boundingBox(), await label.boundingBox(), await next.boundingBox(), await line.boundingBox()];
 					const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
-					return { x: own!.x + scroll.x, y: own!.y + scroll.y, label: box!.height, next: below!.y + scroll.y };
+					return { x: own!.x + scroll.x, y: own!.y + scroll.y, label: box!.height, next: below!.y + scroll.y, line: status?.height ?? 0 };
 				};
 				const idle = await where();
+				// An idle row carries no blank status line.
+				expect(idle.line, 'idle status line').toBeLessThanOrEqual(1);
 				// Nothing waits on the label line: a label of up to 26 characters stays on one line from 393px.
 				if (width >= 393 && text.length <= 26) expect(idle.label, 'idle label height').toBeLessThan(21);
 				await expect(undo).toHaveCount(0);
@@ -1135,13 +1139,73 @@ test.describe('Row layout', () => {
 					expect(Math.abs(at.y - idle.y), `switch y while ${phase}`).toBeLessThan(0.5);
 					expect(Math.abs(at.label - idle.label), `label height while ${phase}`).toBeLessThan(0.5);
 				}
-				// The rows below move once when the line appears, stay put while it shows, and come back when it goes.
-				for (const [phase, at] of Object.entries({ saved, 'Undo shown': withUndo, undoing, 'Changed back': changedBack })) {
-					expect(Math.abs(at.next - pending.next), `next row while ${phase}`).toBeLessThan(0.5);
+				// Saving takes no room: a tap moves no row below.
+				expect(Math.abs(pending.next - idle.next), 'next row while saving').toBeLessThan(0.5);
+				// The line appears once the save lands with Undo, stays while it shows, and goes away after.
+				expect(saved.next - idle.next, 'next row once Undo is offered').toBeGreaterThan(20);
+				for (const [phase, at] of Object.entries({ 'Undo shown': withUndo, undoing, 'Changed back': changedBack })) {
+					expect(Math.abs(at.next - saved.next), `next row while ${phase}`).toBeLessThan(0.5);
 				}
 				expect(Math.abs(after.next - idle.next), 'next row once the line is gone').toBeLessThan(0.5);
+				expect(after.line, 'status line once idle again').toBeLessThanOrEqual(1);
 			});
 		}
+	}
+
+	// A failed save puts its alert and Retry on the status line, under the switch: the switch stays
+	// where it was, beside the label (1440) or wrapped under it (320), through the failure, a Retry
+	// and the failure again, so tapping it again flips it.
+	for (const width of [1440, 320]) {
+		test(`at ${width}px a failed save and its Retry never move the switch`, async ({ page }) => {
+			await page.clock.install();
+			await openComposed(page, width);
+			const sound = page.getByRole('switch', { name: 'Play a sound' });
+			const row = rowOf(sound);
+			await sound.scrollIntoViewIfNeeded();
+			const where = async () => {
+				const box = await sound.boundingBox();
+				const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
+				return { x: box!.x + scroll.x, y: box!.y + scroll.y, cx: box!.x + box!.width / 2, cy: box!.y + box!.height / 2 };
+			};
+			const idle = await where();
+			await pauseClock(page);
+			await sound.click();
+			await page.clock.runFor(SETTLE);
+			await expect(row.getByRole('alert')).toHaveText("Couldn't change sounds. Changed back.");
+			const failed = await where();
+			const retry = row.getByRole('button', { name: /^Retry/ });
+			await retry.click();
+			await expect(row).toHaveAttribute('data-status', 'pending');
+			const retrying = await where();
+			await page.clock.runFor(SETTLE);
+			await expect(row.getByRole('alert')).toHaveText("Couldn't change sounds. Changed back.");
+			const failedAgain = await where();
+			for (const [phase, at] of Object.entries({ failed, retrying, 'failed again': failedAgain })) {
+				expect(Math.abs(at.x - idle.x), `switch x while ${phase}`).toBeLessThan(0.5);
+				expect(Math.abs(at.y - idle.y), `switch y while ${phase}`).toBeLessThan(0.5);
+			}
+			// A second tap where the switch was flips it again.
+			await page.mouse.click(failedAgain.cx, failedAgain.cy);
+			await expect(row).toHaveAttribute('data-status', 'pending');
+			await expect(sound).toBeChecked();
+		});
+	}
+
+	for (const width of [1440, 393]) {
+		test(`at ${width}px tapping the next switch right after a tap flips it`, async ({ page }) => {
+			await page.clock.install();
+			await openComposed(page, width);
+			const compact = page.getByRole('switch', { name: 'Compact lists' });
+			const sound = page.getByRole('switch', { name: 'Play a sound' });
+			await compact.scrollIntoViewIfNeeded();
+			const box = (await sound.boundingBox())!;
+			await pauseClock(page);
+			await compact.click();
+			await page.clock.runFor(150);
+			await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+			await expect(sound).toBeChecked();
+			await expect(rowOf(sound)).toHaveAttribute('data-status', 'pending');
+		});
 	}
 
 	test('facts line up with the meter beside them in a list={false} section', async ({ page }) => {
@@ -1184,4 +1248,47 @@ test.describe('Instant status', () => {
 		await expect(row.getByRole('status')).toHaveText('Saved');
 		await expect(row.getByRole('alert')).toHaveText('');
 	});
+});
+
+test.describe('Final fixes: request rows hold still', () => {
+	for (const width of [393, 320]) {
+		test(`at ${width}px "Request sent again" and a failure show after the buttons, which stay put`, async ({ page }) => {
+			const section = await openOnClock(page, 'requested-change');
+			await page.setViewportSize({ width, height: 900 });
+			await pauseClock(page);
+			const tops = async (...buttons: Locator[]) => Promise.all(buttons.map(async (b) => (await b.boundingBox())!.y + (await page.evaluate(() => window.scrollY))));
+			const resend = section.getByRole('button', { name: 'Send again for Parallel runs' });
+			const cancel = section.getByRole('button', { name: 'Cancel request for Parallel runs' });
+			await resend.scrollIntoViewIfNeeded();
+			const before = await tops(resend, cancel);
+			await resend.click();
+			await page.clock.runFor(SETTLE);
+			await expect(rowOf(resend).locator('p', { hasText: 'Request sent again.' })).toBeVisible();
+			expect(await tops(resend, cancel)).toEqual(before);
+
+			const roleResend = section.getByRole('button', { name: 'Send again for Role' });
+			const roleCancel = section.getByRole('button', { name: 'Cancel request for Role' });
+			await roleCancel.scrollIntoViewIfNeeded();
+			const roleBefore = await tops(roleResend, roleCancel);
+			await roleCancel.click();
+			await page.clock.runFor(SETTLE);
+			await expect(rowOf(roleCancel).getByRole('alert')).not.toHaveText('');
+			expect(await tops(roleResend, roleCancel)).toEqual(roleBefore);
+		});
+	}
+
+	for (const width of [1440, 393, 320]) {
+		test(`at ${width}px "Request sent" is as tall as the Request access button it replaces`, async ({ page }) => {
+			const section = await openOnClock(page, 'lock-reason');
+			await page.setViewportSize({ width, height: 900 });
+			const ok = section.getByTestId('lock-request-ok');
+			await ok.scrollIntoViewIfNeeded();
+			const before = (await ok.boundingBox())!.height;
+			await pauseClock(page);
+			await ok.getByRole('button', { name: 'Request access' }).click();
+			await page.clock.runFor(SETTLE);
+			await expect(ok.getByRole('button', { name: 'Request access' })).toHaveCount(0);
+			expect(Math.abs((await ok.boundingBox())!.height - before)).toBeLessThan(0.5);
+		});
+	}
 });

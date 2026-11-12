@@ -27,12 +27,12 @@
 	import { cn } from '../../ui/cn';
 	import { getSettingsDraft, getSettingsScope } from '../shared/context';
 	import { isDev } from '../shared/env';
-	import { restoreFocus } from '../shared/focus';
+	import { focusLost, restoreFocus } from '../shared/focus';
 	import { InstantSetting } from '../shared/instant.svelte';
 	import { pickLock } from '../shared/lock';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import type { SettingLock, SettingsHandler } from '../shared/types';
-	import { flippedByPerson, focusLost } from './helpers';
+	import { flippedByPerson } from './helpers';
 	import type { LockReasonLabels } from './LockReason.svelte';
 	import SettingsRow from './SettingsRow.svelte';
 
@@ -183,9 +183,22 @@
 	const errorText = $derived(committing && instant?.status === 'error' ? (instant.error ?? words.failed) : undefined);
 	const statusText = $derived(undoing && status === 'saved' ? words.undone : undefined);
 
+	/**
+	 * The row's status line (Retry, Undo) takes room only while it has one of them, so a flip that
+	 * only saves moves no row below. Once it shows, a save started from it (Undo, Retry, another
+	 * flip) keeps it until that save settles, so the line does not blink out under the pointer.
+	 */
+	const lineContent = $derived(committing && (instant?.status === 'error' || Boolean(instant?.canUndo && !locked)));
+	let holdLine = $state(false);
+	$effect(() => {
+		if (status === 'idle' || status === undefined) holdLine = false;
+	});
+	const showFeedback = $derived(lineContent || (holdLine && status !== 'idle'));
+
 	function change(next: boolean): void {
 		if (!instant) return;
 		undoing = false;
+		holdLine = lineContent;
 		void instant.set(next);
 	}
 
@@ -199,6 +212,7 @@
 		if (!instant) return;
 		const button = event.currentTarget as HTMLElement;
 		undoing = true;
+		holdLine = true;
 		const pending = instant.undo();
 		void keepFocus(button);
 		const done = await pending;
@@ -209,6 +223,7 @@
 	async function retry(event: MouseEvent): Promise<void> {
 		if (!instant) return;
 		const button = event.currentTarget as HTMLElement;
+		holdLine = true;
 		const pending = instant.retry();
 		void keepFocus(button);
 		await pending;
@@ -270,7 +285,7 @@
 	controlId={id ?? undefined}
 	layout="inline"
 	{control}
-	{feedback}
+	feedback={showFeedback ? feedback : undefined}
 	{lock}
 	{reasonId}
 	{onRequest}

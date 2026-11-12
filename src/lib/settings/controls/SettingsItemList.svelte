@@ -361,6 +361,16 @@
 	}
 
 	// The add and empty-state actions: loading while a promise is open, then their `{error}` (or the generic label).
+	/** A locked item's way forward (`lock.action`): one runs at a time; its failure shows on that item. */
+	const lockRun = new SettingsHandlerRun();
+	let lockRunId = $state<string | undefined>(undefined);
+	function runLockAction(item: T, action: SettingsAction, event: MouseEvent): void {
+		if (!action.onSelect || action.unavailable || lockRun.pending) return;
+		lockRunId = item.id;
+		void lockRun.run(action.onSelect);
+		// A promise means the callback handles it: a link with one does not also navigate.
+		if (lockRun.pending) event.preventDefault();
+	}
 	const addRun = new SettingsHandlerRun();
 	const emptyRun = new SettingsHandlerRun();
 
@@ -552,6 +562,16 @@
 				{/if}
 				{#if item.lock && LockIcon}
 					<p id={reasonId(item, 'lock')} class={cn(RECIPES.note, 'm-0 mt-1')}><span aria-hidden="true" class="contents"><LockIcon /></span><span>{lockReasonText(item.lock)}</span></p>
+					{#if item.lock.action}
+						{@const act = item.lock.action}
+						{@const unavailableId = `${reasonId(item, 'lock')}-unavailable`}
+						{@const props = actionButtonProps(act, act.unavailable ? unavailableId : undefined, { ready: ready.current })}
+						<span class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+							<Button size="xs" {...props} aria-describedby={[props['aria-describedby'], reasonId(item, 'lock')].filter(Boolean).join(' ')} loading={lockRun.pending && lockRunId === item.id} onclick={(event: MouseEvent) => runLockAction(item, act, event)}>{act.label}</Button>
+							{#if act.unavailable}<span id={unavailableId} class="text-xs leading-5 text-fg-light">{act.unavailable}</span>{/if}
+							{#if lockRun.status === 'failed' && lockRunId === item.id}<span role="alert" class={cn('basis-full text-xs leading-5 font-medium', DANGER_TEXT)}>{lockRun.error ?? text.actionFailed}</span>{/if}
+						</span>
+					{/if}
 				{/if}
 				{#each unavailable as action (action.id)}
 					<p id={actionReasonId(item, action)} class="m-0 mt-1 text-xs leading-5 text-fg-light">{action.label}: {action.unavailable}</p>

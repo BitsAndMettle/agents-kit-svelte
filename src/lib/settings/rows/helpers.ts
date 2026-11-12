@@ -68,12 +68,6 @@ export function withQuery(url: string, fields: Record<string, string> | undefine
 	return base + separator + new URLSearchParams(entries).toString() + hash;
 }
 
-/** True when focus fell back to the page (its element was removed or hidden). Call it in the browser only. */
-export function focusLost(): boolean {
-	const active = document.activeElement;
-	return !active || active === document.body;
-}
-
 /**
  * True when a person changed this checkbox (clicked it, its label, or pressed Space), not the
  * browser restoring form state or a script. Reads the browser's own record of user interaction

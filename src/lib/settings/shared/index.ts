@@ -23,7 +23,7 @@ export type { SettingsScope, SectionContext } from './context';
 export { ReadyGate } from './ready.svelte';
 export { searchSettings, filterSettingsLinks, toPaletteCommands, highlightSegments, mergeRanges, queryTokens } from './search';
 export type { SettingsSearchResult, TextRange } from './search';
-export { rememberOpener, openerFor, restoreFocus, focusIndexAfterRemoval, nextFocusAfterRemoval, firstInvalidControl, OPENER_ATTRIBUTE } from './focus';
+export { rememberOpener, openerFor, restoreFocus, focusIndexAfterRemoval, nextFocusAfterRemoval, firstInvalidControl, focusLost, OPENER_ATTRIBUTE } from './focus';
 export { CopyState } from './copy.svelte';
 export type { CopyStatus } from './copy.svelte';
 export { matchesPhrase, phrasePattern } from './confirm';

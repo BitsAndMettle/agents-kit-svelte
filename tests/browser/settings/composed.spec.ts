@@ -250,3 +250,101 @@ test.describe('without JavaScript', () => {
 		await expect(page.getByRole('link', { name: 'View' })).toHaveAttribute('href', /dialog=recovery-codes/);
 	});
 });
+
+test.describe('Final fixes: saving, leaving and locks', () => {
+	test('Composed settings: a save that lands while the leave dialog is open lets the navigation go', async ({ page }) => {
+		const errors = watch(page);
+		await openOnClock(page);
+		await page.getByRole('textbox', { name: 'Workspace name' }).fill('Racing');
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(100);
+		await rail(page).getByRole('link', { name: /^Members/ }).click();
+		await page.clock.runFor(100);
+		const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
+		await expect(dialog).toBeVisible();
+		await page.clock.runFor(800);
+		// Nothing is left to lose: no dialog over an empty change list, the navigation goes ahead.
+		await expect(page).toHaveURL(/section=members/);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+		await expect(page.getByTestId('composed-log')).toHaveText('Saved revision 5: Workspace name → Racing');
+		expect(errors).toEqual([]);
+	});
+
+	test('Composed settings: Escape and the backdrop leave the dialog open while "Save and leave" runs', async ({ page }) => {
+		await openOnClock(page);
+		await page.getByRole('textbox', { name: 'Workspace name' }).fill('Racing');
+		await rail(page).getByRole('link', { name: /^Members/ }).click();
+		await page.clock.runFor(100);
+		const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
+		await expect(dialog).toBeVisible();
+		const saveAndLeave = dialog.getByRole('button', { name: 'Save and leave' });
+		// Counts every close, even one the open state undoes at once.
+		await dialog.evaluate((node) => {
+			(window as unknown as { closes: number }).closes = 0;
+			node.addEventListener('close', () => (window as unknown as { closes: number }).closes++);
+		});
+		await saveAndLeave.click();
+		await page.clock.runFor(50);
+		await page.keyboard.press('Escape');
+		await page.mouse.click(4, 4);
+		await page.clock.runFor(50);
+		await expect(dialog).toBeVisible();
+		expect(await page.evaluate(() => (window as unknown as { closes: number }).closes)).toBe(0);
+		await expect(saveAndLeave).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(1000);
+		await expect(page).toHaveURL(/section=members/);
+	});
+
+	test('Composed settings: resolving a conflict from the keyboard keeps focus in the form', async ({ page }) => {
+		await openOnClock(page);
+		await page.getByTestId('someone-saves').check();
+		const name = page.getByRole('textbox', { name: 'Workspace name' });
+		await name.fill('Mine');
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(700);
+		const yours = page.getByRole('radiogroup', { name: 'Workspace name' }).getByRole('radio', { name: 'Yours' });
+		await yours.focus();
+		await page.keyboard.press('Space');
+		await page.keyboard.press('Enter');
+		await page.clock.runFor(700);
+		await expect(page.getByTestId('composed-log')).toContainText('(kept workspaceName=mine, retention=theirs)');
+		await expect(page.getByRole('radiogroup', { name: 'Workspace name' })).toHaveCount(0);
+		await expect(name).toBeFocused();
+	});
+
+	test('Composed settings: a failed save leaves focus with a field typed in while it ran', async ({ page }) => {
+		await openOnClock(page);
+		await page.getByTestId('reject-role').check();
+		const name = page.getByRole('textbox', { name: 'Workspace name' });
+		await name.fill('Harbor Crew');
+		await page.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(100);
+		await name.click();
+		await page.keyboard.press('End');
+		await page.keyboard.type(' A');
+		await page.clock.runFor(600);
+		await expect(page.getByText('Pick a role your plan allows.')).toBeVisible();
+		await page.keyboard.type('BC');
+		await expect(name).toHaveValue('Harbor Crew ABC');
+		await expect(name).toBeFocused();
+	});
+
+	test('Composed settings: a lock that arrives while a field is unsaved drops it from the change list until it lifts', async ({ page }) => {
+		await open(page);
+		const name = page.getByRole('textbox', { name: 'Workspace name' });
+		await name.fill('Harbor Crew');
+		const unsaved = page.getByText('1 unsaved change', { exact: true });
+		await expect(unsaved).toBeVisible();
+		await page.getByTestId('as-viewer').check();
+		await expect(name).toBeDisabled();
+		// A disabled field neither posts nor counts: nothing stale to save, nothing to hold a navigation for.
+		await expect(unsaved).toHaveCount(0);
+		await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0);
+		await page.getByTestId('as-viewer').uncheck();
+		await expect(unsaved).toBeVisible();
+		await page.getByTestId('as-viewer').check();
+		await rail(page).getByRole('link', { name: /^Members/ }).click();
+		await expect(page).toHaveURL(/section=members/);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+	});
+});
