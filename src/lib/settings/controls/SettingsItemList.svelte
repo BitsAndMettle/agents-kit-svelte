@@ -383,12 +383,16 @@
 		filterInput?.focus();
 	}
 
-	// Text typed (or restored on Back) before the page was ready stays in the box: filter by it.
+	// Text typed (or restored on Back) before the page was ready stays in the box: filter by it. The
+	// boxes are read first, while every row is still in the page: a row the filter text hides takes
+	// its checkbox with it, and a box ticked before the page was ready would be lost.
 	$effect(() => {
 		const input = filterInput;
 		if (!input) return;
 		untrack(() => {
-			if (input.value !== query) setQuery(input.value);
+			if (input.value === query) return;
+			readSelection();
+			setQuery(input.value);
 		});
 	});
 

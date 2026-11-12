@@ -962,7 +962,7 @@ test.describe('SettingsItemList filter, focus and bulk actions', () => {
 	});
 });
 
-test.describe('Before the page is interactive (composed)', () => {
+test.describe('Before the page is interactive', () => {
 	test('a select changed, boxes ticked and a filter typed before hydration are kept, counted and applied', async ({ page }) => {
 		const release = await openComposedHeld(page);
 		const form = page.getByTestId('composed-form');
@@ -985,6 +985,29 @@ test.describe('Before the page is interactive (composed)', () => {
 		await form.getByRole('button', { name: 'Discard' }).click();
 		await expect(summary).toHaveText('2 selected');
 		await expect(form.getByRole('combobox', { name: 'Data retention' })).toHaveValue('90');
+	});
+
+	test('a box ticked before hydration on a row a filter typed before hydration hides stays selected', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		let release: () => void = () => undefined;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		await page.route('**/_app/immutable/**/*.js', async (route) => {
+			await held;
+			await route.continue();
+		});
+		await page.goto('/fixtures/settings-controls/', { waitUntil: 'domcontentloaded' });
+		const feeds = page.getByTestId('actions').getByRole('region', { name: 'Feeds' });
+		await feeds.getByRole('checkbox', { name: 'Select Audit feed' }).check();
+		await feeds.getByRole('searchbox').fill('Release');
+		release();
+		await expect(page.getByTestId('nm-list-instant').getByRole('checkbox', { name: 'Mentions by In app', exact: true })).toBeEnabled({ timeout: 45000 });
+
+		await expect(feeds.locator('li[data-item-id]')).toHaveCount(1);
+		await expect(feeds.locator('[data-selection] > [role=status]').first()).toHaveText('2 selected');
+		await expect(feeds.locator('input[type="hidden"][name="selected"][value="f2"]')).toHaveCount(1);
+		await feeds.getByRole('searchbox').fill('');
+		await expect(feeds.getByRole('checkbox', { name: 'Select Audit feed' })).toBeChecked();
+		await expect(feeds.getByRole('checkbox', { name: 'Select Release feed' })).toBeChecked();
 	});
 
 	test('the selection summary counts only selected rows that are still listed', async ({ page }) => {
