@@ -162,9 +162,11 @@
 	const statusId = `${uid}-status`;
 	const lockId = `${uid}-lock`;
 	const formId = `${uid}-form`;
+	const fieldErrorId = `${uid}-field-error`;
 	const scope = getSettingsScope();
 	const draft = getSettingsDraft();
-	const ready = new ReadyGate();
+	// The scope's readiness (SettingsLayout `ready`) holds back instant cells and column toggles too.
+	const ready = new ReadyGate(() => scope?.ready());
 	// The cells are their own controls: a surrounding row's Field must not hand them its id or label.
 	setFieldContext(createFieldState({ id: `${uid}-cells`, group: () => true }));
 
@@ -172,6 +174,8 @@
 		console.warn('NotificationMatrix: onCellCommit is ignored inside a SettingsForm; the form\'s Save commits the cells.');
 	}
 
+	/** A server error for the cells, from the surrounding SettingsForm; hidden once a cell is edited. */
+	const fieldError = $derived(draft ? draft.fieldError(name) : undefined);
 	const groupLock = $derived(pickLock(lock, scope?.lock?.lock));
 	const ownLock = $derived(groupLock !== undefined && groupLock === lock);
 	const groupReasonId = $derived(groupLock ? (ownLock ? lockId : scope?.lock?.reasonId) : undefined);
@@ -417,7 +421,7 @@
 		groupCell: 'block pt-4 pb-1 text-left text-[11px] font-semibold tracking-wide text-fg-light uppercase',
 		row: 'block border-t border-canvas-border py-3 first:border-t-0 first:pt-0',
 		rowHeader: 'block pb-2 text-left font-normal',
-		cell: 'inline-block pr-5 pb-1 align-top',
+		cell: 'inline-block pr-5 pb-1 align-top pointer-coarse:pb-6',
 		cellInner: 'relative inline-flex flex-row flex-wrap items-center gap-x-2 gap-y-0.5',
 		cellLabel: 'text-[13px] text-fg-main',
 		spinner: SPINNER
@@ -431,7 +435,7 @@
 		groupCell: '@max-lg/settings:block @max-lg/settings:pt-4 @max-lg/settings:pb-1',
 		row: '@max-lg/settings:block @max-lg/settings:py-3',
 		rowHeader: '@max-lg/settings:block @max-lg/settings:py-0 @max-lg/settings:pr-0 @max-lg/settings:pb-2',
-		cell: '@max-lg/settings:inline-block @max-lg/settings:px-0 @max-lg/settings:py-0 @max-lg/settings:pr-5 @max-lg/settings:pb-1 @max-lg/settings:text-left',
+		cell: '@max-lg/settings:inline-block @max-lg/settings:px-0 @max-lg/settings:py-0 @max-lg/settings:pr-5 @max-lg/settings:pb-1 @max-lg/settings:text-left @max-lg/settings:pointer-coarse:pb-6',
 		cellInner: '@max-lg/settings:flex-row @max-lg/settings:flex-wrap @max-lg/settings:gap-x-2 @max-lg/settings:gap-y-0.5',
 		cellLabel: '@max-lg/settings:not-sr-only @max-lg/settings:text-[13px] @max-lg/settings:text-fg-main',
 		spinner: ''
@@ -458,6 +462,8 @@
 	const narrowStrip = (part: keyof typeof STRIP): string => (layout === 'list' ? STRIP[part] : layout === 'grid' ? '' : STRIP_NARROW[part]);
 	type Part = keyof typeof GRID;
 	const look = (part: Part): string => (layout === 'list' ? LIST[part] : layout === 'grid' ? GRID[part] : cn(GRID[part], AUTO_NARROW[part]));
+	/** Stacked, the header row is hidden: the first event draws no rule of its own under whatever sits above (a section header), unless the toggle strip does. */
+	const firstRowRule = $derived(layout === 'auto' && !toggles ? '@max-lg/settings:first:border-t-0 @max-lg/settings:first:pt-0' : '');
 </script>
 
 <div {...rest}
@@ -508,7 +514,7 @@
 					</tr>
 				{/if}
 				{#each group.events as event (event.id)}
-					<tr class={look('row')} data-event={event.id}>
+					<tr class={cn(look('row'), firstRowRule)} data-event={event.id}>
 						<th scope="row" class={look('rowHeader')}>
 							<span class="block font-medium text-fg-main">{event.label}</span>
 							{#if event.description}<span class="mt-0.5 block text-xs leading-5 text-fg-light">{event.description}</span>{/if}
@@ -521,12 +527,12 @@
 							{@const snap = instant ? snapshots[key] : undefined}
 							{@const dirty = draft ? stagedOn.has(key) !== stagedSaved.has(key) : false}
 							{@const id = cellId(key)}
-							{@const describedBy = [fixed ? lockedNoteId(key) : '', hasChannelNote(channel) ? channelNoteId(ci) : '', groupReasonId ?? '', snap?.status === 'error' ? errorId(key) : '', instant ? statusId : ''].filter(Boolean).join(' ') || undefined}
+							{@const describedBy = [fixed ? lockedNoteId(key) : '', hasChannelNote(channel) ? channelNoteId(ci) : '', groupReasonId ?? '', snap?.status === 'error' ? errorId(key) : '', instant ? statusId : '', fieldError ? fieldErrorId : ''].filter(Boolean).join(' ') || undefined}
 							<td class={cn(look('cell'), dirty && 'bg-accent-subtle/60', snap?.status === 'error' && 'bg-status-danger-subtle/60')} data-cell-key={key} data-dirty={dirty ? '' : undefined} data-failed={snap?.status === 'error' ? '' : undefined}>
 								<span class={look('cellInner')}>
 									<span class="relative inline-flex">
 										{#if draft && !fixed}
-											<Checkbox {id} {name} value={key} defaultChecked={stagedStart.has(key)} disabled={off} aria-label={text.cell(event.label, channel.label)} aria-describedby={describedBy} data-cell="" onCheckedChange={(checked) => setCell(key, checked)} />
+											<Checkbox {id} {name} value={key} defaultChecked={stagedStart.has(key)} disabled={off} invalid={Boolean(fieldError)} aria-label={text.cell(event.label, channel.label)} aria-describedby={describedBy} data-cell="" onCheckedChange={(checked) => setCell(key, checked)} />
 										{:else}
 											<Checkbox
 												{id}
@@ -590,8 +596,13 @@
 		<p id={lockId} class={cn(RECIPES.note, 'm-0')} data-lock={groupLock.kind}><span aria-hidden="true" class="contents"><LockIcon /></span><span>{lockReasonText(groupLock)}</span></p>
 	{/if}
 
+	{#if draft}
+		<p id={fieldErrorId} role="alert" data-field-error="" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, !fieldError && 'sr-only')}>{fieldError ?? ''}</p>
+	{/if}
+
 	{#if instant}
-		<div class="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
+		<!-- With nothing to say the line takes no room (its status stays in the page to announce). -->
+		<div class={cn('flex flex-wrap items-center gap-x-2 gap-y-1', !anyPending && !lastSaved && !canUndo && 'sr-only')} data-instant-status="">
 			<p id={statusId} role="status" class="m-0 inline-flex items-center gap-1.5 text-xs leading-5 text-fg-light [&_svg]:size-3.5">
 				{#if anyPending}<Spinner size="xs" decorative />{text.saving}{:else if lastSaved}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
 			</p>

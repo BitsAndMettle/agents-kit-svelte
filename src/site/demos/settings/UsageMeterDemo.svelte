@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { UsageMeter } from '$lib/settings/controls';
-	import { RECIPES } from '$lib/settings/shared';
+	import { RECIPES, type SettingsResult } from '$lib/settings/shared';
 	import { SAMPLE_STORAGE_SEGMENTS } from '$lib/fixtures/settings';
 
 	// A fixed "now", so the reset line reads the same on the server and in the browser.
@@ -10,8 +10,11 @@
 
 	let seats = $state(42);
 	let log = $state('');
-	async function addSeats(): Promise<void> {
+	let tries = 0;
+	/** The first try fails with a message, so the failure under the button can be seen. */
+	async function addSeats(): Promise<void | SettingsResult> {
 		await new Promise((resolve) => setTimeout(resolve, 600));
+		if (++tries === 1) return { error: 'Seat checkout is busy. Try again in a moment.' };
 		log = 'Opened seat checkout';
 	}
 

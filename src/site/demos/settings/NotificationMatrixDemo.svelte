@@ -1,17 +1,8 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
 	import { Bell, Mail, MessageSquareText, Smartphone } from '@lucide/svelte';
-	import { Button } from '$lib/primitives/actions';
-	import { DANGER_TEXT } from '$lib/primitives/form/classes';
 	import { NotificationMatrix, type NotificationChannel, type NotificationEvent } from '$lib/settings/controls';
-	import { RECIPES, SettingsDraft, setSettingsDraft, type SettingsResult } from '$lib/settings/shared';
-	import NotificationMatrixDemoSelf from './NotificationMatrixDemo.svelte';
-
-	interface Props {
-		/** Renders only the staged form, inside its own SettingsDraft (the demo renders itself once more with it). */
-		staged?: boolean;
-	}
-	let { staged = false }: Props = $props();
+	import { SaveBar, SettingsForm } from '$lib/settings/save';
+	import { RECIPES, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
 
 	/** A slow server: answers after 600 ms. */
 	const wait = (ms = 600) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -52,79 +43,55 @@
 		{ id: 'email', label: 'Email', icon: Mail },
 		{ id: 'app', label: 'In app', icon: Bell }
 	];
-	async function saveTeam(): Promise<void> {
+	/** Saving with no way to hear about invoices is refused with a message on the cells. */
+	async function saveTeam(values: SettingsValues): Promise<void | SettingsResult> {
 		await wait();
+		const on = ([] as unknown[]).concat(values.team ?? []).map(String);
+		if (!on.some((key) => key.startsWith('billing:'))) return { errors: { team: 'Pick at least one way to hear about invoices.' } };
+		saves++;
 	}
 
-	// ---- The staged form. ----
-	// A SettingsDraft in context turns every control below it staged, so the staged form is this same
-	// demo rendered again with `staged` (its own component, so the instant controls above stay instant).
-	// It stands in for SettingsForm and SaveBar, which another group builds.
 	let saves = $state(0);
-	const draft = untrack(() => staged)
-		? new SettingsDraft({
-				fields: () => undefined,
-				changes: () => undefined,
-				revision: () => saves,
-				submit: () => async () => {
-					await saveTeam();
-					saves++;
-				},
-				result: () => undefined,
-				pending: () => undefined,
-				onDirtyChange: () => undefined,
-				genericError: () => "Couldn't save. Your changes are still here."
-			})
-		: undefined;
-	if (draft) setSettingsDraft(draft);
 </script>
 
-{#if draft}
-	<form method="post" action="/settings-demo/team-notices" class={RECIPES.section} aria-labelledby="nm-staged-title" data-testid="nm-staged" {@attach draft.attach} onsubmit={draft.onsubmit}>
+<div class="@container/settings mx-auto flex w-full max-w-3xl flex-col gap-4">
+	<section class={RECIPES.section} aria-labelledby="nm-title">
 		<div class={RECIPES.sectionHeader}>
 			<div class="min-w-0 flex-1">
-				<h3 id="nm-staged-title" class="m-0 text-sm font-semibold text-fg-main">Team notices</h3>
-				<p class="m-0 mt-0.5 text-xs leading-5 text-fg-light">Who hears about team changes. Changes apply when you save.</p>
+				<h3 id="nm-title" class="m-0 text-sm font-semibold text-fg-main">Notify me</h3>
+				<p class="m-0 mt-0.5 text-xs leading-5 text-fg-light">Each change saves on its own. Weekly summary by Push is refused in this demo.</p>
 			</div>
 		</div>
-		{#if draft.error}<p role="alert" data-form-error tabindex="-1" class="m-0 border-b border-canvas-border px-4 py-2 text-xs font-medium {DANGER_TEXT}">{draft.error}</p>{/if}
-		<div class="flex flex-col gap-5 px-4 py-4">
-			<NotificationMatrix events={teamEvents} channels={teamChannels} name="team" defaultValue={['joined:email', 'billing:email', 'billing:app']} layout="list" labels={{ caption: 'Team notices' }} data-testid="nm-list" />
+		<div class="px-4 py-3">
+			<NotificationMatrix
+				{events}
+				{channels}
+				{locked}
+				bind:value
+				onCellCommit={commitCell}
+				onRequestPermission={askPermission}
+				columnToggle
+				action="/settings-demo/notifications"
+				labels={{ caption: 'Notify me' }}
+				data-testid="nm-instant"
+			/>
+			<p class="m-0 mt-2 text-xs text-fg-light" data-testid="nm-saved">Saved: {value.length} cells</p>
 		</div>
-		<div class={RECIPES.sectionFooter}>
-			<p role="status" class="m-0 min-w-0 flex-1" data-testid="nm-staged-status">
-				{#if draft.status === 'pending'}Saving…{:else if draft.dirtyCount > 0}{draft.changes.map((c) => `${c.label}: ${c.from || '—'} → ${c.to || '—'}`).join('; ')}{:else if draft.status === 'saved'}Saved{:else}No unsaved changes{/if}
-			</p>
-			<Button type="reset" size="sm" variant="ghost" softDisabled={draft.dirtyCount === 0}>Discard</Button>
-			<Button type="submit" size="sm" variant="accent" loading={draft.pending}>Save</Button>
-		</div>
-	</form>
-{:else}
-	<div class="@container/settings mx-auto flex w-full max-w-3xl flex-col gap-4">
-		<section class={RECIPES.section} aria-labelledby="nm-title">
+	</section>
+
+	<!-- Staged: a SettingsForm turns the cells below it staged; its SaveBar saves them together. -->
+	<SettingsForm action="/settings-demo/team-notices" revision={saves} onSubmit={saveTeam} aria-labelledby="nm-staged-title" class={RECIPES.section} data-testid="nm-staged">
+		{#snippet children()}
 			<div class={RECIPES.sectionHeader}>
 				<div class="min-w-0 flex-1">
-					<h3 id="nm-title" class="m-0 text-sm font-semibold text-fg-main">Notify me</h3>
-					<p class="m-0 mt-0.5 text-xs leading-5 text-fg-light">Each change saves on its own. Weekly summary by Push is refused in this demo.</p>
+					<h3 id="nm-staged-title" class="m-0 text-sm font-semibold text-fg-main">Team notices</h3>
+					<p class="m-0 mt-0.5 text-xs leading-5 text-fg-light">Who hears about team changes. Changes apply when you save; leaving invoices with no way to reach you is refused.</p>
 				</div>
 			</div>
-			<div class="px-4 py-3">
-				<NotificationMatrix
-					{events}
-					{channels}
-					{locked}
-					bind:value
-					onCellCommit={commitCell}
-					onRequestPermission={askPermission}
-					columnToggle
-					action="/settings-demo/notifications"
-					labels={{ caption: 'Notify me' }}
-					data-testid="nm-instant"
-				/>
-				<p class="m-0 mt-2 text-xs text-fg-light" data-testid="nm-saved">Saved: {value.length} cells</p>
+			<div class="flex flex-col gap-5 px-4 py-4">
+				<NotificationMatrix events={teamEvents} channels={teamChannels} name="team" defaultValue={['joined:email', 'billing:email', 'billing:app']} layout="list" labels={{ caption: 'Team notices' }} data-testid="nm-list" />
 			</div>
-		</section>
-
-		<NotificationMatrixDemoSelf staged />
-	</div>
-{/if}
+			<SaveBar layout="footer" data-testid="nm-staged-bar" />
+		{/snippet}
+	</SettingsForm>
+</div>

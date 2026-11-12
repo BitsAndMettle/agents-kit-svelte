@@ -23,6 +23,7 @@
 
 <script lang="ts">
 	import { untrack, type Snippet } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import type { HTMLSelectAttributes } from 'svelte/elements';
 	import { ChevronDown } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
@@ -119,6 +120,24 @@
 		childLabel = ref.selectedOptions[0]?.text;
 	});
 	const pillLabel = $derived((value ? findLabel(options, value) : undefined) ?? childLabel ?? (value || placeholder || ''));
+
+	/**
+	 * A choice made before the page was interactive, or restored by the browser on Back, is in the
+	 * server-rendered select when it hydrates; the binding would put `value` back over it. Read it
+	 * first (this runs before the binding does) and adopt it, reporting it like any other choice.
+	 * Only on hydration: a server-rendered select marks its starting option `selected`.
+	 */
+	const adoptShownChoice: Attachment<HTMLElement> = (box) => {
+		const select = box.querySelector('select');
+		const marked = select?.querySelector<HTMLOptionElement>('option[selected]');
+		if (!select || !marked || select.selectedIndex < 0) return;
+		const shown = select.value;
+		untrack(() => {
+			if (shown === value || shown === marked.value) return;
+			value = shown;
+			onValueChange?.(shown);
+		});
+	};
 </script>
 
 {#snippet entries()}
@@ -148,6 +167,7 @@
 		draws its own text, so without JavaScript a new choice still shows (at worst clipped).
 	-->
 	<div
+		{@attach adoptShownChoice}
 		class={cn(
 			'relative inline-flex max-w-full min-w-0 items-center rounded-full border border-transparent bg-canvas-secondary font-medium text-fg-main transition-colors hover:bg-canvas-primary hover:border-card-border has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-accent-primary/70 has-[select:disabled]:opacity-50 has-[select:disabled]:hover:border-transparent has-[select:disabled]:hover:bg-canvas-secondary has-[select[aria-invalid=true]]:border-status-danger/70',
 			PILL_SIZES[size],
@@ -172,7 +192,7 @@
 		<ChevronDown aria-hidden="true" class={['pointer-events-none absolute top-1/2 -translate-y-1/2 text-fg-light', size === 'sm' ? 'right-1.5 size-3' : size === 'lg' ? 'right-2.5 size-3.5' : 'right-2 size-3']} />
 	</div>
 {:else}
-	<div class={cn('relative w-full min-w-0', className)}>
+	<div {@attach adoptShownChoice} class={cn('relative w-full min-w-0', className)}>
 		<select {...rest}
 			{...control}
 			bind:this={ref}

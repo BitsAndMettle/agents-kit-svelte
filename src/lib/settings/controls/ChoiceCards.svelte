@@ -124,7 +124,8 @@
 	const field = getFieldContext();
 	const scope = getSettingsScope();
 	const draft = getSettingsDraft();
-	const ready = new ReadyGate();
+	// The scope's readiness (SettingsLayout `ready`) holds back an instant choice with nothing to post.
+	const ready = new ReadyGate(() => scope?.ready());
 
 	if (draft && untrack(() => onCommit) && isDev()) {
 		console.warn(`ChoiceCards "${untrack(() => name)}": onCommit is ignored inside a SettingsForm; the form's Save commits it.`);
@@ -261,7 +262,7 @@
 		},
 		segmented: {
 			group: 'flex w-full max-w-full min-w-0 flex-wrap items-stretch gap-0.5 rounded-2xl bg-canvas-secondary p-0.5 group-aria-invalid/choices:ring-1 group-aria-invalid/choices:ring-status-danger/60',
-			item: 'relative flex h-7 min-w-0 flex-auto cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-fg-light transition-colors hover:text-fg-main has-checked:bg-card-bg has-checked:text-fg-main has-checked:shadow-btn has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-accent-primary/70 has-disabled:cursor-not-allowed has-disabled:opacity-55 has-disabled:hover:text-fg-light',
+			item: 'relative flex h-7 min-w-0 flex-auto cursor-pointer items-center justify-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-fg-light transition-colors hover:text-fg-main has-checked:bg-card-bg has-checked:text-fg-main has-checked:shadow-btn forced-colors:has-checked:outline-2 forced-colors:has-checked:-outline-offset-2 forced-colors:has-checked:outline-solid has-focus-visible:outline-2 has-focus-visible:outline-offset-1 has-focus-visible:outline-accent-primary/70 has-disabled:cursor-not-allowed has-disabled:opacity-55 has-disabled:hover:text-fg-light',
 			dot: 'sr-only',
 			preview: 'hidden',
 			head: 'flex min-w-0 items-center gap-1.5',
@@ -275,7 +276,7 @@
 	};
 	const AUTO_NARROW = {
 		group: '@max-lg/settings:flex @max-lg/settings:w-full @max-lg/settings:flex-wrap @max-lg/settings:gap-0.5 @max-lg/settings:rounded-2xl @max-lg/settings:bg-canvas-secondary @max-lg/settings:p-0.5',
-		item: '@max-lg/settings:h-7 @max-lg/settings:flex-auto @max-lg/settings:flex-row @max-lg/settings:items-center @max-lg/settings:justify-center @max-lg/settings:gap-1.5 @max-lg/settings:rounded-full @max-lg/settings:border-0 @max-lg/settings:bg-transparent @max-lg/settings:px-2.5 @max-lg/settings:py-0 @max-lg/settings:text-xs @max-lg/settings:text-fg-light @max-lg/settings:shadow-none @max-lg/settings:has-checked:bg-card-bg @max-lg/settings:has-checked:text-fg-main @max-lg/settings:has-checked:shadow-btn',
+		item: '@max-lg/settings:h-7 @max-lg/settings:flex-auto @max-lg/settings:flex-row @max-lg/settings:items-center @max-lg/settings:justify-center @max-lg/settings:gap-1.5 @max-lg/settings:rounded-full @max-lg/settings:border-0 @max-lg/settings:bg-transparent @max-lg/settings:px-2.5 @max-lg/settings:py-0 @max-lg/settings:text-xs @max-lg/settings:text-fg-light @max-lg/settings:shadow-none @max-lg/settings:has-checked:bg-card-bg @max-lg/settings:has-checked:text-fg-main @max-lg/settings:has-checked:shadow-btn @max-lg/settings:forced-colors:has-checked:outline-2 @max-lg/settings:forced-colors:has-checked:-outline-offset-2 @max-lg/settings:forced-colors:has-checked:outline-solid',
 		dot: '@max-lg/settings:sr-only',
 		preview: '@max-lg/settings:hidden',
 		head: '@max-lg/settings:items-center @max-lg/settings:gap-1.5 @max-lg/settings:opacity-100 @max-lg/settings:group-has-disabled/item:opacity-55',
@@ -404,7 +405,8 @@
 	{/if}
 
 	{#if instant}
-		<div class="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
+		<!-- With nothing to say the line takes no room (its status stays in the page to announce); it shows while saving, once saved and while Undo is offered. -->
+		<div class={cn('flex flex-wrap items-center gap-x-2 gap-y-1', status !== 'pending' && status !== 'saved' && !instant.canUndo && 'sr-only')} data-instant-status="">
 			<p id={statusId} role="status" class="m-0 inline-flex items-center gap-1.5 text-xs leading-5 text-fg-light [&_svg]:size-3.5">
 				{#if status === 'pending'}<Spinner size="xs" decorative />{text.saving}{:else if status === 'saved'}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
 			</p>

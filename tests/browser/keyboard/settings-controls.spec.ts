@@ -124,11 +124,12 @@ test.describe('ChoiceCards', () => {
 		await role.getByRole('radio', { name: 'Viewer' }).check();
 		await expect(role.getByRole('radio', { name: 'Viewer' })).toHaveAccessibleDescription(/Changed/);
 		await expect(role.getByRole('radio', { name: 'Editor' })).toHaveAccessibleDescription(/Current/);
-		await expect(form.getByTestId('cc-defaults-status')).toHaveText('Default role: Editor → Viewer');
+		await expect(form.getByTestId('cc-defaults-bar')).toContainText('1 unsaved change');
+		await expect(form.getByTestId('cc-defaults-bar')).toContainText('Default role');
 		await expect(role).toContainText('New members can read documents and comments.');
 		await form.getByRole('button', { name: 'Discard' }).click();
 		await expect(role.getByRole('radio', { name: 'Editor' })).toBeChecked();
-		await expect(form.getByTestId('cc-defaults-status')).toHaveText('No unsaved changes');
+		await expect(form.getByTestId('cc-defaults-bar')).toContainText('No unsaved changes');
 	});
 
 	test('a changed option still passes colour contrast in both themes', async ({ page }) => {
@@ -369,11 +370,12 @@ test.describe('NotificationMatrix', () => {
 		const section = await openSection(page, 'notification-matrix');
 		const form = section.getByTestId('nm-staged');
 		await form.getByRole('checkbox', { name: 'Someone leaves the team by Email', exact: true }).check();
-		await expect(form.getByTestId('nm-staged-status')).toContainText('Team notices:');
+		await expect(form.getByTestId('nm-staged-bar')).toContainText('1 unsaved change');
+		await expect(form.getByTestId('nm-staged-bar')).toContainText('Team notices');
 		await expect(form.locator('[data-cell-key="left:email"]')).toHaveAttribute('data-dirty', '');
 		await form.getByRole('button', { name: 'Discard' }).click();
 		await expect(form.getByRole('checkbox', { name: 'Someone leaves the team by Email', exact: true })).not.toBeChecked();
-		await expect(form.getByTestId('nm-staged-status')).toHaveText('No unsaved changes');
+		await expect(form.getByTestId('nm-staged-bar')).toContainText('No unsaved changes');
 	});
 
 	test('without JavaScript Apply posts every cell that is on, locked and unavailable ones through hidden inputs', async ({ browser }) => {
@@ -544,7 +546,7 @@ test.describe('SettingsItemList', () => {
 		await exports.getByRole('checkbox', { name: 'Select export-2026-08-01.zip' }).check();
 		await expect(summary).toHaveText('3 selected · frees 2.9 GB');
 		await exports.getByRole('searchbox', { name: 'Filter' }).fill('nothing like this');
-		await expect(exports.getByText('Nothing matches “nothing like this”.')).toBeVisible();
+		await expect(exports.getByText('Nothing matches “nothing like this”.').and(page.locator(':not([role=status])'))).toBeVisible();
 		await exports.getByRole('button', { name: 'Clear filter' }).click();
 		for (const name of ['export-2026-10-01.zip', 'export-2026-09-01.zip', 'export-2026-08-01.zip']) {
 			await expect(exports.getByRole('checkbox', { name: `Select ${name}` })).toBeChecked();
@@ -581,7 +583,8 @@ test.describe('SettingsItemList', () => {
 		await expect(ada.getByRole('link')).toHaveCount(0);
 		for (const button of await ada.getByRole('button').all()) {
 			await expect(button).toHaveAttribute('type', 'button');
-			await button.click({ force: true });
+			// A dispatched click: a forced mouse click can land on the sticky page header above the row.
+			await button.dispatchEvent('click');
 		}
 		// A confirm-first bulk action without a route waits for the page.
 		const bulk = section.getByTestId('il-exports').getByRole('button', { name: 'Delete selected' });
@@ -629,13 +632,18 @@ test.describe('UsageMeter', () => {
 		expect(await width('um-row-design')).toBe(await width('um-row-research'));
 	});
 
-	test('the action loads while its promise is pending', async ({ page }) => {
+	test('the action loads while its promise is pending, shows its returned error, then succeeds', async ({ page }) => {
 		const section = await openOnClock(page, 'usage-meter');
-		const add = section.getByRole('button', { name: 'Add seats' });
+		const seats = section.getByTestId('um-seats');
+		const add = seats.getByRole('button', { name: 'Add seats' });
 		await add.click();
 		await expect(add).toHaveAttribute('aria-busy', 'true');
 		await page.clock.runFor(SETTLE);
 		await expect(add).not.toHaveAttribute('aria-busy', 'true');
+		await expect(seats.getByRole('alert')).toHaveText('Seat checkout is busy. Try again in a moment.');
+		await add.click();
+		await page.clock.runFor(SETTLE);
+		await expect(seats.getByRole('alert')).toHaveCount(0);
 		await expect(section.getByTestId('um-log')).toHaveText('Opened seat checkout');
 	});
 });
@@ -752,4 +760,307 @@ test('NativeSelect pill: a compact chip that keeps the native select and reports
 	await pill.focus();
 	await expect(face).toHaveCSS('outline-style', 'solid');
 	await expect(section.getByRole('combobox', { name: 'Role for Ada Park' })).toBeDisabled();
+});
+
+/** Opens the controls fixture and waits until it is interactive (an instant cell with no `action` is enabled once mounted). */
+async function openFixture(page: Page, width = 1440): Promise<void> {
+	await page.setViewportSize({ width, height: 900 });
+	await page.goto('/fixtures/settings-controls/');
+	await expect(page.getByTestId('nm-list-instant').getByRole('checkbox', { name: 'Mentions by In app', exact: true })).toBeEnabled({ timeout: 45000 });
+}
+
+/** Opens the composed settings fixture with its scripts held back; returns the function that lets them load. */
+async function openComposedHeld(page: Page): Promise<() => Promise<void>> {
+	await page.setViewportSize({ width: 1440, height: 900 });
+	let release: () => void = () => undefined;
+	const held = new Promise<void>((resolve) => (release = resolve));
+	await page.route('**/_app/immutable/**/*.js', async (route) => {
+		await held;
+		await route.continue();
+	});
+	await page.goto('/fixtures/settings-composed/', { waitUntil: 'domcontentloaded' });
+	return async () => {
+		release();
+		// An instant switch with no `action` is enabled once the page is interactive.
+		await expect(page.getByRole('switch', { name: 'Play a sound' })).toBeEnabled({ timeout: 45000 });
+	};
+}
+
+/** Opens the composed settings fixture once it is interactive. */
+async function openComposed(page: Page, width = 1440): Promise<void> {
+	await page.setViewportSize({ width, height: 900 });
+	await page.goto('/fixtures/settings-composed/');
+	await expect(page.getByRole('switch', { name: 'Play a sound' })).toBeEnabled({ timeout: 45000 });
+}
+
+test.describe('Readiness and staged errors', () => {
+	test('below a SettingsLayout that is not ready, every JS-only control waits', async ({ page }) => {
+		await openFixture(page);
+		const held = page.getByTestId('not-ready');
+		await expect(held.getByRole('radio', { name: 'Default' })).toBeDisabled();
+		await expect(held.getByRole('button', { name: 'Copy Held ID' })).toHaveAttribute('aria-disabled', 'true');
+		await expect(held.getByRole('checkbox', { name: 'Mentions by Email', exact: true })).toBeDisabled();
+		await expect(held.getByRole('checkbox', { name: /^All events by/ })).toHaveCount(0);
+		for (const name of ['Remove', 'Ping', 'Add held', 'Add held seats']) {
+			const button = held.getByRole('button', { name, exact: true }).first();
+			await expect(button, name).toHaveAttribute('aria-disabled', 'true');
+			await button.click({ force: true });
+		}
+		await expect(page.getByRole('alertdialog')).toHaveCount(0);
+		await expect(held.getByTestId('held-calls')).toHaveText('0');
+	});
+
+	test('a server error for a staged matrix or selection shows on it, marks it invalid, and clears once it is edited', async ({ page }) => {
+		await openFixture(page);
+		const form = page.getByRole('form', { name: 'Team policy' });
+		await form.getByRole('checkbox', { name: 'Someone leaves by Email', exact: true }).check();
+		await form.getByRole('button', { name: 'Save', exact: true }).click();
+		const matrixError = form.locator('table').locator('xpath=..').getByRole('alert');
+		await expect(matrixError).toHaveText('Pick at least one way to hear about people leaving.');
+		const cell = form.getByRole('checkbox', { name: 'Someone joins by In app', exact: true });
+		await expect(cell).toHaveAttribute('aria-invalid', 'true');
+		await expect(cell).toHaveAccessibleDescription(/Pick at least one way/);
+		const approvers = form.getByRole('region', { name: 'Approvers' });
+		const ben = approvers.getByRole('checkbox', { name: 'Select Ben Ortiz' });
+		await expect(approvers.getByRole('alert')).toHaveText('Choose at least two approvers.');
+		await expect(ben).toHaveAttribute('aria-invalid', 'true');
+		await expect(ben).toHaveAccessibleDescription('Choose at least two approvers.');
+
+		await cell.check();
+		await expect(matrixError).toHaveText('');
+		await expect(cell).not.toHaveAttribute('aria-invalid', 'true');
+		await expect(approvers.getByRole('alert')).toHaveText('Choose at least two approvers.');
+		await ben.check();
+		await expect(approvers.getByRole('alert')).toHaveText('');
+		await expect(ben).not.toHaveAttribute('aria-invalid', 'true');
+	});
+
+	test('Enter in a read-only CopyValue inside a settings form does not save it', async ({ page }) => {
+		await openFixture(page);
+		const form = page.getByRole('form', { name: 'Team policy' });
+		await form.getByRole('checkbox', { name: 'Someone leaves by Email', exact: true }).check();
+		await form.getByRole('textbox', { name: 'Invite link' }).focus();
+		await press(page, 'Enter');
+		// Pressing Save afterwards proves the counter works; Enter alone must leave it at 0.
+		await expect(page.getByTestId('staged-saves')).toHaveText('0');
+		await form.getByRole('button', { name: 'Save', exact: true }).click();
+		await expect(page.getByTestId('staged-saves')).toHaveText('1');
+	});
+
+	test('inside a settings form without JavaScript the filter is disabled, so Enter cannot post the form', async ({ browser }) => {
+		const context = await browser.newContext({ javaScriptEnabled: false });
+		const page = await context.newPage();
+		await page.goto('/fixtures/settings-controls/');
+		await expect(page.getByRole('form', { name: 'Team policy' }).getByRole('searchbox', { name: 'Filter Approvers' })).toBeDisabled();
+		await context.close();
+	});
+});
+
+test.describe('Action failures', () => {
+	test("a meter's action shows its returned error, and a rejection shows the generic label", async ({ page }) => {
+		await page.clock.install();
+		await openFixture(page);
+		await page.clock.pauseAt(new Date(Date.now() + 5000));
+		const actions = page.getByTestId('actions');
+		const error = actions.getByRole('button', { name: 'Add error seats' });
+		await error.click();
+		await expect(error).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(error.locator('xpath=..').getByRole('alert')).toHaveText('Could not add seats.');
+		const reject = actions.getByRole('button', { name: 'Add rejecting seats' });
+		await reject.click();
+		await page.clock.runFor(SETTLE);
+		await expect(reject.locator('xpath=..').getByRole('alert')).toHaveText("Couldn't do that. Try again.");
+	});
+
+	test("a list's add action shows its returned error, and an empty list's action runs its callback", async ({ page }) => {
+		await page.clock.install();
+		await openFixture(page);
+		await page.clock.pauseAt(new Date(Date.now() + 5000));
+		const actions = page.getByTestId('actions');
+		const add = actions.getByRole('button', { name: 'Add feed' });
+		await add.click();
+		await expect(add).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(actions.getByRole('region', { name: 'Feeds' }).getByRole('alert')).toHaveText('Feeds are full.');
+		await actions.getByRole('button', { name: 'Create first key' }).click();
+		await expect(actions.getByTestId('empty-calls')).toHaveText('1');
+	});
+});
+
+test.describe('SettingsItemList filter, focus and bulk actions', () => {
+	test('the filter announces how many match or that nothing does; Clear filter gives focus back to the box; the search region is named', async ({ page }) => {
+		const section = await openSection(page, 'settings-item-list');
+		const members = section.getByTestId('il-members');
+		await expect(members.getByRole('search', { name: 'Filter Members' })).toBeVisible();
+		const box = members.getByRole('searchbox', { name: 'Filter Members' });
+		const status = members.locator('[data-filter-status]');
+		await expect(status).toHaveAttribute('role', 'status');
+		await box.fill('zzz');
+		await expect(status).toHaveText('Nothing matches “zzz”.');
+		await press(page, 'Tab');
+		await expect(members.getByRole('button', { name: 'Clear filter' })).toBeFocused();
+		await press(page, 'Enter');
+		await expect(box).toBeFocused();
+		await expect(box).toHaveValue('');
+		await expect(status).toHaveText('');
+		await box.fill('ben');
+		await expect(status).toHaveText('1 shown');
+	});
+
+	test('the list heading, where focus lands after a removal, shows a focus ring', async ({ page }) => {
+		const section = await openSection(page, 'settings-item-list');
+		const heading = section.getByTestId('il-members').getByRole('heading', { name: 'Members' });
+		await press(page, 'Tab');
+		await heading.evaluate((el) => (el as HTMLElement).focus());
+		await expect(heading).toBeFocused();
+		const style = await heading.evaluate((el) => {
+			const s = getComputedStyle(el);
+			return `${s.outlineStyle} ${s.outlineWidth}`;
+		});
+		expect(style).toBe('solid 2px');
+	});
+
+	test('a bulk action shows why it is unavailable, and a bulk link navigates', async ({ page }) => {
+		await openFixture(page);
+		const feeds = page.getByTestId('actions').getByRole('region', { name: 'Feeds' });
+		const send = feeds.locator('[data-bulk=send]');
+		await expect(send).toHaveAttribute('aria-disabled', 'true');
+		await expect(send).toHaveAccessibleDescription('Send: Sending is not available here.');
+		const open = feeds.locator('[data-bulk=open]');
+		await expect(open).toHaveAttribute('href', '?report=1');
+		await open.click();
+		await expect(page).toHaveURL(/\?report=1/);
+		await expect(page.getByTestId('bulk-log')).toHaveText('');
+	});
+
+	test("a row's status that changes is announced politely", async ({ page }) => {
+		await openFixture(page);
+		const feeds = page.getByTestId('actions').getByRole('region', { name: 'Feeds' });
+		const news = feeds.locator('[data-item-status]');
+		await expect(news).toHaveAttribute('role', 'status');
+		await expect(news).toHaveText('');
+		await page.getByRole('button', { name: 'Break audit feed' }).click();
+		await expect(news).toHaveText('Audit feed: Sync failed');
+	});
+
+	test('without JavaScript a GET filter keeps the hidden fields it is given', async ({ browser }) => {
+		const context = await browser.newContext({ javaScriptEnabled: false });
+		const page = await context.newPage();
+		await page.goto('/fixtures/settings-controls/');
+		const feeds = page.getByTestId('actions').getByRole('region', { name: 'Feeds' });
+		await feeds.getByRole('searchbox').fill('Release');
+		await feeds.getByRole('button', { name: 'Filter', exact: true }).click();
+		await expect(page).toHaveURL(/section=feeds/);
+		await expect(page).toHaveURL(/feed=Release/);
+		await context.close();
+	});
+
+	test('the default badge on the current item is neutral', async ({ page }) => {
+		await openFixture(page);
+		await expect(page.getByTestId('not-ready').getByRole('region', { name: 'Held people' }).locator('[data-current]')).toContainText('Current');
+	});
+});
+
+test.describe('Before the page is interactive', () => {
+	test('a select changed, boxes ticked and a filter typed before hydration are kept, counted and applied', async ({ page }) => {
+		const release = await openComposedHeld(page);
+		const form = page.getByTestId('composed-form');
+		await form.getByRole('combobox', { name: 'Data retention' }).selectOption('30');
+		await page.getByTestId('composed-approvers').getByRole('checkbox', { name: 'Select Chloe Martin' }).check();
+		await page.getByTestId('composed-members').getByRole('searchbox').fill('Ben');
+		await release();
+
+		await expect(form.getByRole('combobox', { name: 'Data retention' })).toHaveValue('30');
+		await expect(form.getByText('2 unsaved changes', { exact: true })).toBeVisible();
+		const approvers = page.getByTestId('composed-approvers');
+		const summary = approvers.locator('[data-selection] > [role=status]').first();
+		await expect(summary).toHaveText('3 selected');
+		await approvers.getByRole('checkbox', { name: 'Select Dev Rao' }).check();
+		await expect(summary).toHaveText('4 selected');
+		const members = page.getByTestId('composed-members');
+		await expect(members.locator('li[data-item-id]')).toHaveCount(1);
+		await expect(members.locator('li[data-item-id="m2"]')).toBeVisible();
+
+		await form.getByRole('button', { name: 'Discard' }).click();
+		await expect(summary).toHaveText('2 selected');
+		await expect(form.getByRole('combobox', { name: 'Data retention' })).toHaveValue('90');
+	});
+
+	test('a box ticked before hydration on a row a filter typed before hydration hides stays selected', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		let release: () => void = () => undefined;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		await page.route('**/_app/immutable/**/*.js', async (route) => {
+			await held;
+			await route.continue();
+		});
+		await page.goto('/fixtures/settings-controls/', { waitUntil: 'domcontentloaded' });
+		const feeds = page.getByTestId('actions').getByRole('region', { name: 'Feeds' });
+		await feeds.getByRole('checkbox', { name: 'Select Audit feed' }).check();
+		await feeds.getByRole('searchbox').fill('Release');
+		release();
+		await expect(page.getByTestId('nm-list-instant').getByRole('checkbox', { name: 'Mentions by In app', exact: true })).toBeEnabled({ timeout: 45000 });
+
+		await expect(feeds.locator('li[data-item-id]')).toHaveCount(1);
+		await expect(feeds.locator('[data-selection] > [role=status]').first()).toHaveText('2 selected');
+		await expect(feeds.locator('input[type="hidden"][name="selected"][value="f2"]')).toHaveCount(1);
+		await feeds.getByRole('searchbox').fill('');
+		await expect(feeds.getByRole('checkbox', { name: 'Select Audit feed' })).toBeChecked();
+		await expect(feeds.getByRole('checkbox', { name: 'Select Release feed' })).toBeChecked();
+	});
+
+	test('the selection summary counts only selected rows that are still listed', async ({ page }) => {
+		await openComposed(page);
+		const approvers = page.getByTestId('composed-approvers');
+		const summary = approvers.locator('[data-selection] > [role=status]').first();
+		await expect(summary).toHaveText('2 selected');
+		await page.getByTestId('composed-members').getByRole('button', { name: 'Remove Ben Ortiz' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Remove' }).click();
+		await expect(approvers.getByRole('checkbox', { name: 'Select Ben Ortiz' })).toHaveCount(0, { timeout: 5000 });
+		await expect(summary).toHaveText('1 selected');
+	});
+});
+
+test.describe('Layout and forced colours', () => {
+	test('an idle instant choice and matrix reserve no empty status line', async ({ page }) => {
+		const section = await openSection(page, 'choice-cards');
+		const density = section.getByTestId('cc-density');
+		const line = density.locator('[data-instant-status]');
+		expect((await line.boundingBox())!.height).toBeLessThanOrEqual(1);
+		await density.getByText('Compact').click();
+		await expect(line).toContainText(/Saving…|Saved/);
+		expect((await line.boundingBox())!.height).toBeGreaterThan(10);
+		const matrix = (await openSection(page, 'notification-matrix')).getByTestId('nm-instant');
+		expect((await matrix.locator('[data-instant-status]').boundingBox())!.height).toBeLessThanOrEqual(1);
+	});
+
+	test('in forced colours the chosen segment is outlined and the meter keeps its track and fill', async ({ page }) => {
+		await page.emulateMedia({ forcedColors: 'active' });
+		const section = await openSection(page, 'choice-cards');
+		const density = section.getByTestId('cc-density');
+		const outline = (name: string) => density.getByRole('radio', { name }).locator('xpath=ancestor::label[1]').evaluate((el) => getComputedStyle(el).outlineStyle);
+		expect(await outline('Default')).toBe('solid');
+		expect(await outline('Compact')).toBe('none');
+		const meter = (await openSection(page, 'usage-meter')).getByTestId('um-seats').getByRole('meter');
+		expect(await meter.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('1px');
+		const fill = meter.locator('span').first();
+		expect(await fill.evaluate((el) => getComputedStyle(el).forcedColorAdjust)).toBe('none');
+		expect(await fill.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+	});
+
+	test('stacked, a matrix without column toggles draws no rule of its own under the section header', async ({ page }) => {
+		await openComposed(page, 360);
+		const first = page.getByRole('table', { name: 'Team notices' }).locator('tbody tr').first();
+		expect(await first.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('0px');
+	});
+
+	test('on a coarse pointer, wrapped list cells sit a full hit area apart', async ({ browser }) => {
+		const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+		const page = await context.newPage();
+		await page.goto('/fixtures/settings-controls/');
+		const cell = page.getByTestId('nm-list-instant').locator('td[data-cell-key="mention:app"]');
+		expect(await cell.evaluate((el) => getComputedStyle(el).paddingBottom)).toBe('24px');
+		await context.close();
+	});
 });
