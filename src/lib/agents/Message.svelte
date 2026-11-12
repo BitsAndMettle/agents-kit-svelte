@@ -4,15 +4,18 @@
 	import { Sparkle } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import { SOFT } from '../ui/styles';
+	import Markdown from './Markdown.svelte';
 
-	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'id' | 'role' | 'author' | 'badge' | 'timestamp' | 'children'> {
+	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'id' | 'role' | 'author' | 'badge' | 'timestamp' | 'children' | 'text'> {
 		id?: string;
 		role: 'user' | 'assistant' | 'system';
 		author: string;
 		badge?: string;
 		timestamp?: string;
+		/** The message as Markdown, rendered safely with `Markdown`. Used when there are no children. */
+		text?: string;
 		class?: string;
-		children: Snippet;
+		children?: Snippet;
 	}
 
 	let {
@@ -21,11 +24,16 @@
 		author,
 		badge,
 		timestamp,
+		text = '',
 		class: className = '',
 		children,
 		...rest
 	}: Props = $props();
 </script>
+
+{#snippet body()}
+	{#if children}{@render children()}{:else}<Markdown {text} />{/if}
+{/snippet}
 
 <article {...rest}
 	{id}
@@ -65,13 +73,13 @@
 		{#if role === 'user'}
 			<div
 				data-slot="message-content"
-				class="rounded-bubble bg-chat-user px-4 py-2.5 text-[15px] leading-6 text-fg-main"
+				class="min-w-0 rounded-bubble bg-chat-user px-4 py-2.5 text-[15px] leading-6 text-fg-main"
 			>
-				{@render children()}
+				{@render body()}
 			</div>
 		{:else}
 			<div data-slot="message-content" class="space-y-3.5 text-[15px] leading-7 text-fg-main">
-				{@render children()}
+				{@render body()}
 			</div>
 		{/if}
 	</div>

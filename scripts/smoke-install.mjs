@@ -98,7 +98,7 @@ mount(App, { target: document.getElementById('app')! });
 `,
 		'src/App.svelte': `<script lang="ts">
 	import { CodeBlock, ThinkingShimmer, TodoList, type TodoItem } from 'agents-kit-svelte';
-	import { ChatWorkbench, TrailsideClaudeChat } from 'agents-kit-svelte/chat';
+	import { ChatWorkbench, Markdown, TrailsideClaudeChat, type ChatWorkbenchMessage, type PromptAttachment } from 'agents-kit-svelte/chat';
 	import { GitHubIssueCard } from 'agents-kit-svelte/github';
 	import { SkillCard } from 'agents-kit-svelte/skills';
 	import { AgentOrchestrator } from 'agents-kit-svelte/workflows';
@@ -116,6 +116,8 @@ mount(App, { target: document.getElementById('app')! });
 	const session = new AgentSession();
 	const diff = parseUnifiedDiff(['@@ -1 +1 @@', '-a', '+b'].join(String.fromCharCode(10)));
 
+	let messages = $state<ChatWorkbenchMessage[]>([{ id: 'a', role: 'assistant', text: 'Hello **there**' }]);
+
 	const items: TodoItem[] = [
 		{ id: '1', label: 'Install agents-kit-svelte', status: 'completed' },
 		{ id: '2', label: 'Render a component', status: 'in-progress' }
@@ -127,7 +129,21 @@ mount(App, { target: document.getElementById('app')! });
 	<TodoList {items} data-testid="plan" aria-label="Plan" />
 	<CodeBlock code="pnpm add agents-kit-svelte" language="bash" />
 	<GitHubIssueCard issue={SAMPLE_ISSUE} compact />
-	<ChatWorkbench />
+	<div class="h-[600px]">
+		<ChatWorkbench
+			title="Referee"
+			status={{ text: 'Online', tone: 'success' }}
+			{messages}
+			conversations={[{ id: 'c1', title: 'First', active: true }]}
+			models={[{ id: 'sonnet', label: 'Sonnet' }]}
+			model="sonnet"
+			onSend={(text: string, sent: PromptAttachment[]) => messages.push({ id: String(messages.length), role: 'user', text: text + sent.length })}
+		>
+			{#snippet headerActions({ button })}<button class={button}>Pause</button>{/snippet}
+		</ChatWorkbench>
+	</div>
+	<ChatWorkbench demo />
+	<Markdown text="**bold** [link](https://example.com)" />
 	<!-- The deprecated alias still works until the next major. -->
 	<TrailsideClaudeChat />
 	<SkillCard skill={SAMPLE_SKILLS[0]} />

@@ -16,6 +16,7 @@ export { default as ImageGeneration } from '../agents/ImageGeneration.svelte';
 export { default as Message } from '../agents/Message.svelte';
 export { default as MessageBubble } from '../agents/MessageBubble.svelte';
 export { default as LevelDial } from '../agents/LevelDial.svelte';
+export { default as Markdown } from '../agents/Markdown.svelte';
 export { default as MessageScroller } from '../agents/MessageScroller.svelte';
 export { default as PresenceBanner } from '../agents/PresenceBanner.svelte';
 export { default as PromptInput } from '../agents/PromptInput.svelte';
@@ -53,6 +54,8 @@ export * from '../core/agent';
 export { groupCode, speakCode, timeLeft, formatRequestedAgo } from '../agents/device-approval';
 export type { TimeLeft } from '../agents/device-approval';
 export { summarizeSources } from '../agents/cited-answer';
+export { parseMarkdown, parseInlines, safeHref } from '../agents/markdown';
+export type { MarkdownBlock, MarkdownInline } from '../agents/markdown';
 export type { SourcesState, SourcesSummary } from '../agents/cited-answer';
 export type * from '../types';
 

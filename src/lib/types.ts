@@ -728,3 +728,83 @@ export interface ActionReceiptData {
 	/** Whether Undo is offered while the outcome is `done`. */
 	undoable?: boolean;
 }
+
+/** One choice in `PromptInput`'s picker: an agent, a model, anything with a label. `SupportedAgentOption` is one. */
+export interface PromptInputOption {
+	id: string;
+	label: string;
+	/** The line under the label. Without it, an option with a `version` reads `v{version} · Signed in`; one without shows none. */
+	detail?: string;
+	version?: string;
+	/** `false` disables the option, e.g. an agent that is not signed in. */
+	signedIn?: boolean;
+}
+
+/** One step of the effort row in `PromptInput`'s picker, e.g. `{ id: 'high', label: 'High' }`. */
+export interface PromptInputEffort {
+	id: string;
+	label: string;
+}
+
+/** A chip attached to the composer: a file, a worktree, a card, anything the next message is about. */
+export interface PromptAttachment {
+	id: string;
+	label: string;
+	/** Picks the chip's icon: `file`, `worktree`, `skill` and `gate` have their own; anything else shows `@`. */
+	kind?: 'file' | 'worktree' | 'skill' | 'gate' | (string & {});
+	/** A tooltip for the chip. */
+	title?: string;
+}
+
+/** An entry in `PromptInput`'s `+` menu; choosing it attaches `attachment`. */
+export interface PromptContextOption {
+	label: string;
+	attachment: PromptAttachment;
+}
+
+/** One piece of a `ChatWorkbench` message, drawn in order. */
+export type ChatWorkbenchPart =
+	/** Markdown, rendered safely with `Markdown`. */
+	| { type: 'text'; text: string }
+	/** A tool call and its result, drawn as `ToolResult`. */
+	| { type: 'tool'; tool: string; summary?: string; output?: string; status?: ToolResultStatus; meta?: string }
+	/** The agent's activity trace, drawn as `AgentActivity`. */
+	| { type: 'activity'; items: ActivityItem[]; status?: ActivityStatus }
+	/** A short muted line, e.g. `About #12 · owner/repo`. */
+	| { type: 'note'; text: string };
+
+/** One message in a `ChatWorkbench` conversation. */
+export interface ChatWorkbenchMessage {
+	id: string;
+	role: 'user' | 'assistant' | 'system';
+	/** Defaults to `You` for the user and the workbench's `assistantName` otherwise. */
+	author?: string;
+	badge?: string;
+	timestamp?: string;
+	/** Markdown drawn after `parts`. */
+	text?: string;
+	parts?: ChatWorkbenchPart[];
+	/** `streaming` shows a thinking line until text arrives; `error` shows `statusText` in the danger tone. */
+	status?: 'streaming' | 'complete' | 'error';
+	statusText?: string;
+}
+
+/** One past conversation in the `ChatWorkbench` list. */
+export interface ChatWorkbenchConversation {
+	id: string;
+	title: string;
+	/** Shown under the title, e.g. `Nov 12, 14:05`. */
+	date?: string;
+	/** Shown after the date, e.g. the machine it ran on. */
+	subtitle?: string;
+	/** The conversation on screen. */
+	active?: boolean;
+}
+
+/** The status line under a `ChatWorkbench` title: a coloured dot and its text. */
+export interface ChatWorkbenchStatus {
+	text: string;
+	tone?: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+	/** Makes the dot breathe, e.g. while a reply is on its way. */
+	pulse?: boolean;
+}
