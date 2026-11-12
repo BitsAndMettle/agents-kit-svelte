@@ -24,6 +24,12 @@
 		{ value: 'conflict', label: 'Conflicts' }
 	];
 	const fields = EVENTS.map((e) => ({ name: e.name, label: e.label }));
+	/** A second section that saves on its own, in the same scrolling frame. */
+	const PUSH = [
+		{ name: 'pushDirect', label: 'Direct messages', description: 'A push notification for each new message to you.', on: true },
+		{ name: 'pushQuiet', label: 'Quiet hours', description: 'No pushes between 22:00 and 07:00.', on: false }
+	];
+	const pushFields = PUSH.map((e) => ({ name: e.name, label: e.label }));
 
 	let layout = $state<SaveBarLayout>('sticky');
 	let outcome = $state('ok');
@@ -78,6 +84,30 @@
 					<SaveBar {layout} impact="You can change these again at any time." reviewHref="#conflict-resolver" onReviewConflict={() => (reviewed = true)} />
 				{/if}
 				{#if layout === 'floating'}<div aria-hidden="true" class="h-24"></div>{/if}
+			</SettingsForm>
+			<!-- Its own form and bar: a sticky bar beside the sticky one above, else a footer (a floating bar has the frame's bottom). -->
+			<SettingsForm fields={pushFields} onSubmit={save} aria-label="Push settings" class="mt-3">
+				<section aria-labelledby="sbd-push-heading" class={RECIPES.section}>
+					<header class={RECIPES.sectionHeader}>
+						<div class="min-w-0 flex-1">
+							<h3 id="sbd-push-heading" class="m-0 text-sm font-semibold text-fg-main">Push me when</h3>
+							<p class="m-0 text-xs leading-5 text-fg-light">Only on this device. Saved on its own.</p>
+						</div>
+					</header>
+					<ul role="list" class={RECIPES.list}>
+						{#each PUSH as event (event.name)}
+							<li class={RECIPES.row}>
+								<Switch name={event.name} label={event.label} description={event.description} defaultChecked={event.on} labelFirst class="w-full" />
+							</li>
+						{/each}
+					</ul>
+					{#if layout !== 'sticky'}
+						<SaveBar layout="footer" />
+					{/if}
+				</section>
+				{#if layout === 'sticky'}
+					<SaveBar layout="sticky" data-testid="sbd-push-bar" />
+				{/if}
 			</SettingsForm>
 		</div>
 	</div>

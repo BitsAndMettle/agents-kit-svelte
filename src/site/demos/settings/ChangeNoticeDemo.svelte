@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ChangeNotice } from '$lib/settings/save';
+	import { SettingsSection } from '$lib/settings/rows';
 	import { InstantSetting, RECIPES, SETTINGS_CONTAINER, type SettingsResult } from '$lib/settings/shared';
 	import { Spinner } from '$lib/primitives/display';
 	import { cn } from '$lib/ui/cn';
@@ -45,10 +46,26 @@
 	}
 
 	let retentionUndone = $state(false);
+	const TEAM_LOCK = { kind: 'permission', reason: 'Only admins can change the team’s theme.' } as const;
 	let retentionDismissed = $state(false);
 </script>
 
 <div class={cn(SETTINGS_CONTAINER, 'mx-auto grid w-full max-w-2xl gap-3')}>
+	<SettingsSection title="Team theme" description="Set by an admin for everyone in the team." headingLevel={3} lock={TEAM_LOCK} list={false} data-testid="cnd-locked">
+		<div class="p-3">
+			<ChangeNotice
+				tone="neutral"
+				lead="Theme set to dark for the team"
+				detail="Ada Park changed it a minute ago."
+				undoToken="t-7"
+				onUndo={async () => {
+					await wait(600);
+				}}
+				secondary={{ label: 'Reset to default', onSelect: () => wait(600) }}
+			/>
+		</div>
+	</SettingsSection>
+
 	<section aria-labelledby="cnd-heading" class={RECIPES.section}>
 		<header class={RECIPES.sectionHeader}>
 			<div class="min-w-0 flex-1">
@@ -95,7 +112,18 @@
 				detail={notice.detail}
 				undoToken={notice.token}
 				currentToken={density.undoToken ?? null}
-				onUndo={async (token) => ((await density.undo(token as number)) ? undefined : { error: density.error ?? 'Couldn’t undo. Nothing changed.' })}
+				onUndo={async (token) => {
+					if (await density.undo(token)) return;
+					if (density.status === 'error') return { error: density.error ?? 'Couldn’t undo. Nothing changed.' };
+					return { error: 'Couldn’t undo: a newer change replaced it.' };
+				}}
+				secondary={{
+					label: 'Use for the whole team',
+					onSelect: async () => {
+						await wait(600);
+						return { error: 'Only admins can set the team’s density.' };
+					}
+				}}
 				onDismiss={() => (notices = notices.filter((n) => n.key !== notice.key))}
 			/>
 		{/each}

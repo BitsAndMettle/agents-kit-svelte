@@ -2,10 +2,12 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { CloudOff, Trash2, UserMinus } from '@lucide/svelte';
+	import { Archive, CloudOff, CreditCard, Crown, Trash2, UserMinus } from '@lucide/svelte';
 	import { ConsequenceDialog, type ConsequenceConfirmContext } from '$lib/settings/save';
-	import { rememberOpener, RECIPES, SETTINGS_CONTAINER, type ConsequenceGroup, type ReassignSpec, type SettingsResult } from '$lib/settings/shared';
+	import { SettingsRow, SettingsSection } from '$lib/settings/rows';
+	import { rememberOpener, RECIPES, SETTINGS_CONTAINER, type ConsequenceGroup, type ReassignSpec, type SettingLock, type SettingsResult } from '$lib/settings/shared';
 	import { Button } from '$lib/primitives/actions';
+	import { Input } from '$lib/primitives/form';
 	import { cn } from '$lib/ui/cn';
 	import { buttonClass } from '$lib/ui/styles';
 
@@ -81,6 +83,12 @@
 			]
 		}
 	];
+
+	/** "View as a viewer" locks the Ownership section: its dialogs still open, but can't confirm. */
+	let viewer = $state(false);
+	const VIEWER_LOCK: SettingLock = { kind: 'permission', reason: 'Only the team owner can archive the team or hand over billing.' };
+	/** One row is always locked: the dialog behind it opens, but its phrase and Confirm stay off. */
+	const TRANSFER_LOCK: SettingLock = { kind: 'permission', reason: 'Only the current owner can transfer the team.' };
 
 	let disconnectOpen = $state(false);
 	let removeOpen = $state(false);
@@ -170,6 +178,91 @@
 		</ul>
 	</section>
 
+	<SettingsSection title="Ownership" description="Who runs the team, and who pays for it." headingLevel={3} lock={viewer ? VIEWER_LOCK : undefined} data-testid="cdd-ownership">
+		<SettingsRow label="Archive team" description="Hides the team. Members keep read access.">
+			{#snippet control()}
+				<ConsequenceDialog
+					title="Archive Northwind Studio?"
+					description="The team becomes read-only for everyone."
+					icon={Archive}
+					consequences={[
+						{ tone: 'no', label: 'Nobody can change documents or settings' },
+						{ tone: 'ok', label: 'Everything stays readable and exportable' }
+					]}
+					confirmPhrase="Archive"
+					confirmLabel="Archive team"
+					reversible
+					action="/settings-demo/archive"
+					intent="archive"
+					onConfirm={(context) => run('Team archived', context)}
+				>
+					{#snippet trigger(part)}
+						<button {...part} class={buttonClass('secondary', 'sm')}>Archive…</button>
+					{/snippet}
+					{#snippet identity()}
+						<span class="font-medium">Northwind Studio</span> <span class="text-fg-light">· 6 members · 214 documents</span>
+					{/snippet}
+				</ConsequenceDialog>
+			{/snippet}
+		</SettingsRow>
+		<SettingsRow label="Hand over billing" description="Make someone else the billing contact.">
+			{#snippet control()}
+				<ConsequenceDialog
+					title="Hand over billing?"
+					description="The new contact gets every invoice and can change the plan."
+					icon={CreditCard}
+					consequences={[
+						{ tone: 'warn', label: 'You stop receiving invoices' },
+						{ tone: 'ok', label: 'Past invoices stay in your downloads' }
+					]}
+					confirmLabel="Hand over"
+					tone="accent"
+					confirmUnavailable="Handing over billing is not available in this preview."
+					action="/settings-demo/billing"
+					intent="handover"
+					onConfirm={(context) => run('Billing handed over', context)}
+				>
+					{#snippet trigger(part)}
+						<button {...part} class={buttonClass('secondary', 'sm')}>Hand over…</button>
+					{/snippet}
+					{#snippet identity()}
+						<span class="font-medium">Billing contact</span> <span class="text-fg-light">· you · invoices monthly</span>
+					{/snippet}
+					<div class="grid gap-1.5">
+						<label for="cdd-handover-note" class="text-xs font-medium text-fg-main">Note for the new contact</label>
+						<Input id="cdd-handover-note" name="note" placeholder="Optional" autocomplete="off" />
+					</div>
+				</ConsequenceDialog>
+			{/snippet}
+		</SettingsRow>
+		<SettingsRow label="Transfer ownership" description="Make someone else the team owner." lock={TRANSFER_LOCK}>
+			{#snippet control()}
+				<ConsequenceDialog
+					title="Transfer Northwind Studio?"
+					description="The new owner can delete the team and change billing."
+					icon={Crown}
+					consequences={[
+						{ tone: 'warn', label: 'You become an admin' },
+						{ tone: 'ok', label: 'Your documents stay yours' }
+					]}
+					confirmPhrase="Transfer"
+					confirmLabel="Transfer team"
+					reversible={false}
+					action="/settings-demo/transfer"
+					intent="transfer"
+					onConfirm={(context) => run('Team transferred', context)}
+				>
+					{#snippet trigger(part)}
+						<button {...part} class={buttonClass('secondary', 'sm')}>Transfer…</button>
+					{/snippet}
+					{#snippet identity()}
+						<span class="font-medium">Northwind Studio</span> <span class="text-fg-light">· owned by Ada Park</span>
+					{/snippet}
+				</ConsequenceDialog>
+			{/snippet}
+		</SettingsRow>
+	</SettingsSection>
+
 	<!-- With JavaScript this frame is empty and the route opens as a modal; without it, the server-rendered route shows here. -->
 	<div class="contents noscript:grid noscript:gap-2 noscript:rounded-window noscript:border noscript:border-dashed noscript:border-card-border noscript:p-3">
 		<p class="m-0 hidden text-xs text-fg-light noscript:block">Without JavaScript the server renders the <code>?dialog=delete-team</code> route already open:</p>
@@ -206,6 +299,10 @@
 		<label class="inline-flex items-center gap-1.5">
 			<input type="checkbox" bind:checked={failNext} class="size-3.5 accent-accent-primary" />
 			Make the next action fail
+		</label>
+		<label class="inline-flex items-center gap-1.5">
+			<input type="checkbox" bind:checked={viewer} class="size-3.5 accent-accent-primary" />
+			View as a viewer
 		</label>
 		<span class="ml-auto" aria-live="polite" data-testid="cdd-status">{status}</span>
 	</div>

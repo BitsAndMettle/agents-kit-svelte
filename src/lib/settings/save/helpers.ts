@@ -116,3 +116,30 @@ export function readReassign(data: { get(name: string): unknown }, spec: Pick<Re
 	}
 	return out;
 }
+
+/**
+ * Room to keep at the bottom of one scroller for every bar covering it: the tallest wins. Each
+ * SaveBar that sticks or floats over a scroller adds its height under its own key and removes it
+ * when it hides, so focus scrolling (`scroll-padding-bottom`) never parks a field under a bar.
+ */
+export class ScrollRoom {
+	#rooms = new Map<symbol, number>();
+
+	/** Sets (or, with `undefined`, removes) the room one bar needs. Returns the room to apply now. */
+	set(key: symbol, px: number | undefined): number {
+		if (px === undefined) this.#rooms.delete(key);
+		else this.#rooms.set(key, Math.max(0, px));
+		return this.current;
+	}
+
+	/** The room to apply: the largest any bar needs, or 0. */
+	get current(): number {
+		let most = 0;
+		for (const px of this.#rooms.values()) most = Math.max(most, px);
+		return most;
+	}
+
+	get empty(): boolean {
+		return this.#rooms.size === 0;
+	}
+}

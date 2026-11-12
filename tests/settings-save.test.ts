@@ -12,6 +12,7 @@ import {
 	reassignDefaults,
 	reassignFieldName,
 	reassignOptions,
+	ScrollRoom,
 	summarizeChanges
 } from '../src/lib/settings/save/helpers.ts';
 import { adoptSnapshotAsDefaults, diffForm, snapshotForm } from '../src/lib/settings/shared/diff.ts';
@@ -231,4 +232,18 @@ test('ConsequenceDialog spreads rest on its own form only, never on the draft-mo
 	assert.equal(spreads.length, 1);
 	assert.match(spreads[0], /^\s*<form \{\.\.\.rest\}/);
 	assert.doesNotMatch(source, /<fieldset[^>]*\.\.\.rest/);
+});
+
+test('ScrollRoom keeps the room the tallest bar needs and forgets a bar once it hides', () => {
+	const room = new ScrollRoom();
+	const a = Symbol('a');
+	const b = Symbol('b');
+	assert.equal(room.current, 0);
+	assert.equal(room.set(a, 90), 90);
+	assert.equal(room.set(b, 120), 120);
+	assert.equal(room.set(b, undefined), 90);
+	assert.equal(room.empty, false);
+	assert.equal(room.set(a, undefined), 0);
+	assert.equal(room.empty, true);
+	assert.equal(room.set(a, -5), 0);
 });

@@ -4,9 +4,14 @@
 	then "+N more"), an optional impact line, Discard (a native reset) and Save (a native submit).
 	It shows a failed save, a conflict with a way to review it, and a saved notice. It reads the
 	surrounding SettingsForm's draft, works without JavaScript (always shown, Save always enabled),
-	and returns focus to the last edited control when its buttons go away.
+	and returns focus to the last edited control (else the first unsaved or editable field) when its
+	buttons go away. While a sticky or floating bar shows, its scroller keeps that much room at the
+	bottom (`scroll-padding-bottom`, from `--ak-settings-bar-space`), so a focused field is never
+	hidden under it.
 -->
 <script lang="ts" module>
+	import { ScrollRoom } from './helpers';
+
 	/** Every word SaveBar shows or announces. */
 	export interface SaveBarLabels {
 		/** "2 unsaved changes". */
@@ -39,6 +44,28 @@
 	}
 
 	export type SaveBarLayout = 'footer' | 'sticky' | 'floating';
+
+	/**
+	 * Room kept per scroller for the bars covering it (several bars can share one page), with the
+	 * scroller's own inline values from before the first bar, put back once the last bar hides.
+	 */
+	const ROOMS = new WeakMap<HTMLElement, { room: ScrollRoom; padding: string; space: string }>();
+	/** The CSS variable a covered scroller gets: the room its tallest covering bar needs. */
+	const BAR_SPACE = '--ak-settings-bar-space';
+
+	/** The nearest ancestor that scrolls vertically, else the page's scroller. */
+	function scrollerOf(node: HTMLElement): HTMLElement {
+		for (let el = node.parentElement; el; el = el.parentElement) {
+			if (el === document.body || el === document.documentElement) break;
+			if (/(auto|scroll|overlay)/.test(getComputedStyle(el).overflowY)) return el;
+		}
+		return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+	}
+
+	/** Where a scroller's visible area ends, in viewport coordinates. */
+	function scrollerBottom(scroller: HTMLElement): number {
+		return scroller === document.scrollingElement || scroller === document.documentElement ? window.innerHeight : scroller.getBoundingClientRect().bottom;
+	}
 </script>
 
 <script lang="ts">
@@ -78,7 +105,7 @@
 		reviewHref?: string;
 		/** Called by the conflict's Review action. */
 		onReviewConflict?: () => void;
-		/** Where focus goes when the bar's buttons go away. Default: the last edited control. */
+		/** Where focus goes when the bar's buttons go away. Default: the last edited control, else the first unsaved field, else the first field. */
 		refocus?: () => HTMLElement | null;
 		labels?: Partial<SaveBarLabels>;
 		class?: string;
@@ -173,7 +200,41 @@
 		const lost = !active || active === document.body || !active.isConnected || Boolean(active.disabled);
 		if (!lost) return;
 		hadFocus = false;
-		restoreFocus(refocus?.(), draft?.lastEdited());
+		const host = hostForm();
+		if (restoreFocus(refocus?.(), draft?.lastEdited(), ...changedControls(host), ...stagedControls(host))) return;
+		// Nothing to edit is left (a conflict review that took the last edited control with it): the form itself.
+		if (host && !host.hasAttribute('tabindex')) host.setAttribute('tabindex', '-1');
+		restoreFocus(host);
+	}
+
+	/** The form the bar saves: its `form` id, else the form around it. */
+	function hostForm(): HTMLFormElement | null {
+		const byId = form ? document.getElementById(form) : null;
+		return byId instanceof HTMLFormElement ? byId : (root?.closest('form') ?? null);
+	}
+
+	/** The controls of the fields that are still unsaved, in change order (a radio group: its checked radio). */
+	function changedControls(host: HTMLFormElement | null): HTMLElement[] {
+		if (!host) return [];
+		const out: HTMLElement[] = [];
+		for (const change of list) {
+			const named = host.elements.namedItem(change.name);
+			if (named instanceof RadioNodeList) {
+				const nodes = Array.from(named) as HTMLInputElement[];
+				const pick = nodes.find((node) => node.checked) ?? nodes[0];
+				if (pick) out.push(pick);
+			} else if (named instanceof HTMLElement) out.push(named);
+		}
+		return out;
+	}
+
+	/** The form's named value controls outside the bar, in page order. */
+	function stagedControls(host: HTMLFormElement | null): HTMLElement[] {
+		if (!host) return [];
+		return Array.from(host.elements).filter(
+			(el): el is HTMLElement =>
+				el instanceof HTMLElement && el.matches('input:not([type="hidden"]), select, textarea') && Boolean((el as HTMLInputElement).name) && !(root?.contains(el) ?? false)
+		);
 	}
 	$effect(() => {
 		void visible;
@@ -187,6 +248,44 @@
 		const inside = root?.contains(document.activeElement);
 		if (inside) hadFocus = true;
 		queueMicrotask(giveFocusBack);
+	});
+
+	// A sticky or floating bar covers the bottom of its scroller. While it shows, keep that much
+	// room as the scroller's `scroll-padding-bottom`, so moving focus never parks a field under it.
+	$effect(() => {
+		if (!root || !visible || layout === 'footer') return;
+		const bar = root;
+		const scroller = scrollerOf(bar);
+		// The first bar on a scroller records its own values; later bars share them.
+		const before = ROOMS.get(scroller) ?? { room: new ScrollRoom(), padding: scroller.style.scrollPaddingBottom, space: scroller.style.getPropertyValue(BAR_SPACE) };
+		ROOMS.set(scroller, before);
+		const { room } = before;
+		const key = Symbol('save-bar');
+		const apply = (px: number) => {
+			scroller.style.setProperty(BAR_SPACE, `${px}px`);
+			scroller.style.scrollPaddingBottom = `var(${BAR_SPACE})`;
+		};
+		const measure = () => {
+			// A stuck bar sits its `bottom` inset above the scroller's padding; a floating one is always where it shows.
+			const offset =
+				layout === 'sticky'
+					? (parseFloat(getComputedStyle(bar).bottom) || 0) + (parseFloat(getComputedStyle(scroller).paddingBottom) || 0)
+					: Math.max(0, scrollerBottom(scroller) - bar.getBoundingClientRect().bottom);
+			// Breathing room above the bar, so the focus ring shows too.
+			apply(room.set(key, Math.ceil(bar.offsetHeight + offset + 8)));
+		};
+		measure();
+		const observer = new ResizeObserver(measure);
+		observer.observe(bar);
+		return () => {
+			observer.disconnect();
+			const left = room.set(key, undefined);
+			if (!room.empty) return apply(left);
+			ROOMS.delete(scroller);
+			scroller.style.scrollPaddingBottom = before.padding;
+			if (before.space) scroller.style.setProperty(BAR_SPACE, before.space);
+			else scroller.style.removeProperty(BAR_SPACE);
+		};
 	});
 
 	const LAYOUT: Record<SaveBarLayout, string> = {

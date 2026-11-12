@@ -83,7 +83,7 @@
 				</div>
 			</header>
 			<div class="px-4 py-3">
-				<ConsequenceList items={archive} heading="What happens" headingLevel={4} size="sm" />
+				<ConsequenceList items={archive} title="What happens" headingLevel={4} size="sm" />
 			</div>
 		</section>
 	</div>

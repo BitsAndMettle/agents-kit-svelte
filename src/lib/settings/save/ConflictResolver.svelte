@@ -3,8 +3,10 @@
 	The end of a stale save: for each setting someone else changed, it shows your value against the
 	latest one and asks which to keep (Yours, Latest, or Both where a merge makes sense; when Both
 	is not offered, it says why). Native radios named `keep.<field>`, so it posts without
-	JavaScript; place it inside a SettingsForm or your own dialog form. A table in a wide
-	container, one stacked group per setting in a narrow one. Your app merges.
+	JavaScript; place it inside a SettingsForm or your own dialog form. Its radios are never a
+	SettingsForm change (their saved state follows the choice), so they add no unsaved change and
+	no development warning. A table in a wide container, one stacked group per setting in a
+	narrow one. Your app merges.
 -->
 <script lang="ts" module>
 	import type { ConflictKeep } from './helpers';
@@ -32,6 +34,7 @@
 
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import type { HTMLFieldsetAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
 	import { formatElapsed, type TimeInput } from '../../core/time';
@@ -103,6 +106,28 @@
 		onValueChange?.(value);
 	}
 
+	/**
+	 * A choice's saved state follows it at once: captured before a surrounding SettingsForm sees
+	 * the edit, so a choice is never an unsaved change (nor a development warning), and a form
+	 * reset leaves the choices as they are.
+	 */
+	const followChoice: Attachment<HTMLFieldSetElement> = (node) => {
+		const sync = (event: Event) => {
+			const input = event.target;
+			if (!(input instanceof HTMLInputElement) || input.type !== 'radio' || !input.checked) return;
+			input
+				.closest('[role="radiogroup"]')
+				?.querySelectorAll<HTMLInputElement>('input[type="radio"]')
+				.forEach((radio) => (radio.defaultChecked = radio === input));
+		};
+		node.addEventListener('input', sync, true);
+		node.addEventListener('change', sync, true);
+		return () => {
+			node.removeEventListener('input', sync, true);
+			node.removeEventListener('change', sync, true);
+		};
+	};
+
 	const fieldId = (index: number, part: string) => `${id}-${index}-${part}`;
 
 	const SIDE_CELL =
@@ -112,7 +137,7 @@
 		'relative inline-flex h-7 cursor-pointer items-center rounded-full px-3 text-xs font-medium text-fg-light transition-colors hover:text-fg-main has-[:checked]:bg-card-bg has-[:checked]:text-fg-main has-[:checked]:shadow-btn has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-accent-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:disabled]:hover:text-fg-light';
 </script>
 
-<fieldset {...rest} aria-describedby={[`${id}-description`, rest['aria-describedby']].filter(Boolean).join(' ')} class={cn('m-0 min-w-0 border-0 p-0', className)}>
+<fieldset {...rest} {@attach followChoice} aria-describedby={[`${id}-description`, rest['aria-describedby']].filter(Boolean).join(' ')} class={cn('m-0 min-w-0 border-0 p-0', className)}>
 	<legend class="m-0 p-0 text-sm font-semibold text-fg-main">{text.legend}</legend>
 	<p id={`${id}-description`} class="m-0 mt-1 text-xs leading-5 text-fg-light">
 		{text.description}
@@ -152,6 +177,7 @@
 											name={`${name}.${field.name}`}
 											value={side}
 											checked={choice === side}
+											defaultChecked={choice === side}
 											disabled={side === 'both' && noBoth}
 											aria-describedby={side === 'both' ? (noBoth ? fieldId(index, 'reason') : undefined) : fieldId(index, side)}
 											onchange={() => choose(field.name, side)}
