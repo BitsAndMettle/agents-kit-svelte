@@ -90,8 +90,12 @@
 		addAction?: SettingsAction;
 		/** What an empty list says. */
 		empty?: { title: string; description?: string; action?: SettingsAction };
-		/** A filter box. Without JavaScript it is a GET form (`name`, default `q`); with it, the list filters as you type. `false` or absent: no filter. */
-		filter?: { value?: string; name?: string } | false;
+		/**
+		 * A filter box. Without JavaScript it is a GET form (`name`, default `q`) to the current page,
+		 * which posts only its own fields: put the query parameters the page needs to stay where it
+		 * is (`?section=`) in `hidden`. With JavaScript the list filters as you type. `false` or absent: no filter.
+		 */
+		filter?: { value?: string; name?: string; hidden?: Record<string, string> } | false;
 		onFilterChange?: (query: string) => void;
 		/** Adds a checkbox to each row (locked rows cannot be selected). */
 		selectable?: boolean;
@@ -621,6 +625,7 @@
 			<div role="search" class="flex items-center gap-2 border-b border-canvas-border px-4 py-2.5">{@render filterBox()}</div>
 		{:else}
 			<form method="get" role="search" class="m-0 flex items-center gap-2 border-b border-canvas-border px-4 py-2.5" onsubmit={(event) => event.preventDefault()}>
+				{#each Object.entries((filter && filter.hidden) || {}) as [key, kept] (key)}<input type="hidden" name={key} value={kept} />{/each}
 				{@render filterBox()}
 				{#if !ready.current}<Button type="submit" size="sm" variant="secondary">{text.applyFilter}</Button>{/if}
 			</form>

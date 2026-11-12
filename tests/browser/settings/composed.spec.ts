@@ -70,6 +70,63 @@ test('Composed settings: "Save and leave" while a save is in flight waits for it
 	expect(errors).toEqual([]);
 });
 
+test('Composed settings: "Save and leave" saves edits made while the first save was in flight, then leaves', async ({ page }) => {
+	const errors = watch(page);
+	await openOnClock(page);
+	const name = page.getByRole('textbox', { name: 'Workspace name' });
+	await name.fill('Racing');
+	await page.getByRole('button', { name: 'Save', exact: true }).click();
+	await page.clock.runFor(100);
+	// Typed while "Racing" is still being saved: not part of that save.
+	await name.fill('Racing Two');
+	await rail(page).getByRole('link', { name: /^Members/ }).click();
+	await page.clock.runFor(100);
+	const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Save and leave' }).click();
+	// The first save settles at 600 ms, then the newer edit is saved (another 600 ms).
+	await page.clock.runFor(2400);
+	await expect(page).toHaveURL(/section=members/);
+	await expect(page.getByTestId('composed-log')).toHaveText('Saved revision 6: Workspace name → Racing Two');
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	expect(errors).toEqual([]);
+});
+
+test('Composed settings: when "Save and leave" fails, Keep editing focuses the invalid field', async ({ page }) => {
+	const errors = watch(page);
+	await openOnClock(page);
+	await page.getByTestId('reject-role').check();
+	await page.getByRole('textbox', { name: 'Workspace name' }).fill('Racing');
+	await rail(page).getByRole('link', { name: /^Members/ }).click();
+	await page.clock.runFor(100);
+	const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
+	await expect(dialog).toBeVisible();
+	await dialog.getByRole('button', { name: 'Save and leave' }).click();
+	await page.clock.runFor(1000);
+	await expect(dialog.getByText("Couldn't save")).toBeVisible();
+	await dialog.getByRole('button', { name: 'Keep editing' }).click();
+	await expect(page.getByRole('dialog')).toHaveCount(0);
+	await expect(page).not.toHaveURL(/section=members/);
+	// The radio group carries aria-invalid but cannot take focus: its checked radio does, not the rail link that opened the dialog.
+	const group = page.getByRole('radiogroup', { name: 'Default role' });
+	await expect(group).toHaveAttribute('aria-invalid', 'true');
+	await expect(group.getByRole('radio', { name: /^Member/ })).toBeFocused();
+	expect(errors).toEqual([]);
+});
+
+test('Composed settings: an attention item whose dismissal answers with a conflict stays, with the conflict announced', async ({ page }) => {
+	const errors = watch(page);
+	await openOnClock(page);
+	const attention = page.getByTestId('composed-page').getByTestId('composed-attention');
+	const item = attention.locator('[data-attention-item="region"]');
+	await item.getByRole('button', { name: /^Dismiss/ }).click();
+	await page.clock.runFor(700);
+	// A conflict is a failure even without an `error`: its message is the alert.
+	await expect(item.getByRole('alert')).toHaveText('An administrator answered this a moment ago. Reload to see it.');
+	await expect(item).toBeVisible();
+	expect(errors).toEqual([]);
+});
+
 test('Composed settings: leaving without saving clears the dirty dot and the unsaved attention item', async ({ page }) => {
 	const errors = watch(page);
 	await open(page);
@@ -123,6 +180,16 @@ test.describe('without JavaScript', () => {
 		await expect(page.getByRole('meter', { name: 'Seats' })).toBeVisible();
 		expect(await page.locator('form form').count()).toBe(0);
 		expect(errors).toEqual([]);
+	});
+
+	test('Composed settings: filtering members without JavaScript keeps the page on its section', async ({ page }) => {
+		await page.goto('/fixtures/settings-composed/?section=workspace');
+		const members = page.getByTestId('composed-members');
+		await members.getByRole('searchbox', { name: 'Filter' }).fill('ada');
+		await members.getByRole('button', { name: 'Filter', exact: true }).click();
+		await expect(page).toHaveURL(/[?&]section=workspace(&|$)/);
+		await expect(page).toHaveURL(/[?&]member=ada(&|$)/);
+		await expect(page.getByTestId('composed-members')).toBeVisible();
 	});
 
 	test('Composed settings: actions that only call back are unavailable, not silently dead', async ({ page }) => {
