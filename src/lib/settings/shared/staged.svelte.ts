@@ -76,15 +76,17 @@ function valuesOf(data: FormData): SettingsValues {
  * - `onsubmit` cancels the native post only when there is a handler; while pending, submits are
  *   ignored (and stopped before later listeners, for SvelteKit `enhance`).
  * - A handler result shows until the next submit: field errors (hidden once that field is edited),
- *   a form error, or a conflict (the draft is kept). Success makes the submitted values the new
+ *   a form error, or a conflict (the draft is kept). A conflict stays (`conflict`) until a save
+ *   succeeds, so its review and the choices made in it outlive a retry in flight or one that
+ *   fails. Success makes the submitted values the new
  *   defaults, so Discard restores what was saved and an edit made while the save was in flight
  *   stays unsaved.
  * - Only the form's own controls count: an input or change from a control of another form (a
  *   nested dialog's own form) is not an edit.
  * - After a failed submit, focus goes to the first invalid control (`firstInvalidControl`: a
  *   group marked invalid gives its checked choice) or `[data-form-error]`, but only while it is
- *   still where the submit left it (or lost): someone typing elsewhere meanwhile keeps their
- *   place, and the alert is announced. After a successful one that took the focused control
+ *   still where the submit left it (or lost) and nothing was edited since: someone typing on, in
+ *   the same field or another, keeps their place, and the alert is announced. After a successful one that took the focused control
  *   away (a conflict review), focus goes to the last edited control, else the first field.
  * - A lock that switches controls off (or on) re-reads the change list: a disabled control
  *   neither posts nor counts as unsaved.
@@ -108,7 +110,11 @@ export class SettingsDraft {
 	/** The handler's last result; undefined until a handler runs, then it wins over the prop. */
 	#result = $state.raw<SettingsResult | undefined>(undefined);
 	#handled = $state(false);
+	/** The last conflict a handler answered with; kept until a save succeeds. */
+	#conflict = $state.raw<SettingsConflict | undefined>(undefined);
 	#saved = $state(false);
+	/** Counts edits (not reactive): a failed save moves focus only when none came after its submit. */
+	#edits = 0;
 	#edited = $state.raw<ReadonlySet<string>>(new Set());
 	#generation = 0;
 	#lastEdited: HTMLElement | null = null;
@@ -205,8 +211,9 @@ export class SettingsDraft {
 		return this.status === 'saved' ? this.result?.notice : undefined;
 	}
 
+	/** The latest result's conflict, else the last one a handler answered with, until a save succeeds. */
 	get conflict(): SettingsConflict | undefined {
-		return this.result?.conflict;
+		return this.result?.conflict ?? (this.#handled ? this.#conflict : undefined);
 	}
 
 	isDirty(name: string): boolean {
@@ -245,6 +252,7 @@ export class SettingsDraft {
 			// A control that posts with another form (a dialog's own form, a `form` attribute) bubbles here too.
 			if (target && 'form' in target && target.form !== form) return;
 			if (target instanceof HTMLElement) this.#lastEdited = target;
+			this.#edits++;
 			const name = target?.name;
 			if (typeof name === 'string' && name && !this.#edited.has(name)) this.#edited = new Set([...this.#edited, name]);
 			this.#saved = false;
@@ -301,7 +309,7 @@ export class SettingsDraft {
 		const data = new FormData(form, event.submitter);
 		const submitted = snapshotForm(form);
 		// Where focus was when the save went out: a failure moves it only if it is still there.
-		const focusedAt = { submitter: event.submitter, active: document.activeElement };
+		const focusedAt = { submitter: event.submitter, active: document.activeElement, edits: this.#edits };
 		const context: SettingsSubmitContext = { changes: this.changes, revision: this.#options.revision(), data, event };
 		this.#handled = true;
 		this.#result = undefined;
@@ -334,6 +342,7 @@ export class SettingsDraft {
 		this.#running = false;
 		this.#handled = false;
 		this.#result = undefined;
+		this.#conflict = undefined;
 		this.#edited = new Set();
 		this.#saved = false;
 	}
@@ -350,12 +359,14 @@ export class SettingsDraft {
 	async #finish(
 		form: HTMLFormElement,
 		submitted: readonly ControlSnapshot[],
-		focusedAt: { submitter: HTMLElement | null; active: Element | null },
+		focusedAt: { submitter: HTMLElement | null; active: Element | null; edits: number },
 		result: void | SettingsResult
 	): Promise<boolean> {
 		this.#running = false;
 		this.#result = result || undefined;
+		if (this.#result?.conflict) this.#conflict = this.#result.conflict;
 		if (!hasFailure(result)) {
+			this.#conflict = undefined;
 			adoptSnapshotAsDefaults(submitted);
 			this.#saved = true;
 			this.#version++;
@@ -368,8 +379,10 @@ export class SettingsDraft {
 		}
 		await tick();
 		const active = document.activeElement;
-		// Someone who moved on to another control while the save ran keeps their place: the alert is announced.
-		if (!focusLost() && active !== focusedAt.active && active !== focusedAt.submitter) return false;
+		// Someone who typed on (in the field they pressed Enter in, or another) or moved to another
+		// control while the save ran keeps their place: the alert is announced.
+		const movedOn = focusedAt.edits !== this.#edits || (active !== focusedAt.active && active !== focusedAt.submitter);
+		if (!focusLost() && movedOn) return false;
 		const target = firstInvalidControl(form) ?? form.querySelector<HTMLElement>('[data-form-error]');
 		target?.focus();
 		return false;

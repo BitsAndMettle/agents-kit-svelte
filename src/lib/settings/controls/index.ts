@@ -23,7 +23,7 @@ export { default as SettingsItemList } from './SettingsItemList.svelte';
 export type { SettingsItemListLabels } from './SettingsItemList.svelte';
 /** SettingsItemList's props, for items of type `T`. */
 export type SettingsItemListProps<T extends SettingsItem = SettingsItem> = ComponentProps<typeof SettingsItemListComponent<T>>;
-export { filterSettingsItems, groupSettingsItems, selectableIds } from './item-list';
+export { groupSettingsItems, selectableIds } from './item-list';
 export { default as UsageMeter } from './UsageMeter.svelte';
 export type { Props as UsageMeterProps, UsageMeterLabels, UsageMeterVariant } from './UsageMeter.svelte';
 export { usageLevel, usageTone, usageScale, usagePercent } from './meter';

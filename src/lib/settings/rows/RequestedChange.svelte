@@ -158,7 +158,14 @@
 		cancel.status === 'failed' ? (cancel.error ?? words.cancelFailed) : resend.status === 'failed' ? (resend.error ?? words.resendFailed) : undefined
 	);
 
-	function run(which: 'cancel' | 'resend', event: MouseEvent): void {
+	/**
+	 * A failure line stays, invisibly, while the next try runs (Send again after a failed Cancel, or
+	 * the other way): it gives way only when that try settles, so the rows below do not move up and
+	 * back down. A new failure mounts a fresh alert, so it is announced again.
+	 */
+	let heldFailure = $state<string | undefined>(undefined);
+
+	async function run(which: 'cancel' | 'resend', event: MouseEvent): Promise<void> {
 		const handler = which === 'cancel' ? onCancelRequest : onResend;
 		if (!handler) {
 			// No handler: the button posts its intent natively. Inside a SettingsForm that post would
@@ -171,8 +178,10 @@
 		}
 		event.preventDefault();
 		if (cancel.pending || resend.pending) return;
+		heldFailure = failure;
 		(which === 'cancel' ? resend : cancel).reset();
-		void (which === 'cancel' ? cancel : resend).run(handler);
+		await (which === 'cancel' ? cancel : resend).run(handler);
+		heldFailure = undefined;
 	}
 
 	/** Submit buttons need a form: their own, or (inside a SettingsForm) the outer one via `formaction`. */
@@ -261,6 +270,6 @@
 		{/if}
 	{/if}
 	<!-- After the buttons, on a line of its own: coming or going it never moves them, stacked or beside the text. On one line, so `:empty` meets no whitespace; empty, it is visually hidden, so its alert stays a live region. -->
-	<div class="flex min-w-0 basis-full flex-col [&:not(:has(>:not(:empty)))]:sr-only">{#if resend.status === 'done' && awaiting}<p aria-hidden="true" class="m-0 text-xs leading-5 text-fg-light">{resend.notice ?? words.resent}</p>{/if}<div role="alert" class={cn('text-xs leading-5 font-medium empty:sr-only', DANGER_TEXT)}>{#if failure}<p class="m-0">{failure}</p>{/if}</div></div>
+	<div class="flex min-w-0 basis-full flex-col [&:not(:has(>:not(:empty)))]:sr-only">{#if heldFailure && (cancel.pending || resend.pending)}<p aria-hidden="true" data-held-failure="" class="invisible m-0 text-xs leading-5 font-medium">{heldFailure}</p>{/if}{#if resend.status === 'done' && awaiting}<p aria-hidden="true" class="m-0 text-xs leading-5 text-fg-light">{resend.notice ?? words.resent}</p>{/if}<div role="alert" class={cn('text-xs leading-5 font-medium empty:sr-only', DANGER_TEXT)}>{#if failure}<p class="m-0">{failure}</p>{/if}</div></div>
 	<span role="status" class="sr-only">{live}</span>
 </li>

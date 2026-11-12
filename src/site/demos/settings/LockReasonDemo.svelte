@@ -36,6 +36,12 @@
 		await wait();
 		throw new Error('offline');
 	}
+
+	/** A way forward that is not a request and fails without a message: the lock says so in its own words. */
+	async function comparePlans(): Promise<void> {
+		await wait();
+		throw new Error('offline');
+	}
 </script>
 
 <div class="flex max-w-3xl flex-col gap-6">
@@ -76,6 +82,10 @@
 			<LockReason
 				data-testid="lock-action-callback"
 				lock={{ kind: 'plan', reason: 'Usage reports are on the Business plan.', action: { label: 'Take the tour', onSelect: startTour } }}
+			/>
+			<LockReason
+				data-testid="lock-action-fail"
+				lock={{ kind: 'plan', reason: 'Audit exports are on the Business plan.', action: { label: 'Compare plans', onSelect: comparePlans } }}
 			/>
 			<LockReason data-testid="lock-hidden" variant="hidden" id="hidden-reason" lock={{ kind: 'readonly', reason: 'Archived teams are read-only.' }} />
 			<p class="m-0 text-xs text-fg-light">Requests sent: <span data-testid="lock-requests">{requests}</span>; tours started: <span data-testid="lock-tours">{tours}</span>.</p>

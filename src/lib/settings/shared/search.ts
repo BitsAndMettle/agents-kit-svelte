@@ -3,7 +3,7 @@
  * and highlight ranges point into the original text. A leaf: type-only imports, no DOM.
  */
 import type { PaletteCommand } from '../../primitives/menus/types';
-import type { SettingsNavGroup, SettingsSearchEntry } from './types';
+import type { SettingsItem, SettingsNavGroup, SettingsSearchEntry } from './types';
 
 /** A half-open range `[start, end)` of UTF-16 indices into the original string. */
 export type TextRange = [number, number];
@@ -174,6 +174,22 @@ export function filterSettingsLinks(groups: SettingsNavGroup[], query: string): 
 		if (items.length) out.push({ ...group, items });
 	}
 	return out;
+}
+
+/**
+ * Items whose label, description, meta, badges or status contain every word of `query`, with the
+ * same folding as `filterSettingsLinks` and `searchSettings` (case and diacritics ignored), so a
+ * list filter and the navigation filter agree on a query. An empty query keeps everything, in order.
+ */
+export function filterSettingsItems<T extends SettingsItem>(items: readonly T[], query: string): T[] {
+	const tokens = queryTokens(query);
+	if (!tokens.length) return [...items];
+	return items.filter((item) => {
+		const haystack = fold(
+			[item.label, item.description, ...(item.meta ?? []), ...(item.badges ?? []).map((b) => b.label), item.status?.label].filter(Boolean).join(' ')
+		).text;
+		return tokens.every((token) => haystack.includes(token));
+	});
 }
 
 /**

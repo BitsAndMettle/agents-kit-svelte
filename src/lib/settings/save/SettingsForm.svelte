@@ -225,13 +225,15 @@
 			<Alert tone="danger" live description={text.leaveFailed} class="mt-3" />
 		{/if}
 		{#snippet footer()}
-			<!-- Where the three do not fit on one line, the primary action wraps onto the top line, not alone at the bottom. -->
-			<div class="flex grow flex-wrap-reverse items-center justify-end gap-2">
-				<Button variant="ghost" disabled={leaving} onclick={() => decide('stay')}>{text.stay}</Button>
-				<Button variant="danger" disabled={leaving} onclick={() => decide('leave')}>{text.leave}</Button>
-				{#if onSubmit}
-					<Button variant="primary" loading={leaving} onclick={() => decide('save')}>{text.saveAndLeave}</Button>
-				{/if}
+			<!-- One line where the three fit, else a full-width stack: either way they read, and Tab moves, in the same order, with the primary action last. -->
+			<div class="@container/leave grow" data-leave-actions="">
+				<div class="flex flex-col items-stretch gap-2 @[25rem]/leave:flex-row @[25rem]/leave:items-center @[25rem]/leave:justify-end">
+					<Button variant="ghost" disabled={leaving} onclick={() => decide('stay')}>{text.stay}</Button>
+					<Button variant="danger" disabled={leaving} onclick={() => decide('leave')}>{text.leave}</Button>
+					{#if onSubmit}
+						<Button variant="primary" loading={leaving} onclick={() => decide('save')}>{text.saveAndLeave}</Button>
+					{/if}
+				</div>
 			</div>
 		{/snippet}
 	</Dialog>

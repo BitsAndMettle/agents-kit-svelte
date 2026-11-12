@@ -223,6 +223,19 @@
 	 */
 	const lineHeld = $derived(Boolean(feedback) || Boolean(errorText) || Boolean(actionError));
 	const savedText = $derived(statusText ?? words.saved);
+	/** A save (`status` pending) or a row action is running. */
+	const busy = $derived(shownStatus === 'pending' || actionRun.pending);
+	/** Whether the line showed a failure when nothing was running last. */
+	let failedBefore = $state(false);
+	$effect(() => {
+		if (!busy) failedBefore = Boolean(errorText) || Boolean(actionError);
+	});
+	/**
+	 * A retry after a failure (the app passes `status` pending again, or a row action runs again)
+	 * keeps the failure line's room until it settles, as SettingsToggle's Retry does, so the rows
+	 * below do not move up and back down.
+	 */
+	const holding = $derived(busy && failedBefore && !lineHeld);
 
 	const changeId = `${uid}-change`;
 	const impactId = `${uid}-impact`;
@@ -291,7 +304,9 @@
 			: layout === 'stacked'
 				? '@lg/settings:flex-col @lg/settings:items-stretch @lg/settings:justify-start @lg/settings:gap-2'
 				: // Inline from 32rem, the status line wraps onto a line of its own (the label takes any width, so nothing else wraps).
-					'@lg/settings:flex-wrap @lg/settings:gap-y-2'
+					// A control that grows a status line of its own (an instant ChoiceCards) top-aligns the row,
+					// so the line coming never re-centres the control under the pointer.
+					'@lg/settings:flex-wrap @lg/settings:gap-y-2 @lg/settings:[&:has([data-instant-status])]:items-start'
 	);
 	/** A lock badge ("Always on") replaces what the row shows. A control stays in the page, visually hidden and disabled, so assistive technology meets the same switch either way. */
 	const badgeOnly = $derived(Boolean(effectiveLock?.badge));
@@ -299,7 +314,13 @@
 	const hideControl = $derived(badgeOnly && !group);
 	const hasControlColumn = $derived(Boolean(control || value !== undefined || badgeOnly || actionList.length || (action && typeof action === 'function')));
 	/** Saving or Saved, under the control (no room taken) unless the status line shows. */
-	const statusUnder = $derived(!lineHeld && hasControlColumn);
+	const statusUnder = $derived(!lineHeld && !holding && hasControlColumn);
+	/**
+	 * Under the control, anchored to its edge at the content's edge so a longer word never leaves the
+	 * row: its end where the control sits at the row's end (beside the label from `CQ.row`), its start
+	 * where it wraps under the label or the row is stacked.
+	 */
+	const underAnchor = $derived(layout === 'stacked' ? 'start-0' : 'start-0 @lg/settings:start-auto @lg/settings:end-0');
 </script>
 
 {#snippet text(content: string | Snippet)}
@@ -394,12 +415,12 @@
 				</DropdownMenu>
 			{/if}
 			{#if statusUnder && (shownStatus === 'pending' || shownStatus === 'saved')}
-				<!-- Centred under the control, in the row's bottom padding (inside the row whether the control sits at its start or its end): no room taken, and never in the way of a tap. -->
-				<span aria-hidden="true" data-row-saving={shownStatus === 'pending' ? '' : undefined} data-row-saved={shownStatus === 'saved' ? '' : undefined} class={cn('pointer-events-none absolute top-full left-1/2 inline-flex -translate-x-1/2 items-center gap-1 text-[11px] leading-3 font-medium whitespace-nowrap [&_svg]:size-3', shownStatus === 'saved' ? STATUS_TEXT_CLASS.success : 'text-fg-light')}>{#if shownStatus === 'pending'}<Spinner size="xs" decorative />{words.saving}{:else}<Check />{savedText}{/if}</span>
+				<!-- Under the control, in the row's bottom padding, from the control's edge at the content's edge (see `underAnchor`): no room taken, never past the row, and never in the way of a tap. -->
+				<span aria-hidden="true" data-row-saving={shownStatus === 'pending' ? '' : undefined} data-row-saved={shownStatus === 'saved' ? '' : undefined} class={cn('pointer-events-none absolute top-full inline-flex items-center gap-1 text-[11px] leading-3 font-medium whitespace-nowrap [&_svg]:size-3', underAnchor, shownStatus === 'saved' ? STATUS_TEXT_CLASS.success : 'text-fg-light')}>{#if shownStatus === 'pending'}<Spinner size="xs" decorative />{words.saving}{:else}<Check />{savedText}{/if}</span>
 			{/if}
 		</div>
 	{/if}
 	<!-- On one line, so `:empty` meets no whitespace: with nothing in it, the line takes no room (visually hidden, so its alert stays a live region). As tall as a small button whatever it holds, so Saving giving way to Saved and Undo moves nothing. Indented past a leading icon only where the control sits beside the label. -->
-	<div data-row-status-line class={cn('flex min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-1 [&:has(>:not(:empty))]:min-h-6 [&:not(:has(>:not(:empty)))]:sr-only', leading && '@lg/settings:ps-11')}>{#if !statusUnder && shownStatus === 'pending'}<span aria-hidden="true" data-row-saving class="inline-flex items-center gap-1.5 text-xs leading-5 font-medium text-fg-light"><Spinner size="sm" decorative />{words.saving}</span>{:else if !statusUnder && shownStatus === 'saved'}<span aria-hidden="true" data-row-saved class={cn('inline-flex items-center gap-1 text-xs leading-5 font-medium', STATUS_TEXT_CLASS.success)}><Check class="size-3.5" />{savedText}</span>{/if}<div id="{uid}-error" role="alert" class={cn('min-w-0 text-xs leading-5 font-medium empty:sr-only', DANGER_TEXT)}>{#if errorText}<p class="m-0">{errorText}</p>{/if}{#if actionError}<p class="m-0">{actionError}</p>{/if}</div>{@render feedback?.()}</div>
+	<div data-row-status-line class={cn('flex min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-1', holding ? 'min-h-6' : '[&:has(>:not(:empty))]:min-h-6 [&:not(:has(>:not(:empty)))]:sr-only', leading && '@lg/settings:ps-11')}>{#if !statusUnder && shownStatus === 'pending'}<span aria-hidden="true" data-row-saving class="inline-flex items-center gap-1.5 text-xs leading-5 font-medium text-fg-light"><Spinner size="sm" decorative />{words.saving}</span>{:else if !statusUnder && shownStatus === 'saved'}<span aria-hidden="true" data-row-saved class={cn('inline-flex items-center gap-1 text-xs leading-5 font-medium', STATUS_TEXT_CLASS.success)}><Check class="size-3.5" />{savedText}</span>{/if}<div id="{uid}-error" role="alert" class={cn('min-w-0 text-xs leading-5 font-medium empty:sr-only', DANGER_TEXT)}>{#if errorText}<p class="m-0">{errorText}</p>{/if}{#if actionError}<p class="m-0">{actionError}</p>{/if}</div>{@render feedback?.()}</div>
 	<span id={statusId} role="status" class="sr-only">{liveText}</span>
 </li>

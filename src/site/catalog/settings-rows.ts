@@ -135,9 +135,12 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		description:
 			'A change that waits for approval elsewhere (on a device, by an admin, at a provider): the value in effect against the value asked for, who it waits on, how long ago it was asked (with an injected now) and optional instructions. It offers Send again (onResend) and Cancel request (onCancelRequest), or posts intent=resend|cancel to action without JavaScript (hidden fields always ride in the query of action, so read them from url.searchParams; inside a SettingsForm without JavaScript the fields of the outer form go along, and with JavaScript the row posts its intent alone). Without action the buttons only call your handlers, so they stay soft-disabled until the page is interactive. It never shows success on click: approved, declined and expired appear only when your app passes a new status.',
 		usageSnippet: `<script lang="ts">
-  import { RequestedChange, SettingsSection } from 'agents-kit-svelte/settings';
+  import { tick } from 'svelte';
+  import { RequestedChange, SettingsSection, focusLost } from 'agents-kit-svelte/settings';
 
   let status = $state<'awaiting' | 'approved' | 'declined' | 'expired'>('awaiting');
+  let withdrawn = $state(false);
+  let withdrawnLine = $state<HTMLElement | null>(null);
   const requestedAt = Date.now() - 12 * 60_000;
 
   async function resend() {
@@ -145,11 +148,19 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
   }
   async function cancel() {
     await fetch('/api/requests/rq_1', { method: 'DELETE' });
+    withdrawn = true;
+    // The row and its focused button are gone: focus goes to the line that took its place.
+    await tick();
+    if (focusLost()) withdrawnLine?.focus();
   }
 </script>
 
 <SettingsSection title="Device limits">
-  <RequestedChange label="Parallel runs" effective="2" requested="3" waitingOn="the device owner" {requestedAt} {status} onResend={resend} onCancelRequest={cancel} />
+  {#if withdrawn}
+    <li bind:this={withdrawnLine} tabindex="-1" class="px-4 py-3 text-sm">Request withdrawn. Parallel runs stay at 2.</li>
+  {:else}
+    <RequestedChange label="Parallel runs" effective="2" requested="3" waitingOn="the device owner" {requestedAt} {status} onResend={resend} onCancelRequest={cancel} />
+  {/if}
 </SettingsSection>`
 	},
 	{

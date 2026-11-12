@@ -1,27 +1,9 @@
 /**
- * Pure rules behind SettingsItemList: the filter match, sub-group placement and the selection a
- * bulk action may touch. A leaf (type-only imports), so node tests load it directly.
+ * Pure rules behind SettingsItemList: sub-group placement and the selection a bulk action may
+ * touch (the filter match is the shared `filterSettingsItems`). A leaf (type-only imports), so
+ * node tests load it directly.
  */
 import type { SettingsItem } from '../shared/types';
-
-function fold(text: string): string {
-	return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
-}
-
-/**
- * Items whose label, description, meta, badges or status contain every word of `query`
- * (case and accents ignored). An empty query keeps everything, in order.
- */
-export function filterSettingsItems<T extends SettingsItem>(items: readonly T[], query: string): T[] {
-	const words = fold(query).split(/\s+/).filter(Boolean);
-	if (words.length === 0) return [...items];
-	return items.filter((item) => {
-		const haystack = fold(
-			[item.label, item.description, ...(item.meta ?? []), ...(item.badges ?? []).map((b) => b.label), item.status?.label].filter(Boolean).join(' ')
-		);
-		return words.every((word) => haystack.includes(word));
-	});
-}
 
 /**
  * Splits items into the main list and the named sub-groups, in the order the groups are given.

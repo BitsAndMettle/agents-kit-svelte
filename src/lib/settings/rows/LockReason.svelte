@@ -11,6 +11,8 @@
 		requested: string;
 		/** Shown when sending the request failed. */
 		requestFailed: string;
+		/** Shown when `lock.action`'s callback failed without a message of its own. */
+		actionFailed: string;
 	}
 </script>
 
@@ -67,6 +69,7 @@
 		requesting: 'Sending request…',
 		requested: 'Request sent',
 		requestFailed: "Couldn't send the request. Try again.",
+		actionFailed: "Couldn't do that. Try again.",
 		...labels
 	});
 	const reasonId = $derived(id ?? `${uid}-reason`);
@@ -92,6 +95,16 @@
 
 	let sent = $state<HTMLElement | null>(null);
 
+	const requestFailure = $derived(request.status === 'failed' ? (request.error ?? words.requestFailed) : undefined);
+	const actionFailure = $derived(action.status === 'failed' ? (action.error ?? words.actionFailed) : undefined);
+	/**
+	 * A failure line stays, invisibly, while a retry of it runs: it gives way only when the retry
+	 * settles, so what sits below does not move up and back down. A new failure then mounts a fresh
+	 * alert, so it is announced again.
+	 */
+	let heldRequest = $state<string | undefined>(undefined);
+	let heldAction = $state<string | undefined>(undefined);
+
 	/** The button gives way to "Request sent": when focus went with it, the sent line takes it. */
 	async function sendRequest(event: MouseEvent): Promise<void> {
 		if (!onRequest) {
@@ -105,19 +118,24 @@
 		}
 		event.preventDefault();
 		const button = event.currentTarget as HTMLElement;
+		heldRequest = requestFailure;
 		const ok = await request.run(onRequest);
+		heldRequest = undefined;
 		if (!ok) return;
 		await tick();
 		if (!button.isConnected && focusLost()) restoreFocus(sent);
 	}
 
-	function runAction(event: MouseEvent): void {
+	async function runAction(event: MouseEvent): Promise<void> {
 		const select = lock.action?.onSelect;
-		if (!select || lock.action?.unavailable) return;
+		if (!select || lock.action?.unavailable || action.pending) return;
+		heldAction = actionFailure;
 		// A returned `{error}` shows too, not only a rejected promise.
-		void action.run(select);
+		const settled = action.run(select);
 		// A promise means the callback handles it: a link with one does not also navigate.
 		if (action.pending) event.preventDefault();
+		await settled;
+		heldAction = undefined;
 	}
 </script>
 
@@ -177,11 +195,17 @@
 	{/if}
 	{#if requestable && visible}
 		<span role="status" class="sr-only">{live}</span>
-		{#if request.status === 'failed'}
-			<p role="alert" class="m-0 basis-full text-xs leading-5 {DANGER_TEXT}">{request.error ?? words.requestFailed}</p>
+		{#if requestFailure}
+			<p role="alert" class="m-0 basis-full text-xs leading-5 {DANGER_TEXT}">{requestFailure}</p>
+		{:else if heldRequest && request.pending}
+			<p aria-hidden="true" data-held-failure="" class="invisible m-0 basis-full text-xs leading-5">{heldRequest}</p>
 		{/if}
 	{/if}
-	{#if action.status === 'failed' && visible}
-		<p role="alert" class="m-0 basis-full text-xs leading-5 {DANGER_TEXT}">{action.error ?? words.requestFailed}</p>
+	{#if visible}
+		{#if actionFailure}
+			<p role="alert" class="m-0 basis-full text-xs leading-5 {DANGER_TEXT}">{actionFailure}</p>
+		{:else if heldAction && action.pending}
+			<p aria-hidden="true" data-held-failure="" class="invisible m-0 basis-full text-xs leading-5">{heldAction}</p>
+		{/if}
 	{/if}
 </div>

@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { timeUntil, usageLevel, usagePercent, usageScale, usageTone } from '../src/lib/settings/controls/meter.ts';
 import { groupMatrixEvents, matrixCellKey, matrixColumnState, parseMatrixCellKey, toggleMatrixColumn } from '../src/lib/settings/controls/matrix.ts';
-import { filterSettingsItems, groupSettingsItems, selectableIds } from '../src/lib/settings/controls/item-list.ts';
+import { groupSettingsItems, selectableIds } from '../src/lib/settings/controls/item-list.ts';
+import { filterSettingsItems, filterSettingsLinks } from '../src/lib/settings/shared/search.ts';
 import { idPart } from '../src/lib/settings/controls/ids.ts';
 import { SAMPLE_SETTINGS_MEMBERS } from '../src/lib/fixtures/settings.ts';
 
@@ -110,6 +111,23 @@ test('filterSettingsItems matches every word across label, description, meta, ba
 	assert.deepEqual(ids('away'), ['m4']);
 	assert.deepEqual(ids('northwind invited'), ['i1']);
 	assert.deepEqual(ids('nobody here'), []);
+});
+
+test('filterSettingsItems folds a query the way the navigation filter does: only combining marks go', () => {
+	const items = [
+		{ id: 'okina', label: 'Keʻala' },
+		{ id: 'caret', label: 'a^b' },
+		{ id: 'tick', label: 'x`y' },
+		{ id: 'accent', label: 'Zoë' }
+	];
+	const ids = (q: string) => filterSettingsItems(items, q).map((m) => m.id);
+	assert.deepEqual(ids('keʻala'), ['okina']);
+	assert.deepEqual(ids('keala'), []);
+	assert.deepEqual(ids('^'), ['caret']);
+	assert.deepEqual(ids('`'), ['tick']);
+	assert.deepEqual(ids('zoe'), ['accent']);
+	const nav = (q: string) => filterSettingsLinks([{ id: 'g', items: items.map((i) => ({ id: i.id, label: i.label, href: `#${i.id}` })) }], q).flatMap((g) => g.items.map((l) => l.id));
+	for (const q of ['keʻala', 'keala', '^', '`', 'zoe']) assert.deepEqual(ids(q), nav(q), q);
 });
 
 test('groupSettingsItems keeps unknown groups in the main list', () => {

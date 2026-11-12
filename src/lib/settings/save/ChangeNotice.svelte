@@ -66,7 +66,7 @@
 		onDismiss?: () => void;
 		/**
 		 * Where focus goes once Dismiss removed the notice. Default: the next notice beside it, else
-		 * the nearest control before it, else the one after it.
+		 * the nearest control before it, else the one after it, preferring ones in its own page pane (a SettingsLayout page, else `main`) over a rail beside it.
 		 */
 		refocus?: () => HTMLElement | string | null | undefined;
 		/** `inline` sits where it is; `sticky` sticks to the bottom of the scrolling area. */
@@ -176,13 +176,20 @@
 		const hadFocus = node?.contains(document.activeElement) ?? false;
 		const parent = node?.parentElement ?? null;
 		const index = parent && node ? Array.prototype.indexOf.call(parent.children, node) : -1;
-		let before: HTMLElement | null = null;
-		let after: HTMLElement | null = null;
+		/** The nearest control before and after the notice: in its own page pane first, then anywhere. */
+		const near = { before: null as HTMLElement | null, after: null as HTMLElement | null };
+		const inPane = { before: null as HTMLElement | null, after: null as HTMLElement | null };
 		if (hadFocus && node) {
+			// The settings page beside a rail (SettingsLayout), else the page's main region: a control
+			// outside it (the rail's search or links) is used only when the pane has none.
+			const pane = node.closest('[data-settings-page], main, [role="main"]');
 			for (const candidate of document.querySelectorAll<HTMLElement>(FOCUSABLE)) {
 				if (node.contains(candidate) || candidate.checkVisibility?.({ visibilityProperty: true }) === false) continue;
-				if (candidate.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) before = candidate;
-				else if (!after) after = candidate;
+				const side = candidate.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING ? 'before' : 'after';
+				for (const found of pane && !pane.contains(candidate) ? [near] : [near, inPane]) {
+					if (side === 'before') found.before = candidate;
+					else found.after ??= candidate;
+				}
 			}
 		}
 		onDismiss?.();
@@ -190,7 +197,7 @@
 		await tick();
 		const active = document.activeElement;
 		if (node?.isConnected || (active && active !== document.body)) return;
-		restoreFocus(refocus?.(), parent?.isConnected ? nextFocusAfterRemoval(parent, index) : null, before, after);
+		restoreFocus(refocus?.(), parent?.isConnected ? nextFocusAfterRemoval(parent, index) : null, inPane.before, inPane.after, near.before, near.after);
 	}
 
 	async function runSecondary(): Promise<void> {

@@ -21,7 +21,7 @@ export { LOCK_ICONS } from './lock-icons';
 export { setSettingsScope, getSettingsScope, setSettingsDraft, getSettingsDraft, setSectionContext, getSectionContext } from './context';
 export type { SettingsScope, SectionContext } from './context';
 export { ReadyGate } from './ready.svelte';
-export { searchSettings, filterSettingsLinks, toPaletteCommands, highlightSegments, mergeRanges, queryTokens } from './search';
+export { searchSettings, filterSettingsLinks, filterSettingsItems, toPaletteCommands, highlightSegments, mergeRanges, queryTokens } from './search';
 export type { SettingsSearchResult, TextRange } from './search';
 export { rememberOpener, openerFor, restoreFocus, focusIndexAfterRemoval, nextFocusAfterRemoval, firstInvalidControl, focusLost, OPENER_ATTRIBUTE } from './focus';
 export { CopyState } from './copy.svelte';

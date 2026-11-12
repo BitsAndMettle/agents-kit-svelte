@@ -80,6 +80,12 @@
 		await new Promise((resolve) => setTimeout(resolve, 300));
 		return { error: 'Billing is down. Try later.' };
 	}
+	let alertsCalls = $state(0);
+	async function unlockAlerts(): Promise<SettingsResult> {
+		alertsCalls++;
+		await new Promise((resolve) => setTimeout(resolve, 300));
+		return { error: 'Plans are busy. Try later.' };
+	}
 	async function askAdmin(): Promise<SettingsResult> {
 		await wait();
 		return { error: 'No admin is around.' };
@@ -157,6 +163,8 @@
 		<p data-testid="upgrade-calls">{upgradeCalls}</p>
 		<ChoiceCards name="option-lock" aria-label="Seat plan" options={[{ value: 'small', label: 'Small' }, { value: 'large', label: 'Large', lock: { kind: 'plan', reason: 'Large needs the larger plan.', action: { label: 'See plans for Large', href: '?plans=large' } } }]} defaultValue="small" />
 		<NotificationMatrix events={events.slice(0, 1)} channels={channels.slice(0, 2)} defaultValue={[]} lock={{ kind: 'plan', reason: 'Text alerts need the larger plan.', action: { label: 'See plans', href: '?plans=text' } }} labels={{ caption: 'Locked matrix' }} />
+		<NotificationMatrix events={events.slice(1, 2)} channels={channels.slice(0, 2)} defaultValue={[]} lock={{ kind: 'plan', reason: 'Digest alerts need the larger plan.', action: { label: 'Unlock alerts', onSelect: unlockAlerts } }} labels={{ caption: 'Locked digest matrix' }} />
+		<p data-testid="alerts-calls">{alertsCalls}</p>
 		<SettingsItemList title="Locked people" items={[{ id: 'l1', label: 'Ada Park', lock: { kind: 'permission', reason: 'Only admins can change Ada.', action: { label: 'Ask an admin', onSelect: askAdmin } } }]} />
 	</section>
 </main>

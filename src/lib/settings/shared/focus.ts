@@ -77,12 +77,12 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([t
  * the first focusable element of the next item, else the previous one, else `fallback` (the
  * list's heading, with `tabindex="-1"`).
  *
- * @param list - The list element; its element children are the items.
+ * @param list - The list element; its element children are the items (those with `hidden` are skipped: a filter hides them).
  * @param removedIndex - Index the removed item had.
  * @param fallback - Where focus goes when the list is empty.
  */
 export function nextFocusAfterRemoval(list: HTMLElement, removedIndex: number, fallback: HTMLElement | null = null): HTMLElement | null {
-	const items = Array.from(list.children) as HTMLElement[];
+	const items = (Array.from(list.children) as HTMLElement[]).filter((item) => !item.hidden);
 	const index = focusIndexAfterRemoval(removedIndex, items.length);
 	if (index === null) return fallback;
 	const item = items[index];

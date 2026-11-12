@@ -48,6 +48,7 @@
 	import { AlertDialog } from '../../primitives/overlays';
 	import {
 		actionButtonProps,
+		filterSettingsItems,
 		getSettingsDraft,
 		getSettingsScope,
 		LOCK_ICONS,
@@ -62,7 +63,7 @@
 		type SettingsItem,
 		type SettingsItemAction
 	} from '../shared';
-	import { filterSettingsItems, groupSettingsItems, selectableIds } from './item-list';
+	import { groupSettingsItems, selectableIds } from './item-list';
 	import { idPart } from './ids';
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title' | 'defaultValue'> {
@@ -203,13 +204,19 @@
 	const removals = new Map<string, { list: string; index: number }>();
 
 	const shown = $derived(filterSettingsItems(items, query));
-	const split = $derived(groupSettingsItems(shown, groups));
+	const shownIds = $derived(new Set(shown.map((item) => item.id)));
+	/**
+	 * Every row stays in the page and the filter only hides the ones it does not match: a hidden
+	 * row keeps its checkbox, so a staged selection it holds still posts and still counts as unsaved
+	 * (an unmounted box would lose its saved default).
+	 */
+	const split = $derived(groupSettingsItems(items, groups));
+	const visibleCount = (list: T[]) => list.filter((item) => shownIds.has(item.id)).length;
 	const selected = $derived(new Set(value));
 	/** Selected ids that are still in `items`: what the summary counts and bulk actions see. */
 	const present = $derived(value.filter((id) => items.some((item) => item.id === id)));
 	/** A server error for the selection, from the surrounding SettingsForm; hidden once it is edited. */
 	const fieldError = $derived(draft ? draft.fieldError(name) : undefined);
-	const hiddenSelected = $derived(value.filter((id) => !shown.some((item) => item.id === id) && items.some((item) => item.id === id)));
 	const actionable = $derived(selectableIds(items, value));
 	/**
 	 * Failures that arrived while the filter hid their row: the row's own status is not on the page,
@@ -259,7 +266,7 @@
 	async function perform(action: SettingsItemAction, item: T): Promise<void> {
 		if (pending[item.id]) return;
 		const list = root?.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(item.id)}"]`)?.closest<HTMLElement>('[data-list]');
-		if (list) removals.set(item.id, { list: list.dataset.list ?? '', index: Array.from(list.children).findIndex((li) => (li as HTMLElement).dataset.itemId === item.id) });
+		if (list) removals.set(item.id, { list: list.dataset.list ?? '', index: Array.from(list.children).filter((li) => !(li as HTMLElement).hidden).findIndex((li) => (li as HTMLElement).dataset.itemId === item.id) });
 		delete failed[item.id];
 		delete unseenFailures[item.id];
 		// Let a cleared message reach the page first, so a failure that comes straight back is announced again.
@@ -387,8 +394,7 @@
 	}
 
 	// Text typed (or restored on Back) before the page was ready stays in the box: filter by it. The
-	// boxes are read first, while every row is still in the page: a row the filter text hides takes
-	// its checkbox with it, and a box ticked before the page was ready would be lost.
+	// boxes are read first, so a box ticked before the page was ready counts.
 	$effect(() => {
 		const input = filterInput;
 		if (!input) return;
@@ -402,7 +408,7 @@
 	/**
 	 * The selection as the checkboxes show it. Boxes ticked before the page was ready, restored on Back
 	 * or put back by a form reset (Discard) are what posts, so the summary and bulk actions follow them.
-	 * Selected rows the filter hides keep their state.
+	 * Rows the filter hides keep their boxes (hidden), so they are read too.
 	 */
 	function readSelection(): void {
 		if (!root || !selectable) return;
@@ -505,12 +511,14 @@
 	{@const unavailable = (actions?.(item) ?? []).filter((a) => a.unavailable)}
 	{@const isSelected = selected.has(item.id)}
 	<li
+		hidden={!shownIds.has(item.id)}
 		data-item-id={item.id}
 		data-current={item.current ? '' : undefined}
 		data-new={item.isNew ? '' : undefined}
 		data-locked={item.lock?.kind}
 		class={cn(
-			'relative flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-canvas-border px-4 py-3 first:border-t-0',
+			// Divided only from a shown row above: the first row the filter leaves has no top rule.
+			'relative flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 border-canvas-border px-4 py-3 [li:not([hidden])~&]:border-t',
 			item.isNew && 'bg-accent-subtle/40',
 			isSelected && 'bg-canvas-secondary/60'
 		)}
@@ -611,23 +619,24 @@
 		{:else}
 			<p class="m-0 px-4 py-6 text-center text-[13px] text-fg-light">{text.empty}</p>
 		{/if}
-	{:else if shown.length === 0}
-		<div class="flex flex-col items-center gap-2 px-4 py-6 text-center">
-			<p class="m-0 text-[13px] text-fg-light">{text.noMatch(query)}</p>
-			<Button size="xs" variant="ghost" onclick={clearFilter}>{text.clearFilter}</Button>
-		</div>
 	{:else}
+		{#if shown.length === 0}
+			<div class="flex flex-col items-center gap-2 px-4 py-6 text-center">
+				<p class="m-0 text-[13px] text-fg-light">{text.noMatch(query)}</p>
+				<Button size="xs" variant="ghost" onclick={clearFilter}>{text.clearFilter}</Button>
+			</div>
+		{/if}
 		{#if split.main.length > 0}
-			<ul role="list" data-list="main" class={RECIPES.list}>
+			<ul role="list" data-list="main" hidden={visibleCount(split.main) === 0} class={RECIPES.list}>
 				{#each split.main as item (item.id)}{@render row(item)}{/each}
 			</ul>
 		{/if}
 		{#each groups as group (group.id)}
 			{@const members = split.groups.get(group.id) ?? []}
 			{#if members.length > 0}
-				<div class="border-t border-canvas-border">
+				<div class="border-t border-canvas-border" hidden={visibleCount(members) === 0}>
 					<div class="bg-canvas-secondary/40 px-4 pt-3 pb-2">
-						<svelte:element this={`h${subHeading}`} class="m-0 text-xs font-semibold text-fg-main">{group.label} <span class="font-normal text-fg-light">· {members.length}</span></svelte:element>
+						<svelte:element this={`h${subHeading}`} class="m-0 text-xs font-semibold text-fg-main">{group.label} <span class="font-normal text-fg-light">· {visibleCount(members)}</span></svelte:element>
 						{#if group.description}<p class="m-0 text-xs leading-5 text-fg-light">{group.description}</p>{/if}
 					</div>
 					<ul role="list" data-list={group.id} class={RECIPES.list}>
@@ -643,9 +652,6 @@
 	{#if draft}
 		<p id={errorId} role="alert" data-field-error="" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, fieldError ? 'border-t border-canvas-border px-4 py-2' : 'sr-only')}>{fieldError ?? ''}</p>
 	{/if}
-
-	<!-- Selected rows the filter hides still post. -->
-	{#each hiddenSelected as id (id)}<input type="hidden" {name} value={id} />{/each}
 
 	{#if selectable}
 		<div class={cn(RECIPES.sectionFooter, 'justify-between')} data-selection="">

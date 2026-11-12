@@ -47,7 +47,7 @@ Each setting uses exactly one, chosen by the app.
   - Controls sit inside SettingsForm and are uncontrolled (`defaultValue`, `defaultChecked`), so input typed before hydration is kept. `onCommit` is ignored there, with a dev warning.
   - `getSettingsDraft()` being defined means staged mode: drop your own mini-form and Apply button, never call `InstantSetting`. Never mix instant controls inside a SettingsForm.
   - A row with `name` calls `draft.register({ name, label, format })` and unregisters on destroy; dirty state and "was X" come from `draft.isDirty(name)` and `draft.previous(name)`.
-  - SaveBar owns Save (submit) and Discard (`type="reset"`). Success makes the current values the new defaults; a conflict keeps the draft.
+  - SaveBar owns Save (submit) and Discard (`type="reset"`). Success makes the current values the new defaults; a conflict keeps the draft, and `draft.conflict` (with any review drawn from it) stays until a save succeeds, through a retry in flight or one that fails.
 - **Confirmed**, for irreversible actions or ones that affect other people.
   - Always a ConsequenceDialog route (`?dialog=`), opened by a link and closed by `closeHref`. Typed confirmation (`phrasePattern` on the input, `matchesPhrase` in code) only for unrecoverable data loss; the server checks the phrase again.
   - One filled danger button, on the final step only. The footnote says whether the action can be undone.

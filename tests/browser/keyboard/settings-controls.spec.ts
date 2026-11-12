@@ -491,7 +491,7 @@ test.describe('SettingsItemList', () => {
 		const filterBox = members.getByRole('searchbox', { name: 'Filter' });
 		await filterBox.fill('Ben');
 		await expect(filterBox).toHaveValue('Ben');
-		await expect(members.locator('li[data-item-id="m4"]')).toHaveCount(0);
+		await expect(members.locator('li[data-item-id="m4"]')).toBeHidden();
 		await page.clock.runFor(SETTLE);
 		await expect(listStatus).toHaveText("Couldn't finish that for Dev Rao. Try again.");
 		await expect(listStatus).toBeVisible();
@@ -514,7 +514,7 @@ test.describe('SettingsItemList', () => {
 		await page.clock.runFor(60000);
 		const filterBox = members.getByRole('searchbox', { name: 'Filter' });
 		await filterBox.fill('Ben');
-		await expect(members.locator('li[data-item-id="m4"]')).toHaveCount(0);
+		await expect(members.locator('li[data-item-id="m4"]')).toBeHidden();
 		await expect(listStatus).toHaveText('');
 		await expect(listStatus).toHaveClass(/sr-only/);
 		await filterBox.fill('');
@@ -542,7 +542,8 @@ test.describe('SettingsItemList', () => {
 		await expect(summary).toHaveText('2 selected · frees 2.1 GB');
 		await exports.getByRole('searchbox', { name: 'Filter' }).fill('08-01');
 		await expect(exports.getByRole('checkbox', { name: /^Select / })).toHaveCount(1);
-		await expect(exports.locator('input[type=hidden][name=selected]')).toHaveCount(2);
+		// The hidden rows keep their ticked boxes, so the selection still posts.
+		await expect(exports.locator('input[type=checkbox][name=selected]:checked:not(:visible)')).toHaveCount(2);
 		await exports.getByRole('checkbox', { name: 'Select export-2026-08-01.zip' }).check();
 		await expect(summary).toHaveText('3 selected · frees 2.9 GB');
 		await exports.getByRole('searchbox', { name: 'Filter' }).fill('nothing like this');
@@ -979,7 +980,7 @@ test.describe('Before the page is interactive', () => {
 		await approvers.getByRole('checkbox', { name: 'Select Dev Rao' }).check();
 		await expect(summary).toHaveText('4 selected');
 		const members = page.getByTestId('composed-members');
-		await expect(members.locator('li[data-item-id]')).toHaveCount(1);
+		await expect(members.locator('li[data-item-id]:visible')).toHaveCount(1);
 		await expect(members.locator('li[data-item-id="m2"]')).toBeVisible();
 
 		await form.getByRole('button', { name: 'Discard' }).click();
@@ -1002,9 +1003,10 @@ test.describe('Before the page is interactive', () => {
 		release();
 		await expect(page.getByTestId('nm-list-instant').getByRole('checkbox', { name: 'Mentions by In app', exact: true })).toBeEnabled({ timeout: 45000 });
 
-		await expect(feeds.locator('li[data-item-id]')).toHaveCount(1);
+		await expect(feeds.locator('li[data-item-id]:visible')).toHaveCount(1);
 		await expect(feeds.locator('[data-selection] > [role=status]').first()).toHaveText('2 selected');
-		await expect(feeds.locator('input[type="hidden"][name="selected"][value="f2"]')).toHaveCount(1);
+		// The hidden row keeps its ticked box, so the selection still posts.
+		await expect(feeds.locator('input[type="checkbox"][name="selected"][value="f2"]')).toBeChecked();
 		await feeds.getByRole('searchbox').fill('');
 		await expect(feeds.getByRole('checkbox', { name: 'Select Audit feed' })).toBeChecked();
 		await expect(feeds.getByRole('checkbox', { name: 'Select Release feed' })).toBeChecked();
@@ -1083,6 +1085,23 @@ test.describe('Final fixes: a lock shows its way forward', () => {
 		await expect(section.getByTestId('upgrade-calls')).toHaveText('1');
 	});
 
+	test('a NotificationMatrix lock action loads while it runs, calls once, and shows its failure', async ({ page }) => {
+		await page.clock.install();
+		await openFixture(page);
+		await page.clock.pauseAt(new Date(Date.now() + 5000));
+		const section = page.getByTestId('lock-actions');
+		const unlock = section.getByRole('button', { name: 'Unlock alerts' });
+		await unlock.scrollIntoViewIfNeeded();
+		await expect(unlock).toHaveAccessibleDescription(/Digest alerts need the larger plan\./);
+		await unlock.click();
+		await expect(unlock).toHaveAttribute('aria-busy', 'true');
+		await unlock.click({ force: true });
+		await page.clock.runFor(400);
+		await expect(section.getByRole('alert').filter({ hasText: 'Plans are busy. Try later.' })).toBeVisible();
+		await expect(section.getByTestId('alerts-calls')).toHaveText('1');
+		await expect(unlock).not.toHaveAttribute('aria-busy', 'true');
+	});
+
 	test('an option lock, a matrix lock and a locked list item each show their way forward', async ({ page }) => {
 		await openFixture(page);
 		const section = page.getByTestId('lock-actions');
@@ -1114,6 +1133,27 @@ test.describe('Final fixes: an instant choice in a row', () => {
 			await page.clock.runFor(SETTLE);
 			await expect(density.getByRole('status')).toHaveText('Saved');
 			expect(Math.abs((await top()) - pending)).toBeLessThan(0.5);
+		});
+	}
+});
+
+test.describe('Integration fixes: an instant choice in a row holds still', () => {
+	for (const width of [1440, 393]) {
+		test(`at ${width}px choosing an instant ChoiceCards option never moves the options under the pointer`, async ({ page }) => {
+			await page.clock.install();
+			await openComposed(page, width);
+			const density = page.getByRole('radiogroup', { name: 'Density' });
+			const spacious = density.getByRole('radio', { name: 'Spacious' });
+			await density.scrollIntoViewIfNeeded();
+			const y = async () => (await spacious.boundingBox())!.y + (await page.evaluate(() => window.scrollY));
+			const before = await y();
+			await page.clock.pauseAt(new Date(Date.now() + 5000));
+			await density.getByText('Spacious').click();
+			await expect(density.getByRole('status')).toHaveText('Saving…');
+			expect(Math.abs((await y()) - before), 'options while saving').toBeLessThan(0.5);
+			await page.clock.runFor(SETTLE);
+			await expect(density.getByRole('status')).toHaveText('Saved');
+			expect(Math.abs((await y()) - before), 'options once saved').toBeLessThan(0.5);
 		});
 	}
 });

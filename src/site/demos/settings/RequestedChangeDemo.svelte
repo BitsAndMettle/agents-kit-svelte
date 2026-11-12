@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { RequestedChange, SettingsSection } from '$lib/settings/rows';
-	import type { SettingsResult } from '$lib/settings/shared';
+	import { focusLost, type SettingsResult } from '$lib/settings/shared';
 
 	/** Fixed times, so the server and the browser render the same text. */
 	const NOW = Date.parse('2026-11-12T10:00:00Z');
@@ -10,6 +11,7 @@
 	let resends = $state(0);
 	let cancels = $state(0);
 	let cancelled = $state(false);
+	let withdrawn = $state<HTMLElement | null>(null);
 
 	/** A fake server: answers after 600 ms. */
 	const wait = () => new Promise((resolve) => setTimeout(resolve, 600));
@@ -19,10 +21,13 @@
 		resends += 1;
 	}
 
+	/** The app swaps the row for a withdrawn line. Focus that went with the row's button goes to that line, not the page. */
 	async function cancel(): Promise<void | SettingsResult> {
 		await wait();
 		cancels += 1;
 		cancelled = true;
+		await tick();
+		if (focusLost()) withdrawn?.focus();
 	}
 
 	async function refuse(): Promise<void | SettingsResult> {
@@ -34,7 +39,7 @@
 <div class="flex max-w-3xl flex-col gap-6">
 	<SettingsSection data-testid="requested-device" title="Device limits" description="Changes to a device wait until someone at that device allows them.">
 		{#if cancelled}
-			<li class="px-4 py-3 text-[13px] text-fg-light" data-testid="requested-cancelled">Request withdrawn. Parallel runs stay at 2.</li>
+			<li bind:this={withdrawn} tabindex="-1" class="px-4 py-3 text-[13px] text-fg-light outline-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary" data-testid="requested-cancelled">Request withdrawn. Parallel runs stay at 2.</li>
 		{:else}
 			<RequestedChange
 				data-testid="requested-awaiting"

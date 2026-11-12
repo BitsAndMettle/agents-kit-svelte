@@ -420,14 +420,16 @@ test.describe('RequestedChange', () => {
 		await expect(row.getByRole('button')).toHaveCount(0);
 	});
 
-	test('Cancel request reports intent; the app removes the row', async ({ page }) => {
+	test('Cancel request reports intent; the app removes the row and focus goes to what took its place', async ({ page }) => {
 		const section = await openOnClock(page, 'requested-change');
 		await pauseClock(page);
-		await section.getByRole('button', { name: 'Cancel request for Parallel runs' }).click();
+		await section.getByRole('button', { name: 'Cancel request for Parallel runs' }).focus();
+		await press(page, 'Enter');
 		await expect(section.getByTestId('requested-awaiting').getByRole('status')).toHaveText('Cancelling the request…');
 		await page.clock.runFor(SETTLE);
 		await expect(section.getByTestId('requested-cancelled')).toBeVisible();
 		await expect(section.getByTestId('requested-cancels')).toHaveText('1');
+		await expect(section.getByTestId('requested-cancelled')).toBeFocused();
 	});
 
 	test('with JavaScript off, the buttons post their intent; the request id rides in the query', async ({ browser, baseURL }) => {
@@ -1099,11 +1101,14 @@ test.describe('Row layout', () => {
 				const where = async () => {
 					const [own, box, below, status] = [await compact.boundingBox(), await label.boundingBox(), await next.boundingBox(), await line.boundingBox()];
 					const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
-					return { x: own!.x + scroll.x, y: own!.y + scroll.y, label: box!.height, next: below!.y + scroll.y, line: status?.height ?? 0 };
+					// A visually hidden line is taken out of the flow (`sr-only`), so it adds no gap either.
+					const outOfFlow = await line.evaluate((node) => getComputedStyle(node).position === 'absolute');
+					return { x: own!.x + scroll.x, y: own!.y + scroll.y, label: box!.height, next: below!.y + scroll.y, line: status?.height ?? 0, outOfFlow };
 				};
 				const idle = await where();
-				// An idle row carries no blank status line.
+				// An idle row carries no blank status line, not even a 0px one that adds the row's gap.
 				expect(idle.line, 'idle status line').toBeLessThanOrEqual(1);
+				expect(idle.outOfFlow, 'idle status line out of the flow').toBe(true);
 				// Nothing waits on the label line: a label of up to 26 characters stays on one line from 393px.
 				if (width >= 393 && text.length <= 26) expect(idle.label, 'idle label height').toBeLessThan(21);
 				await expect(undo).toHaveCount(0);
@@ -1148,6 +1153,7 @@ test.describe('Row layout', () => {
 				}
 				expect(Math.abs(after.next - idle.next), 'next row once the line is gone').toBeLessThan(0.5);
 				expect(after.line, 'status line once idle again').toBeLessThanOrEqual(1);
+				expect(after.outOfFlow, 'status line out of the flow once idle again').toBe(true);
 			});
 		}
 	}
@@ -1161,11 +1167,13 @@ test.describe('Row layout', () => {
 			await openComposed(page, width);
 			const sound = page.getByRole('switch', { name: 'Play a sound' });
 			const row = rowOf(sound);
+			const next = row.locator('xpath=following-sibling::li[1]');
 			await sound.scrollIntoViewIfNeeded();
 			const where = async () => {
 				const box = await sound.boundingBox();
+				const below = await next.boundingBox();
 				const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
-				return { x: box!.x + scroll.x, y: box!.y + scroll.y, cx: box!.x + box!.width / 2, cy: box!.y + box!.height / 2 };
+				return { x: box!.x + scroll.x, y: box!.y + scroll.y, cx: box!.x + box!.width / 2, cy: box!.y + box!.height / 2, next: below!.y + scroll.y };
 			};
 			const idle = await where();
 			await pauseClock(page);
@@ -1184,6 +1192,11 @@ test.describe('Row layout', () => {
 				expect(Math.abs(at.x - idle.x), `switch x while ${phase}`).toBeLessThan(0.5);
 				expect(Math.abs(at.y - idle.y), `switch y while ${phase}`).toBeLessThan(0.5);
 			}
+			// The failure line keeps its room through the Retry: where it fits on one line, the row below
+			// holds still (at 320px the alert and Retry wrap onto two lines and Saving needs one).
+			if (width >= 1024) expect(Math.abs(retrying.next - failed.next), 'next row while retrying').toBeLessThan(0.5);
+			expect(retrying.next - failed.next, 'next row never jumps above the line while retrying').toBeGreaterThan(-25);
+			expect(Math.abs(failedAgain.next - failed.next), 'next row once failed again').toBeLessThan(0.5);
 			// A second tap where the switch was flips it again.
 			await page.mouse.click(failedAgain.cx, failedAgain.cy);
 			await expect(row).toHaveAttribute('data-status', 'pending');
@@ -1289,6 +1302,111 @@ test.describe('Final fixes: request rows hold still', () => {
 			await page.clock.runFor(SETTLE);
 			await expect(ok.getByRole('button', { name: 'Request access' })).toHaveCount(0);
 			expect(Math.abs((await ok.boundingBox())!.height - before)).toBeLessThan(0.5);
+		});
+	}
+});
+
+test.describe('Integration fixes: a retry holds the failure line', () => {
+	/** Page y of an element (scroll included). */
+	const top = async (page: Page, locator: Locator) => (await locator.boundingBox())!.y + (await page.evaluate(() => window.scrollY));
+
+	for (const width of [1440, 320]) {
+		test(`at ${width}px a row whose app sets status keeps its failure line's room while it saves again`, async ({ page }) => {
+			const section = await openOnClock(page, 'settings-row');
+			await page.setViewportSize({ width, height: 900 });
+			const select = section.getByTestId('row-instant').getByRole('combobox', { name: 'Default view' });
+			const row = rowOf(select);
+			await select.scrollIntoViewIfNeeded();
+			await pauseClock(page);
+			await select.selectOption('calendar');
+			await page.clock.runFor(SETTLE);
+			await expect(row.getByRole('alert')).not.toHaveText('');
+			const failed = (await row.boundingBox())!.height;
+			await select.selectOption('board');
+			await expect(row).toHaveAttribute('data-status', 'pending');
+			expect(Math.abs((await row.boundingBox())!.height - failed), 'row height while saving again').toBeLessThan(0.5);
+			await page.clock.runFor(SETTLE);
+			await expect(row).toHaveAttribute('data-status', 'saved');
+		});
+	}
+
+	for (const width of [1440, 393]) {
+		test(`at ${width}px Send again after a failed Cancel keeps the failure's room until it settles`, async ({ page }) => {
+			const section = await openOnClock(page, 'requested-change');
+			await page.setViewportSize({ width, height: 900 });
+			const cancel = section.getByRole('button', { name: 'Cancel request for Role' });
+			const resend = section.getByRole('button', { name: 'Send again for Role' });
+			const next = section.getByTestId('requested-nojs');
+			await cancel.scrollIntoViewIfNeeded();
+			await pauseClock(page);
+			await cancel.click();
+			await page.clock.runFor(SETTLE);
+			const alert = rowOf(cancel).getByRole('alert');
+			await expect(alert).toHaveText("Couldn't reach the approval service. The request is still waiting.");
+			const failed = await top(page, next);
+			await resend.click();
+			await expect(rowOf(resend)).toHaveAttribute('aria-busy', 'true');
+			expect(Math.abs((await top(page, next)) - failed), 'next row while sending again').toBeLessThan(0.5);
+			await page.clock.runFor(SETTLE);
+			await expect(alert).toHaveText("Couldn't reach the approval service. The request is still waiting.");
+			expect(Math.abs((await top(page, next)) - failed), 'next row once failed again').toBeLessThan(0.5);
+		});
+
+		test(`at ${width}px a LockReason retry keeps its failure's room, and a failed lock action says so in its own words`, async ({ page }) => {
+			const section = await openOnClock(page, 'lock-reason');
+			await page.setViewportSize({ width, height: 900 });
+			await pauseClock(page);
+			const fail = section.getByTestId('lock-request-fail');
+			const ask = fail.getByRole('button', { name: 'Ask for an upgrade' });
+			const below = fail.locator('xpath=following-sibling::*[1]');
+			await ask.scrollIntoViewIfNeeded();
+			await ask.click();
+			await page.clock.runFor(SETTLE);
+			await expect(fail.getByRole('alert')).toHaveText("Couldn't send the request. Try again.");
+			const failed = await top(page, below);
+			await ask.click();
+			await expect(ask).toHaveAttribute('aria-busy', 'true');
+			await expect(fail.getByRole('alert')).toHaveCount(0);
+			expect(Math.abs((await top(page, below)) - failed), 'next lock while requesting again').toBeLessThan(0.5);
+			await page.clock.runFor(SETTLE);
+			await expect(fail.getByRole('alert')).toHaveText("Couldn't send the request. Try again.");
+
+			const plans = section.getByTestId('lock-action-fail');
+			const compare = plans.getByRole('button', { name: 'Compare plans' });
+			const after = plans.locator('xpath=following-sibling::*[1]');
+			await compare.click();
+			await page.clock.runFor(SETTLE);
+			// Not a request: the lock's own words for a failed way forward.
+			await expect(plans.getByRole('alert')).toHaveText("Couldn't do that. Try again.");
+			const actionFailed = await top(page, after);
+			await compare.click();
+			await expect(compare).toHaveAttribute('aria-busy', 'true');
+			expect(Math.abs((await top(page, after)) - actionFailed), 'next lock while the action runs again').toBeLessThan(0.5);
+			await page.clock.runFor(SETTLE);
+			await expect(plans.getByRole('alert')).toHaveText("Couldn't do that. Try again.");
+		});
+	}
+});
+
+test.describe('Integration fixes: Saving stays inside the row', () => {
+	for (const width of [1440, 320]) {
+		test(`at ${width}px Saving under a switch starts and ends inside the row's content`, async ({ page }) => {
+			await page.clock.install();
+			await openComposed(page, width);
+			await pauseClock(page);
+			for (const name of ['Play a sound', 'Compact lists']) {
+				const control = page.getByRole('switch', { name });
+				const row = rowOf(control);
+				await control.scrollIntoViewIfNeeded();
+				await control.click();
+				const saving = row.locator('[data-row-saving]');
+				await expect(saving).toBeVisible();
+				const [box, rowBox] = [(await saving.boundingBox())!, (await row.boundingBox())!];
+				const padding = await row.evaluate((node) => ({ start: parseFloat(getComputedStyle(node).paddingLeft), end: parseFloat(getComputedStyle(node).paddingRight) }));
+				expect(box.x, `${name}: Saving starts inside the content`).toBeGreaterThanOrEqual(rowBox.x + padding.start - 0.5);
+				expect(box.x + box.width, `${name}: Saving ends inside the content`).toBeLessThanOrEqual(rowBox.x + rowBox.width - padding.end + 0.5);
+				await page.clock.runFor(SETTLE);
+			}
 		});
 	}
 });
