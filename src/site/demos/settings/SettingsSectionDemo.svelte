@@ -9,12 +9,13 @@
 	const requestAccess = () => new Promise<void>((resolve) => setTimeout(resolve, 600));
 	const apps: string[] = [];
 	let resets = $state(0);
+	let signOuts = $state(0);
 </script>
 
 <div class="flex max-w-3xl flex-col gap-6">
 	<SettingsSection data-testid="section-plain" title="Profile" description="How you appear to the people you work with.">
-		<SettingsRow label="Display name" value="Ada Park" action={{ label: 'Change', href: '?dialog=display-name' }} />
-		<SettingsRow label="Contact email" description="Where we send receipts and security notices." value="ada@northwind.example" action={{ label: 'Change', href: '?dialog=contact-email' }} />
+		<SettingsRow label="Display name" value="Ada Park" action={{ label: 'Change', ariaLabel: 'Change display name', href: '?dialog=display-name' }} />
+		<SettingsRow label="Contact email" description="Where we send receipts and security notices." value="ada@northwind.example" action={{ label: 'Change', ariaLabel: 'Change contact email', href: '?dialog=contact-email' }} />
 		<SettingsRow label="Member since" value="12 March 2025" />
 	</SettingsSection>
 
@@ -26,18 +27,19 @@
 			</Button>
 		{/snippet}
 		<SettingsRow label="Ada Park" description="ada@northwind.example · Owner" value="You" />
-		<SettingsRow label="Ben Ortiz" description="ben@northwind.example · Admin" actions={[{ label: 'Change role', href: '?dialog=role&member=ben' }, { label: 'Remove', ariaLabel: 'Remove Ben Ortiz', href: '?dialog=remove&member=ben', tone: 'danger' }]} />
+		<SettingsRow label="Ben Ortiz" description="ben@northwind.example · Admin" actions={[{ label: 'Change role', ariaLabel: 'Change role for Ben Ortiz', href: '?dialog=role&member=ben' }, { label: 'Remove', ariaLabel: 'Remove Ben Ortiz', href: '?dialog=remove&member=ben', tone: 'danger' }]} />
 		<SettingsRow
 			label="Chloé Martin"
 			description="chloe@northwind.example · Member"
 			actions={[
-				{ label: 'Change role', href: '?dialog=role&member=chloe' },
+				{ label: 'Change role', ariaLabel: 'Change role for Chloé Martin', href: '?dialog=role&member=chloe' },
 				{ label: 'Reset two-step sign-in', onSelect: () => (resets += 1) },
-				{ label: 'Remove', href: '?dialog=remove&member=chloe', tone: 'danger' }
+				{ label: 'Sign out everywhere', onSelect: () => (signOuts += 1) },
+				{ label: 'Remove', ariaLabel: 'Remove Chloé Martin', href: '?dialog=remove&member=chloe', tone: 'danger' }
 			]}
 		/>
 		{#snippet footer()}
-			<span>3 more members. Two-step resets: <span data-testid="section-resets">{resets}</span>.</span>
+			<span>3 more members. Two-step resets: <span data-testid="section-resets">{resets}</span>; signed out: {signOuts}.</span>
 			<a href="?page=members" class="font-medium text-fg-main underline-offset-2 hover:underline">See everyone</a>
 		{/snippet}
 	</SettingsSection>
@@ -57,10 +59,10 @@
 	<SettingsSection data-testid="section-columns" title="Notifications" description="Choose where each kind of message reaches you." layout="columns">
 		<SettingsSection title="Email">
 			<SettingsToggle label="Weekly summary" checked={true} onCommit={save} />
-			<SettingsToggle label="Mentions" checked={true} onCommit={save} />
+			<SettingsToggle label="Mentions by email" checked={true} onCommit={save} />
 		</SettingsSection>
 		<SettingsSection title="Mobile push">
-			<SettingsToggle label="Mentions" checked={false} onCommit={save} />
+			<SettingsToggle label="Mentions on mobile" checked={false} onCommit={save} />
 			<SettingsToggle label="Reminders" checked={true} onCommit={save} />
 		</SettingsSection>
 	</SettingsSection>

@@ -48,7 +48,7 @@
 	import { getSettingsDraft } from '../shared/context';
 	import { RECIPES } from '../shared/recipes';
 	import type { SettingsHandler } from '../shared/types';
-	import { formatRequestedAgo } from './helpers';
+	import { formatRequestedAgo, withQuery } from './helpers';
 	import { HandlerRun } from './run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, 'class' | 'children' | 'hidden'> {
@@ -75,9 +75,9 @@
 		onCancelRequest?: SettingsHandler<[]>;
 		/** Sends the request again. It never changes `status`. */
 		onResend?: SettingsHandler<[]>;
-		/** No-JavaScript path: Cancel and Send again post `intent=cancel|resend` to this URL. */
+		/** No-JavaScript path: Cancel and Send again post `intent=cancel|resend` to this URL. Inside a SettingsForm they post the outer form there (`formaction`), so that form's fields go along. */
 		action?: string;
-		/** Extra hidden fields for that post (a request id). */
+		/** Extra fields for that post (a request id): hidden inputs in the row's own form, or the `action` URL's query inside a SettingsForm. */
 		hidden?: Record<string, string>;
 		labels?: Partial<RequestedChangeLabels>;
 		class?: string;
@@ -157,16 +157,42 @@
 
 	function run(which: 'cancel' | 'resend', event: MouseEvent): void {
 		const handler = which === 'cancel' ? onCancelRequest : onResend;
-		// No handler: the button posts its intent natively.
-		if (!handler) return;
+		if (!handler) {
+			// No handler: the button posts its intent natively. Inside a SettingsForm that post would
+			// go through the form's own submit handler (as if Save), so post this row's fields alone.
+			if (formAction !== undefined && action !== undefined) {
+				event.preventDefault();
+				postAlone(action, which);
+			}
+			return;
+		}
 		event.preventDefault();
 		if (cancel.pending || resend.pending) return;
 		(which === 'cancel' ? resend : cancel).reset();
 		void (which === 'cancel' ? cancel : resend).run(handler);
 	}
 
+	/** The same post the row's own form makes (`hidden` fields, then the intent), from a form of its own. */
+	function postAlone(url: string, intent: 'cancel' | 'resend'): void {
+		const form = document.createElement('form');
+		form.method = 'post';
+		form.action = url;
+		form.hidden = true;
+		for (const [key, value] of [...Object.entries(hidden ?? {}), ['intent', intent]]) {
+			const input = document.createElement('input');
+			input.type = 'hidden';
+			input.name = key;
+			input.value = value;
+			form.append(input);
+		}
+		document.body.append(form);
+		form.submit();
+	}
+
 	/** Submit buttons need a form: their own, or (inside a SettingsForm) the outer one via `formaction`. */
 	const buttonType = $derived<'submit' | 'button'>(action !== undefined ? 'submit' : 'button');
+	/** Inside someone else's form the hidden fields cannot travel as inputs (they would post with its Save too), so they go in the URL. */
+	const formAction = $derived(!ownForm && action !== undefined ? withQuery(action, hidden) : undefined);
 </script>
 
 {#snippet buttons()}
@@ -178,7 +204,7 @@
 			type={buttonType}
 			name="intent"
 			value="resend"
-			formaction={!ownForm && action !== undefined ? action : undefined}
+			formaction={formAction}
 			formmethod={!ownForm && action !== undefined ? 'post' : undefined}
 			formnovalidate={!ownForm && action !== undefined ? true : undefined}
 			size="sm"
@@ -194,7 +220,7 @@
 			type={buttonType}
 			name="intent"
 			value="cancel"
-			formaction={!ownForm && action !== undefined ? action : undefined}
+			formaction={formAction}
 			formmethod={!ownForm && action !== undefined ? 'post' : undefined}
 			formnovalidate={!ownForm && action !== undefined ? true : undefined}
 			size="sm"

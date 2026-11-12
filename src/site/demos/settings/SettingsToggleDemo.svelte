@@ -105,6 +105,11 @@
 			/>
 			<SettingsToggle name="captions" label="Always show captions" action="/settings-demo/captions" defaultChecked={false} />
 		</SettingsSection>
+		<p class="-mt-4 text-xs text-fg-light">Saved value of “Reduce motion”: <span data-testid="toggle-motion-bound">{motion ? 'on' : 'off'}</span>.</p>
+
+		<SettingsSection data-testid="toggle-section-lock" title="Security" description="Your organisation sets these for everyone." lock={{ kind: 'managed', source: 'Set by Northwind IT', badge: 'Always on' }}>
+			<SettingsToggle label="Two-step sign-in" description="A code from your phone at every sign-in." checked={true} onCommit={saveCompact} />
+		</SettingsSection>
 
 		<Self staged />
 	</div>

@@ -41,7 +41,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/SettingsRow.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'One setting: label and description on the left, a control, read-only value or badge on the right, optional leading icon and trailing actions (more than two collapse into a menu). Kit controls placed in it keep one label and are described by the description, status and lock reason. Inside a staged form, a row with name registers itself, so editing shows "Unsaved" and "was 90 days" plus the impact line, and form errors for that name appear in place. status shows saving, saved or an error for instant changes; lock disables the control and shows the reason (or points at a shared one with reasonId). Below 32rem it stacks; summary plus editHref swaps the control for a summary and an Edit link there. It reports nothing itself: the control does.',
+			'One setting: label and description on the left, a control, read-only value or badge on the right, optional leading icon and trailing actions (more than two collapse into a menu, except links and form intents, which stay buttons). An action onSelect may return a promise (the button loads) or {error}; a failure or rejection shows in the row alert. Kit controls placed in it keep one label and are described by the description, status and lock reason. Inside a staged form, a row with name registers itself, so editing shows "Unsaved" and "was 90 days" plus the impact line, and form errors for that name appear in place. status shows saving, saved or an error for instant changes; lock disables the control and shows the reason (or points at a shared one with reasonId). Below 32rem it stacks; summary plus editHref swaps the control for a summary and an Edit link there. It reports nothing itself: the control does.',
 		usageSnippet: `<script lang="ts">
   import { SettingsRow, SettingsSection } from 'agents-kit-svelte/settings';
   import { NativeSelect } from 'agents-kit-svelte/primitives';
@@ -72,7 +72,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/SettingsFacts.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Read-only facts as a description list: label and value side by side (stacked on narrow containers), or a grid of tiles. A fact can be monospace, carry a tone dot, a detail line, a "managed elsewhere" source caption, a shorter value for narrow containers, a copy button and one action (a link, a callback, or an unavailable action with its reason). Copying happens locally; onCopy(id, ok) says whether the clipboard took it, and a refused copy selects the value and says so. Nothing is sent anywhere.',
+			'Read-only facts as a description list: label and value side by side (stacked on narrow containers), or a grid of tiles. A fact can be monospace, carry a tone dot, a detail line, a "managed elsewhere" source caption, a shorter value for narrow containers, a copy button and one action (a link, a callback, or an unavailable action with its reason). Copying happens locally; onCopy(id, ok) says whether the clipboard took it, and a refused copy says so and shows the exact text to copy, selected. A callback action loads while its promise runs and shows a returned {error}, or a generic line when it rejects. Nothing is sent anywhere.',
 		usageSnippet: `<script lang="ts">
   import { SettingsFacts, SettingsSection, type SettingsFact } from 'agents-kit-svelte/settings';
 
@@ -99,7 +99,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/SettingsToggle.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A boolean setting as a row with a switch. Outside a form it is instant: it applies at once and calls onCommit(checked); a promise shows Saving, a returned {error} or a rejection switches it back and says so with Retry, and success offers one Undo (onUndo, or onCommit with the old value). The bindable checked only ever holds saved values. Inside a SettingsForm it is staged and uncontrolled, posting name=false then true (read it with readBoolean). With action and no JavaScript it renders its own small post form with an Apply button. A lock disables it and shows the reason; lock.badge ("Always on") replaces the switch.',
+			'A boolean setting as a row with a switch. Outside a form it is instant: it applies at once and calls onCommit(checked); a promise shows Saving, a returned {error} or a rejection switches it back and says so with Retry, and success offers one Undo (onUndo, or onCommit with the old value). The bindable checked only ever holds saved values. Inside a SettingsForm it is staged and uncontrolled, posting name=false then true (read it with readBoolean). With action and no JavaScript it renders its own small post form with an Apply button. A switch flipped before the page is interactive is committed once it is. A lock disables it and shows the reason; lock.badge ("Always on") replaces the switch on screen while a disabled switch stays for assistive technology.',
 		usageSnippet: `<script lang="ts">
   import { SettingsSection, SettingsToggle } from 'agents-kit-svelte/settings';
 
@@ -130,7 +130,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/RequestedChange.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A change that waits for approval elsewhere (on a device, by an admin, at a provider): the value in effect against the value asked for, who it waits on, how long ago it was asked (with an injected now) and optional instructions. It offers Send again (onResend) and Cancel request (onCancelRequest), or posts intent=resend|cancel to action without JavaScript. It never shows success on click: approved, declined and expired appear only when your app passes a new status.',
+			'A change that waits for approval elsewhere (on a device, by an admin, at a provider): the value in effect against the value asked for, who it waits on, how long ago it was asked (with an injected now) and optional instructions. It offers Send again (onResend) and Cancel request (onCancelRequest), or posts intent=resend|cancel to action without JavaScript (with hidden fields; inside a SettingsForm they ride in the query of action, and with JavaScript the row posts them alone). It never shows success on click: approved, declined and expired appear only when your app passes a new status.',
 		usageSnippet: `<script lang="ts">
   import { RequestedChange, SettingsSection } from 'agents-kit-svelte/settings';
 

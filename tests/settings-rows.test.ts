@@ -1,27 +1,44 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { factCopyText, formatRequestedAgo, readOutcome, splitActions } from '../src/lib/settings/rows/helpers.ts';
+import { factCopyText, formatRequestedAgo, readOutcome, splitActions, withQuery } from '../src/lib/settings/rows/helpers.ts';
 import type { SettingsAction } from '../src/lib/settings/shared/types.ts';
 
 const link = (label: string): SettingsAction => ({ label, href: `/${label}` });
+const button = (label: string): SettingsAction => ({ label, onSelect: () => undefined });
 
 test('splitActions keeps up to two as buttons and collapses the rest behind a menu', () => {
 	assert.deepEqual(splitActions([]), { visible: [], overflow: [] });
-	const two = [link('a'), link('b')];
+	const two = [button('a'), button('b')];
 	assert.deepEqual(splitActions(two), { visible: two, overflow: [] });
-	const four = [link('a'), link('b'), link('c'), link('d')];
+	const four = [button('a'), button('b'), button('c'), button('d')];
 	const split = splitActions(four);
 	assert.deepEqual(split.visible.map((a) => a.label), ['a']);
 	assert.deepEqual(split.overflow.map((a) => a.label), ['b', 'c', 'd']);
 	assert.deepEqual(splitActions(four, 3).visible.map((a) => a.label), ['a', 'b']);
 });
 
-test('splitActions never collapses a form intent: a menu item cannot submit a form', () => {
-	const actions: SettingsAction[] = [link('a'), { label: 'Reset', intent: 'reset' }, link('c'), { label: 'Off', intent: 'off', unavailable: 'Owners only.' }];
+test('splitActions never collapses a link or a form intent: a menu item is neither', () => {
+	const actions: SettingsAction[] = [
+		button('a'),
+		{ label: 'Reset', intent: 'reset' },
+		button('c'),
+		link('Docs'),
+		{ label: 'Off', intent: 'off', unavailable: 'Owners only.' },
+		{ label: 'Portal', href: '/portal', unavailable: 'Owners only.' }
+	];
 	const split = splitActions(actions);
-	assert.deepEqual(split.visible.map((a) => a.label), ['a', 'Reset']);
-	// An unavailable intent posts nothing, so it may collapse (as a disabled menu item).
-	assert.deepEqual(split.overflow.map((a) => a.label), ['c', 'Off']);
+	assert.deepEqual(split.visible.map((a) => a.label), ['a', 'Reset', 'Docs']);
+	// An unavailable link or intent does nothing, so it may collapse (as a disabled menu item).
+	assert.deepEqual(split.overflow.map((a) => a.label), ['c', 'Off', 'Portal']);
+});
+
+test('withQuery adds fields to the query, keeping any query and fragment', () => {
+	assert.equal(withQuery('/requests', undefined), '/requests');
+	assert.equal(withQuery('/requests', {}), '/requests');
+	assert.equal(withQuery('/requests', { request: 'rq_1' }), '/requests?request=rq_1');
+	assert.equal(withQuery('?/resend', { request: 'rq 1', team: 'a&b' }), '?/resend&request=rq+1&team=a%26b');
+	assert.equal(withQuery('/r?', { request: 'rq_1' }), '/r?request=rq_1');
+	assert.equal(withQuery('/r?a=1#top', { request: 'rq_1' }), '/r?a=1&request=rq_1#top');
 });
 
 test('factCopyText copies the value, a given string, or nothing', () => {

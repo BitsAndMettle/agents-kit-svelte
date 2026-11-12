@@ -17,6 +17,8 @@
 		edit: string;
 		/** Name of the menu that holds the actions beyond the second. */
 		moreActions: string;
+		/** Shown when an action's `onSelect` rejects or throws (a returned `{error}` shows its own text). */
+		actionFailed: string;
 	}
 </script>
 
@@ -30,7 +32,6 @@
 	import { createFieldState, fieldControlAttrs, setFieldContext, type FieldControlAttrs } from '../../primitives/form/field';
 	import { DropdownMenu } from '../../primitives/menus';
 	import type { MenuEntry } from '../../primitives/menus/types';
-	import { isThenable } from '../../core/promise';
 	import { cn } from '../../ui/cn';
 	import { buttonClass, STATUS_TEXT_CLASS, TOUCH_TARGET_CLASS } from '../../ui/styles';
 	import { getSettingsDraft, getSettingsScope } from '../shared/context';
@@ -40,6 +41,7 @@
 	import type { SettingLock, SettingsAction, SettingsHandler, SettingStatus } from '../shared/types';
 	import LockReason, { type LockReasonLabels } from './LockReason.svelte';
 	import { splitActions } from './helpers';
+	import { HandlerRun } from './run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, 'class' | 'children'> {
 		/** Names the setting. With a `control`, it is the control's one `<label>`. */
@@ -60,9 +62,9 @@
 		mono?: boolean;
 		/** An icon or avatar before the label. */
 		leading?: Snippet;
-		/** One trailing action, or your own snippet. */
+		/** One trailing action, or your own snippet. An `onSelect` may return `{error}` or a promise: the button loads, and a failure shows in the row's alert. */
 		action?: SettingsAction | Snippet;
-		/** Trailing actions. More than two collapse into a "More actions" menu once the page is interactive. */
+		/** Trailing actions. More than two collapse into a "More actions" menu once the page is interactive; links and form intents always stay buttons. */
 		actions?: SettingsAction[];
 		/** Where the row's own change stands (instant controls set it). Wins over the form's state. */
 		status?: SettingStatus;
@@ -146,6 +148,7 @@
 		conflict: 'Changed elsewhere. Review it before saving.',
 		edit: 'Edit',
 		moreActions: 'More actions',
+		actionFailed: "Couldn't do that. Try again.",
 		...labels
 	});
 
@@ -169,8 +172,13 @@
 		error ?? (draft && name ? draft.fieldError(name) : undefined) ?? (status === 'error' ? words.failed : status === 'conflict' ? words.conflict : undefined)
 	);
 	const shownStatus = $derived<SettingStatus>(status ?? (errorText ? 'error' : 'idle'));
+	/** The row's own actions: one runs at a time; its failure shows in the alert, its notice in the status. */
+	const actionRun = new HandlerRun();
+	let running = $state.raw<SettingsAction | undefined>(undefined);
+	const actionError = $derived(actionRun.status === 'failed' ? (actionRun.error ?? words.actionFailed) : undefined);
 	const liveText = $derived(
-		statusText ?? (shownStatus === 'pending' ? words.saving : shownStatus === 'saved' ? words.saved : '')
+		statusText ??
+			(shownStatus === 'pending' ? words.saving : shownStatus === 'saved' ? words.saved : actionRun.status === 'done' ? (actionRun.notice ?? '') : '')
 	);
 
 	const changeId = `${uid}-change`;
@@ -202,21 +210,22 @@
 			label: a.label,
 			tone: a.tone === 'danger' ? 'danger' : 'neutral',
 			disabled: Boolean(a.unavailable),
-			onSelect: () => {
-				if (a.onSelect) void a.onSelect();
-				else if (a.href !== undefined) window.location.assign(a.href);
-			}
+			// Links and intents never reach the menu (splitActions), so an item only calls back.
+			onSelect: () => void startAction(a)
 		}))
 	);
-	let busy = $state<Record<number, boolean>>({});
 
-	function runAction(a: SettingsAction, index: number, event: MouseEvent): void {
-		if (!a.onSelect || busy[index]) return;
-		const result = a.onSelect();
-		if (!isThenable(result)) return;
-		event.preventDefault();
-		busy[index] = true;
-		Promise.resolve(result).finally(() => (busy[index] = false));
+	/** Runs an action's `onSelect` unless one is pending. True when it returned a promise (now loading). */
+	function startAction(a: SettingsAction): boolean {
+		if (!a.onSelect || actionRun.pending) return false;
+		running = a;
+		void actionRun.run(a.onSelect);
+		return actionRun.pending;
+	}
+
+	function runAction(a: SettingsAction, event: MouseEvent): void {
+		// A promise means the callback handles it: a link with one does not also navigate.
+		if (startAction(a)) event.preventDefault();
 	}
 
 	const layoutClass = $derived(
@@ -226,6 +235,7 @@
 				? '@lg/settings:flex-col @lg/settings:items-stretch @lg/settings:justify-start @lg/settings:gap-2'
 				: ''
 	);
+	/** A lock badge ("Always on") replaces what the row shows. A control stays in the page, visually hidden and disabled, so assistive technology meets the same switch either way. */
 	const badgeOnly = $derived(Boolean(effectiveLock?.badge));
 </script>
 
@@ -233,15 +243,22 @@
 	{#if typeof content === 'string'}{content}{:else}{@render content()}{/if}
 {/snippet}
 
+{#snippet controlBody(draw: Snippet<[FieldControlAttrs]>)}
+	{#if group}
+		<div role="group" aria-labelledby={labelId} aria-describedby={groupDescribedBy} class="min-w-0">{@render draw(attrs)}</div>
+	{:else}
+		{@render draw(attrs)}
+	{/if}
+{/snippet}
+
 {#snippet controlArea()}
-	{#if badgeOnly}
-		<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>
+	{#if control && badgeOnly}
+		<div class="sr-only">{@render controlBody(control)}</div>
+		<Badge tone="neutral" variant="outline" size="lg" aria-hidden="true">{effectiveLock?.badge}</Badge>
 	{:else if control}
-		{#if group}
-			<div role="group" aria-labelledby={labelId} aria-describedby={groupDescribedBy} class="min-w-0">{@render control(attrs)}</div>
-		{:else}
-			{@render control(attrs)}
-		{/if}
+		{@render controlBody(control)}
+	{:else if badgeOnly}
+		<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>
 	{:else if value !== undefined}
 		<span class={cn('min-w-0 text-[13px] break-words text-fg-main', mono && 'font-mono text-xs')}>{@render text(value)}</span>
 	{/if}
@@ -258,7 +275,7 @@
 		{#if leading}<div class="shrink-0 pt-0.5">{@render leading()}</div>{/if}
 		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
 			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-				{#if control && !group && !badgeOnly}
+				{#if control && !group}
 					<label id={labelId} for={field.controlId} class="text-[13px] leading-5 font-medium text-fg-main">{@render text(label)}{#if required}<span aria-hidden="true" class="text-status-danger"> *</span>{/if}</label>
 				{:else}
 					<span id={labelId} class="text-[13px] leading-5 font-medium text-fg-main">{@render text(label)}</span>
@@ -279,7 +296,7 @@
 			{#if effectiveLock && ownReason}
 				<LockReason lock={effectiveLock} id={lockReasonId} {onRequest} labels={lockLabels} class="mt-1" />
 			{/if}
-			<div id="{uid}-error" role="alert" class={cn('text-xs leading-5 font-medium', DANGER_TEXT)}>{#if errorText}<p class="m-0">{errorText}</p>{/if}</div>
+			<div id="{uid}-error" role="alert" class={cn('text-xs leading-5 font-medium', DANGER_TEXT)}>{#if errorText}<p class="m-0">{errorText}</p>{/if}{#if actionError}<p class="m-0">{actionError}</p>{/if}</div>
 			{#if feedback}<div class="flex flex-wrap items-center gap-2 empty:hidden">{@render feedback()}</div>{/if}
 			{#each split.visible as a, index (index)}
 				{#if a.unavailable}<p id="{uid}-action-{index}" class="m-0 text-xs leading-5 text-fg-light">{a.unavailable}</p>{/if}
@@ -308,7 +325,7 @@
 				{@render (action as Snippet)()}
 			{/if}
 			{#each split.visible as a, index (index)}
-				<Button {...actionButtonProps(a, a.unavailable ? `${uid}-action-${index}` : undefined)} size="sm" loading={busy[index] ?? false} onclick={(event: MouseEvent) => runAction(a, index, event)}>{a.label}</Button>
+				<Button {...actionButtonProps(a, a.unavailable ? `${uid}-action-${index}` : undefined)} size="sm" loading={actionRun.pending && running === a} onclick={(event: MouseEvent) => runAction(a, event)}>{a.label}</Button>
 			{/each}
 			{#if split.overflow.length}
 				<DropdownMenu items={menuItems} placement="bottom-end">

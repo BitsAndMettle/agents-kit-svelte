@@ -19,18 +19,19 @@
 </script>
 
 <script lang="ts">
-	import { untrack, type Snippet } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 	import { Button } from '../../primitives/actions';
-	import { Badge } from '../../primitives/display';
 	import { Switch } from '../../primitives/form';
 	import type { FieldControlAttrs } from '../../primitives/form/field';
 	import { cn } from '../../ui/cn';
 	import { getSettingsDraft, getSettingsScope } from '../shared/context';
+	import { restoreFocus } from '../shared/focus';
 	import { InstantSetting } from '../shared/instant.svelte';
 	import { pickLock } from '../shared/lock';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import type { SettingLock, SettingsHandler } from '../shared/types';
+	import { focusLost } from './helpers';
 	import type { LockReasonLabels } from './LockReason.svelte';
 	import SettingsRow from './SettingsRow.svelte';
 
@@ -51,13 +52,13 @@
 		onUndo?: SettingsHandler<[boolean]>;
 		/** Offer Undo after a change. Default true. */
 		undoable?: boolean;
-		/** No-JavaScript path: the toggle renders its own `<form method="post">` to this URL with an Apply button (hidden once the page is interactive and `onCommit` is set). Dropped inside a SettingsForm. */
+		/** No-JavaScript path: the toggle renders its own `<form method="post">` to this URL with an Apply button (hidden once the page is interactive and `onCommit` is set). A switch flipped before the page was interactive is committed through `onCommit` once it is. Dropped inside a SettingsForm. */
 		action?: string;
 		/** Extra hidden fields for that form (an id, a revision). */
 		hidden?: Record<string, string>;
 		/** Shows "On"/"Off" beside the switch (or your words). */
 		stateText?: boolean | { on: string; off: string };
-		/** Locks the toggle. A `badge` ("Always on") replaces the switch. */
+		/** Locks the toggle. A `badge` ("Always on") replaces the switch on screen; a disabled switch stays for assistive technology. */
 		lock?: SettingLock;
 		/** Id of a reason shown elsewhere that describes this toggle. */
 		reasonId?: string;
@@ -144,11 +145,20 @@
 		});
 	});
 
+	// A switch flipped before hydration (the no-JS form makes it live early) keeps its new state in
+	// the DOM, but nothing saw the change: commit it once, as soon as the input is bound.
+	let reconciled = false;
+	$effect(() => {
+		const node = ref;
+		if (reconciled || !node || !instant) return;
+		reconciled = true;
+		untrack(() => {
+			if (node.checked !== instant.current) change(node.checked);
+		});
+	});
+
 	const effectiveLock = $derived(pickLock(lock, scope?.lock?.lock));
 	const locked = $derived(Boolean(effectiveLock));
-	const alwaysBadge = $derived(effectiveLock?.badge);
-	/** The row shows the reason; the badge is drawn here so the switch stays in the page for assistive technology. */
-	const rowLock = $derived(lock && lock.badge ? { ...lock, badge: undefined } : lock);
 	const current = $derived(instant ? instant.current : start);
 	const ownForm = $derived(!draft && action !== undefined && !locked);
 	const notReady = $derived(!draft && action === undefined && !gate.current);
@@ -167,15 +177,35 @@
 		void instant.set(next);
 	}
 
-	async function undo(): Promise<void> {
+	/** Undo and Retry leave the page once used: when focus went with them, it moves to the switch. */
+	async function keepFocus(button: HTMLElement): Promise<void> {
+		await tick();
+		if (!button.isConnected && focusLost()) restoreFocus(ref);
+	}
+
+	async function undo(event: MouseEvent): Promise<void> {
 		if (!instant) return;
+		const button = event.currentTarget as HTMLElement;
 		undoing = true;
-		const done = await instant.undo();
+		const pending = instant.undo();
+		void keepFocus(button);
+		const done = await pending;
 		if (!done) undoing = false;
+		void keepFocus(button);
+	}
+
+	async function retry(event: MouseEvent): Promise<void> {
+		if (!instant) return;
+		const button = event.currentTarget as HTMLElement;
+		const pending = instant.retry();
+		void keepFocus(button);
+		await pending;
+		void keepFocus(button);
 	}
 
 	function submit(event: SubmitEvent): void {
 		// With a handler the change is already committed; the native post is the no-JS path only.
+		// Apply is hidden then, but the app may still submit the form (requestSubmit, a stray Enter).
 		if (onCommit && gate.current) event.preventDefault();
 	}
 </script>
@@ -196,9 +226,9 @@
 {/snippet}
 
 {#snippet control(attrs: FieldControlAttrs)}
-	{#if alwaysBadge}
-		<input {...rest} {...attrs} bind:this={ref} type="checkbox" role="switch" checked={current} disabled class="sr-only" />
-		<Badge tone="neutral" variant="outline" size="lg" aria-hidden="true">{alwaysBadge}</Badge>
+	{#if effectiveLock?.badge}
+		<!-- A badge ("Always on") stands in for the switch: the row hides this disabled input visually and draws the badge, so assistive technology still meets the switch and its state. -->
+		<input {...rest} {...attrs} bind:this={ref} type="checkbox" role="switch" checked={current} disabled />
 	{:else if ownForm}
 		<form method="post" {action} onsubmit={submit} class="flex items-center gap-2">
 			{#each Object.entries(hidden ?? {}) as [key, value] (key)}<input type="hidden" name={key} {value} />{/each}
@@ -214,7 +244,7 @@
 
 {#snippet feedback()}
 	{#if instant && status === 'error'}
-		<Button size="xs" variant="secondary" onclick={() => instant.retry()}>{words.retry}<span class="sr-only"> {label}</span></Button>
+		<Button size="xs" variant="secondary" onclick={retry}>{words.retry}<span class="sr-only"> {label}</span></Button>
 	{:else if committing && instant?.canUndo && !locked}
 		<Button size="xs" variant="ghost" onclick={undo}>{words.undo}<span class="sr-only"> {label}</span></Button>
 	{/if}
@@ -230,7 +260,7 @@
 	layout="inline"
 	{control}
 	{feedback}
-	lock={rowLock}
+	{lock}
 	{reasonId}
 	{onRequest}
 	{lockLabels}

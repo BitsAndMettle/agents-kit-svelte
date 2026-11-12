@@ -47,15 +47,16 @@ test.describe('SettingsSection', () => {
 		await expect(members.locator('header').getByRole('link', { name: 'Invite people' })).toHaveAttribute('href', '?dialog=invite');
 	});
 
-	test('more than two row actions collapse into a More actions menu once interactive', async ({ page }) => {
+	test('more than two row actions collapse into a More actions menu once interactive; links stay links', async ({ page }) => {
 		const section = await openSection(page, 'settings-section');
 		const row = rowOf(section.getByText('chloe@northwind.example · Member'));
-		await expect(row.getByRole('link', { name: 'Change role' })).toBeVisible();
-		await expect(row.getByRole('link', { name: 'Remove' })).toHaveCount(0);
+		await expect(row.getByRole('link', { name: 'Change role for Chloé Martin' })).toBeVisible();
+		await expect(row.getByRole('link', { name: 'Remove Chloé Martin' })).toHaveAttribute('href', '?dialog=remove&member=chloe');
+		await expect(row.getByRole('button', { name: 'Reset two-step sign-in' })).toHaveCount(0);
 		const more = row.getByRole('button', { name: 'More actions' });
 		await more.focus();
 		await press(page, 'Enter');
-		await expect(page.getByRole('menuitem', { name: 'Remove' })).toBeVisible();
+		await expect(page.getByRole('menuitem')).toHaveText(['Reset two-step sign-in', 'Sign out everywhere']);
 		await page.getByRole('menuitem', { name: 'Reset two-step sign-in' }).click();
 		await expect(section.getByTestId('section-resets')).toHaveText('1');
 		await expect(more).toBeFocused();
@@ -64,7 +65,8 @@ test.describe('SettingsSection', () => {
 	test('without JavaScript every row action is a plain link or button', async ({ browser, baseURL }) => {
 		const { page, close } = await noJsPage(browser, baseURL);
 		const row = rowOf(page.locator('#settings-section').getByText('chloe@northwind.example · Member'));
-		await expect(row.getByRole('link', { name: 'Remove' })).toHaveAttribute('href', '?dialog=remove&member=chloe');
+		await expect(row.getByRole('link', { name: 'Remove Chloé Martin' })).toHaveAttribute('href', '?dialog=remove&member=chloe');
+		await expect(row.getByRole('button', { name: 'Reset two-step sign-in' })).toBeVisible();
 		await expect(row.getByRole('button', { name: 'More actions' })).toHaveCount(0);
 		await close();
 	});
@@ -133,7 +135,7 @@ test.describe('SettingsRow', () => {
 		await expect(sso).toBeDisabled();
 		await expect(sso).toHaveAccessibleDescription(/Require members.*Single sign-on is on the Business plan\./);
 		await expect(section.getByText('Single sign-on is on the Business plan.')).toBeVisible();
-		await expect(section.getByRole('link', { name: 'Compare plans' })).toHaveAttribute('href', '?page=plans');
+		await expect(section.getByRole('button', { name: 'Ask an owner to upgrade' })).toHaveAccessibleDescription('Single sign-on is on the Business plan.');
 		await expect(section.getByRole('textbox', { name: /Team name/ })).toHaveAccessibleDescription('Shown on invites and in the browser tab.');
 	});
 
@@ -205,8 +207,8 @@ test.describe('SettingsFacts', () => {
 	test('facts are a description list with sources, details and a described unavailable action', async ({ page }) => {
 		const section = await openSection(page, 'settings-facts');
 		const facts = section.getByTestId('facts-connection');
-		await expect(facts.locator('dl > div > dt')).toHaveCount(5);
-		await expect(facts.locator('dl > div > dd')).toHaveCount(5);
+		await expect(facts.locator('dl > div > dt')).toHaveCount(6);
+		await expect(facts.locator('dl > div > dd')).toHaveCount(6);
 		await expect(facts.locator('[data-fact=region] dd')).toContainText('Set by your administrator');
 		const version = section.getByTestId('facts-version');
 		const unavailable = version.getByRole('button', { name: 'Switch to preview' });
@@ -493,5 +495,205 @@ test.describe('LockReason', () => {
 		const { page: noJs, close } = await noJsPage(browser, baseURL);
 		await expect(noJs.locator('#lock-reason').getByRole('link', { name: 'Open billing portal' })).toHaveAttribute('href', '?page=billing-portal');
 		await close();
+	});
+});
+
+/** Answers a native post with a stub page, so the test can read what was posted. */
+async function stubPosts(page: Page, pathname: string): Promise<void> {
+	await page.route(
+		(url) => url.pathname === pathname,
+		(route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>posted</p>' })
+	);
+}
+
+test.describe('Actions and failures', () => {
+	test("a row action's returned error and a rejection both show in the row's alert, and nothing is left unhandled", async ({ page }) => {
+		const errors: string[] = [];
+		page.on('pageerror', (error) => errors.push(error.message));
+		const section = await openOnClock(page, 'settings-row');
+		const row = section.getByTestId('row-codes');
+		await pauseClock(page);
+		const regenerate = row.getByRole('button', { name: 'Regenerate' });
+		await regenerate.focus();
+		await press(page, 'Enter');
+		await expect(regenerate).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(row.getByRole('alert')).toHaveText("Couldn't make new codes. Your old ones still work.");
+		await expect(regenerate).toBeFocused();
+
+		const more = row.getByRole('button', { name: 'More actions' });
+		await more.focus();
+		await press(page, 'Enter');
+		await expect(page.getByRole('menuitem')).toHaveText(['Email them to me', 'Mark as printed']);
+		await page.getByRole('menuitem', { name: 'Email them to me' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(row.getByRole('alert')).toHaveText("Couldn't do that. Try again.");
+		await expect(row).not.toContainText('mail service down');
+
+		await more.click();
+		await page.getByRole('menuitem', { name: 'Mark as printed' }).click();
+		await expect(section.getByTestId('row-printed')).toHaveText('1');
+		await expect(row.getByRole('alert')).toHaveText('');
+		expect(errors).toEqual([]);
+	});
+
+	test("a fact's action loads, shows its returned error, then succeeds", async ({ page }) => {
+		const section = await openOnClock(page, 'settings-facts');
+		const fact = section.getByTestId('facts-connection').locator('[data-fact=synced]');
+		const sync = fact.getByRole('button', { name: 'Sync now' });
+		await pauseClock(page);
+		await sync.focus();
+		await press(page, 'Enter');
+		await expect(sync).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(fact.getByRole('alert')).toHaveText("Couldn't reach the shared drive. Try again in a minute.");
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(fact.getByRole('alert')).toHaveCount(0);
+	});
+
+	test('a refused copy selects the exact text to copy, not a shortened value', async ({ page }) => {
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('blocked')) }, configurable: true });
+			document.execCommand = () => false;
+		});
+		const section = await openSection(page, 'settings-facts');
+		const version = section.getByTestId('facts-version');
+		const selection = () => page.evaluate(() => window.getSelection()?.toString().trim());
+		await version.getByRole('button', { name: 'Copy Commit' }).press('Enter');
+		await expect(version.locator('[data-fact=commit]').getByRole('alert')).toBeVisible();
+		await expect.poll(selection).toBe('7f3a91c2e8d04b6a5c13');
+		await page.setViewportSize({ width: 375, height: 800 });
+		await version.getByRole('button', { name: 'Copy Build' }).press('Enter');
+		await expect(version.locator('[data-fact=build]').getByRole('alert')).toBeVisible();
+		await expect(version.getByRole('alert')).toHaveCount(1);
+		await expect.poll(selection).toBe('2026.11.09-7f3a91c');
+	});
+});
+
+test.describe('Focus and hydration', () => {
+	test('a switch flipped before the page is interactive is committed once it is', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		let release: () => void = () => undefined;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		await page.route('**/_app/immutable/**/*.js', async (route) => {
+			await held;
+			await route.continue();
+		});
+		await page.goto('/', { waitUntil: 'domcontentloaded' });
+		const box = page.getByTestId('toggle-nojs');
+		const motion = box.getByRole('switch', { name: 'Reduce motion' });
+		await expect(motion).toBeChecked();
+		await motion.click();
+		await expect(motion).not.toBeChecked();
+		release();
+		await expect(page.getByRole('button', { name: 'Toggle global color theme' })).toBeEnabled({ timeout: 45000 });
+		await expect(motion).not.toBeChecked();
+		// Only a saved value reaches the bound prop, so this proves onCommit ran.
+		await expect(page.getByTestId('toggle-motion-bound')).toHaveText('off');
+		await expect(box.getByRole('button', { name: 'Apply' })).toHaveCount(1);
+	});
+
+	test('Undo and Retry hand focus to their switch when they leave', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-toggle');
+		const instant = section.getByTestId('toggle-instant');
+		const compact = instant.getByRole('switch', { name: 'Compact lists' });
+		await pauseClock(page);
+		await compact.focus();
+		await press(page, 'Space');
+		await page.clock.runFor(SETTLE);
+		const undo = rowOf(compact).getByRole('button', { name: 'Undo Compact lists' });
+		await undo.focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(undo).toHaveCount(0);
+		await expect(compact).not.toBeChecked();
+		await expect(compact).toBeFocused();
+
+		const sounds = instant.getByRole('switch', { name: 'Play sounds' });
+		await sounds.focus();
+		await press(page, 'Space');
+		await page.clock.runFor(SETTLE);
+		const retry = rowOf(sounds).getByRole('button', { name: 'Retry Play sounds' });
+		await retry.focus();
+		await press(page, 'Enter');
+		await expect(retry).toHaveCount(0);
+		await expect(sounds).toBeFocused();
+		await page.clock.runFor(SETTLE);
+		await expect(sounds).toBeChecked();
+		await expect(sounds).toBeFocused();
+	});
+
+	test('after Request access is sent, focus moves to the sent line', async ({ page }) => {
+		const section = await openOnClock(page, 'lock-reason');
+		const ok = section.getByTestId('lock-request-ok');
+		await pauseClock(page);
+		await ok.getByRole('button', { name: 'Request access' }).focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(ok.getByRole('button', { name: 'Request access' })).toHaveCount(0);
+		const sent = ok.locator('[tabindex="-1"]');
+		await expect(sent).toHaveText('Request sent');
+		await expect(sent).toBeFocused();
+	});
+
+	test("with a handler, a submit of the toggle's own form is not posted", async ({ page }) => {
+		const section = await openSection(page, 'settings-toggle');
+		await stubPosts(page, '/settings-demo/motion');
+		const form = section.getByTestId('toggle-nojs').locator('form').first();
+		const prevented = await form.evaluate((node: HTMLFormElement) => {
+			let seen = false;
+			node.addEventListener('submit', (event) => (seen = event.defaultPrevented), { once: true });
+			node.requestSubmit();
+			return seen;
+		});
+		expect(prevented).toBe(true);
+	});
+
+	test('a section lock with a badge keeps one disabled switch for assistive technology', async ({ page }) => {
+		const section = await openSection(page, 'settings-toggle');
+		const box = section.getByTestId('toggle-section-lock');
+		const two = box.getByRole('switch', { name: 'Two-step sign-in' });
+		await expect(two).toHaveCount(1);
+		await expect(two).toBeDisabled();
+		await expect(two).toBeChecked();
+		await expect(two).toHaveAccessibleDescription(/A code from your phone.*Managed by an administrator\./);
+		await expect(box.getByText('Always on')).toBeVisible();
+	});
+});
+
+test.describe('RequestedChange in a form', () => {
+	test('Cancel is ignored while Send again is in flight', async ({ page }) => {
+		const section = await openOnClock(page, 'requested-change');
+		const row = section.getByTestId('requested-awaiting');
+		await pauseClock(page);
+		await row.getByRole('button', { name: 'Send again for Parallel runs' }).click();
+		await row.getByRole('button', { name: 'Cancel request for Parallel runs' }).click();
+		await expect(row.getByRole('status')).toHaveText('Sending the request again…');
+		await page.clock.runFor(SETTLE);
+		await expect(row.getByRole('status')).toHaveText('Request sent again.');
+		await expect(section.getByTestId('requested-cancels')).toHaveText('0');
+		await expect(section.getByTestId('requested-resends')).toHaveText('1');
+	});
+
+	test('inside a staged form without JavaScript, Send again posts to its action with the request id in the query', async ({ browser, baseURL }) => {
+		const { page, close } = await noJsPage(browser, baseURL);
+		await stubPosts(page, '/settings-demo/requests');
+		const request = page.waitForRequest((r) => new URL(r.url()).pathname === '/settings-demo/requests' && r.method() === 'POST');
+		await page.getByTestId('row-owner-request').getByRole('button', { name: 'Send again for Team owner' }).click();
+		const sent = await request;
+		expect(new URL(sent.url()).search).toBe('?request=rq_2207');
+		expect(sent.postData()).toContain('intent=resend');
+		await close();
+	});
+
+	test('inside a staged form with JavaScript, Send again posts its own fields, not the form', async ({ page }) => {
+		const section = await openSection(page, 'settings-row');
+		await stubPosts(page, '/settings-demo/requests');
+		const request = page.waitForRequest((r) => new URL(r.url()).pathname === '/settings-demo/requests' && r.method() === 'POST');
+		await section.getByTestId('row-owner-request').getByRole('button', { name: 'Send again for Team owner' }).click();
+		const sent = await request;
+		expect(new URL(sent.url()).search).toBe('');
+		expect(sent.postData()).toBe('request=rq_2207&intent=resend');
 	});
 });

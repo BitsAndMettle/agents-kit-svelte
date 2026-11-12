@@ -16,6 +16,7 @@
 
 <script lang="ts">
 	import { Check } from '@lucide/svelte';
+	import { tick } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { Button } from '../../primitives/actions';
 	import { isThenable } from '../../core/promise';
@@ -24,8 +25,10 @@
 	import { STATUS_TEXT_CLASS } from '../../ui/styles';
 	import { LOCK_LABELS, lockReasonText } from '../shared/lock';
 	import { LOCK_ICONS } from '../shared/lock-icons';
+	import { restoreFocus } from '../shared/focus';
 	import { actionButtonProps } from '../shared/recipes';
 	import type { SettingLock, SettingsHandler } from '../shared/types';
+	import { focusLost } from './helpers';
 	import { HandlerRun } from './run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'id'> {
@@ -72,6 +75,17 @@
 	/** Live text: what the request is doing now. Failures go to the alert below. */
 	const live = $derived(request.status === 'pending' ? words.requesting : request.status === 'done' ? (request.notice ?? words.requested) : '');
 
+	let sent = $state<HTMLElement | null>(null);
+
+	/** The button gives way to "Request sent": when focus went with it, the sent line takes it. */
+	async function sendRequest(event: MouseEvent): Promise<void> {
+		const button = event.currentTarget as HTMLElement;
+		const ok = await request.run(onRequest);
+		if (!ok) return;
+		await tick();
+		if (!button.isConnected && focusLost()) restoreFocus(sent);
+	}
+
 	function runAction(event: MouseEvent): void {
 		const select = lock.action?.onSelect;
 		if (!select) return;
@@ -107,11 +121,11 @@
 			{/if}
 			{#if onRequest}
 				{#if request.status === 'done'}
-					<span class={cn('inline-flex items-center gap-1 text-xs font-medium', STATUS_TEXT_CLASS.success)}>
+					<span bind:this={sent} tabindex="-1" class={cn('inline-flex items-center gap-1 text-xs font-medium outline-none', STATUS_TEXT_CLASS.success)}>
 						<Check class="size-3.5" aria-hidden="true" />{request.notice ?? words.requested}
 					</span>
 				{:else}
-					<Button size="xs" variant="secondary" loading={request.pending} aria-describedby={reasonId} onclick={() => request.run(onRequest)}>
+					<Button size="xs" variant="secondary" loading={request.pending} aria-describedby={reasonId} onclick={sendRequest}>
 						{words.request}
 					</Button>
 				{/if}

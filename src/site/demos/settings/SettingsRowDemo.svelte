@@ -7,7 +7,7 @@
 	import { Globe, KeyRound } from '@lucide/svelte';
 	import { Button } from '$lib/primitives/actions';
 	import { Input, NativeSelect, Switch } from '$lib/primitives/form';
-	import { SettingsRow, SettingsSection } from '$lib/settings/rows';
+	import { RequestedChange, SettingsRow, SettingsSection } from '$lib/settings/rows';
 	import { SettingsDraft, setSettingsDraft, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
 
 	const RETENTION = [
@@ -23,6 +23,29 @@
 	const retentionText = (raw: string | string[]) => RETENTION.find((o) => o.value === raw)?.label ?? String(raw);
 
 	let saves = $state(0);
+	let requests = $state(0);
+	let regenerated = $state(0);
+	let printed = $state(0);
+
+	/** A fake server: answers after 600 ms. */
+	const wait = () => new Promise((resolve) => setTimeout(resolve, 600));
+
+	async function requestAccess(): Promise<void> {
+		await wait();
+		requests += 1;
+	}
+
+	/** Refuses the first time, so the row's error is easy to see. */
+	async function regenerate(): Promise<void | SettingsResult> {
+		await wait();
+		regenerated += 1;
+		if (regenerated === 1) return { error: "Couldn't make new codes. Your old ones still work." };
+	}
+
+	async function emailCodes(): Promise<void> {
+		await wait();
+		throw new Error('mail service down');
+	}
 
 	/** A fake server: answers after 600 ms, and refuses one name. */
 	async function submit(values: SettingsValues): Promise<void | SettingsResult> {
@@ -86,12 +109,37 @@
 		<SettingsRow
 			label="Single sign-on"
 			description="Require members to sign in through your identity provider."
-			lock={{ kind: 'plan', reason: 'Single sign-on is on the Business plan.', action: { label: 'Compare plans', href: '?page=plans' } }}
+			lock={{ kind: 'plan', reason: 'Single sign-on is on the Business plan.' }}
+			onRequest={requestAccess}
+			lockLabels={{ request: 'Ask an owner to upgrade' }}
 		>
 			{#snippet control()}
 				<Switch name="sso" value="true" />
 			{/snippet}
 		</SettingsRow>
+		<SettingsRow
+			data-testid="row-codes"
+			label="Recovery codes"
+			description="Ten one-time codes for when you lose your phone."
+			value="8 of 10 left"
+			actions={[
+				{ label: 'Regenerate', onSelect: regenerate },
+				{ label: 'View', ariaLabel: 'View recovery codes', href: '?dialog=recovery-codes' },
+				{ label: 'Email them to me', onSelect: emailCodes },
+				{ label: 'Mark as printed', onSelect: () => (printed += 1) }
+			]}
+		/>
+		<RequestedChange
+			data-testid="row-owner-request"
+			label="Team owner"
+			description="Ownership moves once the current owner agrees."
+			effective="Ada Park"
+			requested="Ben Ortiz"
+			waitingOn="Ada Park"
+			status="awaiting"
+			action="/settings-demo/requests"
+			hidden={{ request: 'rq_2207' }}
+		/>
 		{#snippet footer()}
 			<span role="status" class="mr-auto" data-testid="row-dirty">
 				{#if draft.status === 'pending'}Saving…{:else if draft.dirtyCount}{draft.dirtyCount === 1 ? '1 unsaved change' : `${draft.dirtyCount} unsaved changes`}{:else if draft.status === 'saved'}All changes saved{:else}No unsaved changes{/if}
@@ -100,7 +148,9 @@
 			<Button type="submit" size="sm" variant="primary" loading={draft.status === 'pending'}>Save</Button>
 		{/snippet}
 	</SettingsSection>
-	<p class="mt-2 text-xs text-fg-light">Saved <span data-testid="row-saves">{saves}</span> times. Try “Taken” as the team name to see a field error.</p>
+	<p class="mt-2 text-xs text-fg-light">
+		Saved <span data-testid="row-saves">{saves}</span> times. Try “Taken” as the team name to see a field error. Upgrade requests: <span data-testid="row-requests">{requests}</span>; codes printed: <span data-testid="row-printed">{printed}</span>.
+	</p>
 </form>
 
 {#snippet zoneSummary()}Berlin (UTC+1){/snippet}
