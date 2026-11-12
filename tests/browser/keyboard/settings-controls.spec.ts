@@ -17,6 +17,37 @@ async function openOnClock(page: Page, slug: string): Promise<Locator> {
 /** Longer than the demos' 600 ms answer. */
 const SETTLE = 700;
 
+/**
+ * Clicks a cell's label-bearing checkbox and checks that while it saves no cell box moves, the spinner
+ * stays off the cell's label and inside the cell's own box, and that nothing moves once it settles.
+ */
+async function expectSpinnerMovesNoCell(page: Page, matrix: Locator, cellName: string): Promise<void> {
+	const cell = matrix.getByRole('checkbox', { name: cellName, exact: true });
+	const td = cell.locator('xpath=ancestor::td[1]');
+	const label = td.locator('label');
+	// The narrow and list layouts label each cell.
+	await expect(label).toBeVisible();
+	await cell.scrollIntoViewIfNeeded();
+	const boxes = () => matrix.locator('td[data-cell-key]').evaluateAll((tds) => tds.map((el) => { const r = el.getBoundingClientRect(); return [el.getAttribute('data-cell-key'), Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; }));
+	const before = await boxes();
+	await cell.click();
+	await expect(cell).toHaveAttribute('aria-busy', 'true');
+	const spinner = td.locator('svg.ak-spinner');
+	await expect(spinner).toBeVisible();
+	expect(await boxes()).toEqual(before);
+	const l = (await label.boundingBox())!;
+	const sp = (await spinner.boundingBox())!;
+	const t = (await td.boundingBox())!;
+	const overlaps = l.x < sp.x + sp.width && sp.x < l.x + l.width && l.y < sp.y + sp.height && sp.y < l.y + l.height;
+	expect(overlaps, `label ${JSON.stringify(l)} spinner ${JSON.stringify(sp)}`).toBe(false);
+	// It sits in the cell's own room, not over a neighbour.
+	const inside = sp.x >= t.x - 0.5 && sp.x + sp.width <= t.x + t.width + 0.5 && sp.y >= t.y - 0.5 && sp.y + sp.height <= t.y + t.height + 0.5;
+	expect(inside, `cell ${JSON.stringify(t)} spinner ${JSON.stringify(sp)}`).toBe(true);
+	await page.clock.runFor(SETTLE);
+	await expect(spinner).toHaveCount(0);
+	expect(await boxes()).toEqual(before);
+}
+
 /** Opens the showcase with JavaScript off and returns the section (server-rendered markup only). */
 async function openWithoutJs(browser: Browser, slug: string): Promise<{ page: Page; section: Locator; close: () => Promise<void> }> {
 	const context = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 1440, height: 900 } });
@@ -317,30 +348,20 @@ test.describe('NotificationMatrix', () => {
 		test(`at ${width}px a saving cell's spinner moves no cell and stays off the label`, async ({ page }) => {
 			const section = await openOnClock(page, 'notification-matrix');
 			await page.setViewportSize({ width, height: 900 });
-			const matrix = section.getByTestId('nm-instant');
-			const cell = matrix.getByRole('checkbox', { name: 'Replies by Email', exact: true });
-			const td = cell.locator('xpath=ancestor::td[1]');
-			const label = td.locator('label');
-			// The narrow layout labels each cell.
-			await expect(label).toBeVisible();
-			await cell.scrollIntoViewIfNeeded();
-			const boxes = () => matrix.locator('td[data-cell-key]').evaluateAll((tds) => tds.map((el) => { const r = el.getBoundingClientRect(); return [el.getAttribute('data-cell-key'), Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; }));
-			const before = await boxes();
-			await cell.click();
-			await expect(cell).toHaveAttribute('aria-busy', 'true');
-			const spinner = td.locator('svg.ak-spinner');
-			await expect(spinner).toBeVisible();
-			expect(await boxes()).toEqual(before);
-			const l = (await label.boundingBox())!;
-			const sp = (await spinner.boundingBox())!;
-			const t = (await td.boundingBox())!;
-			const overlaps = l.x < sp.x + sp.width && sp.x < l.x + l.width && l.y < sp.y + sp.height && sp.y < l.y + l.height;
-			expect(overlaps, `label ${JSON.stringify(l)} spinner ${JSON.stringify(sp)}`).toBe(false);
-			// It sits in the cell's own room, not over a neighbour.
-			expect(sp.x + sp.width).toBeLessThanOrEqual(t.x + t.width + 0.5);
-			await page.clock.runFor(SETTLE);
-			await expect(spinner).toHaveCount(0);
-			expect(await boxes()).toEqual(before);
+			await expectSpinnerMovesNoCell(page, section.getByTestId('nm-instant'), 'Replies by Email');
+		});
+	}
+
+	// The explicit list layout has its own classes; no catalogue demo saves a list cell on its own.
+	for (const width of [320, 1440]) {
+		test(`in the list layout at ${width}px a saving cell's spinner moves no cell and stays off the label`, async ({ page }) => {
+			await page.clock.install();
+			await page.setViewportSize({ width, height: 900 });
+			await page.goto('/fixtures/settings-controls/');
+			await page.clock.pauseAt(new Date(Date.now() + 5000));
+			const matrix = page.getByTestId('nm-list-instant');
+			await expect(matrix).toHaveAttribute('data-layout', 'list');
+			await expectSpinnerMovesNoCell(page, matrix, 'Replies by Email');
 		});
 	}
 
