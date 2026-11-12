@@ -235,6 +235,57 @@ export function describeChanges<V extends Record<string, unknown>>(
 	return changes;
 }
 
+/** One control's value at the moment a form was submitted (see `snapshotForm`). */
+export interface ControlSnapshot {
+	control: ControlLike;
+	checked?: boolean;
+	selected?: boolean[];
+	value?: string;
+}
+
+function snapshotOf(control: ControlLike): ControlSnapshot {
+	if (control.type === 'checkbox' || control.type === 'radio') return { control, checked: Boolean(control.checked) };
+	if (control.type.startsWith('select')) return { control, selected: Array.from(control.options ?? [], (o) => o.selected) };
+	return { control, value: control.value ?? '' };
+}
+
+function differs(a: ControlSnapshot, b: ControlSnapshot): boolean {
+	if (a.selected || b.selected) return (a.selected ?? []).some((s, i) => s !== b.selected?.[i]);
+	return a.checked !== b.checked || a.value !== b.value;
+}
+
+function putBack(state: ControlSnapshot): void {
+	const { control } = state;
+	if (state.checked !== undefined) control.checked = state.checked;
+	else if (state.selected) Array.from(control.options ?? []).forEach((o, i) => (o.selected = state.selected?.[i] ?? false));
+	else if (state.value !== undefined && control.value !== state.value) control.value = state.value;
+}
+
+/**
+ * What every value-holding control (the ones `readDefaults` reads) holds now. Take it when a save
+ * is submitted, and pass it to `adoptSnapshotAsDefaults` once that save succeeded.
+ */
+export function snapshotForm(form: FormLike): ControlSnapshot[] {
+	return controlsOf(form).map(snapshotOf);
+}
+
+/**
+ * Makes a snapshot's values the controls' reset target (`defaultValue`, `defaultChecked`,
+ * `defaultSelected`), after the save of exactly those values succeeded. What the controls hold
+ * now is kept, so an edit made while that save was in flight still differs from its default and
+ * still counts as unsaved; every other control is clean, and Discard restores the saved values.
+ */
+export function adoptSnapshotAsDefaults(snapshot: readonly ControlSnapshot[]): void {
+	const current = snapshot.map((s) => snapshotOf(s.control));
+	for (const { control, checked, selected, value } of snapshot) {
+		if (checked !== undefined) control.defaultChecked = checked;
+		else if (selected) Array.from(control.options ?? []).forEach((o, i) => (o.defaultSelected = selected[i] ?? false));
+		else control.defaultValue = value ?? '';
+	}
+	// Setting a default can move a control's value (an untouched select, a radio group): put each back.
+	for (const state of current) if (differs(state, snapshotOf(state.control))) putBack(state);
+}
+
 /**
  * Makes what the controls hold now their reset target (`defaultValue`, `defaultChecked`,
  * `defaultSelected`), after a save succeeded without the page re-rendering new defaults. The

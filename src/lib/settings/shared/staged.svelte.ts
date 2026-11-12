@@ -1,7 +1,7 @@
 import { tick, untrack } from 'svelte';
 import type { Attachment } from 'svelte/attachments';
 import { isThenable } from '../../core/promise';
-import { adoptCurrentAsDefaults, CHANGE_WORDS, diffForm, undescribedChanges, type ChangeWords } from './diff';
+import { adoptSnapshotAsDefaults, CHANGE_WORDS, diffForm, snapshotForm, undescribedChanges, type ChangeWords, type ControlSnapshot } from './diff';
 import type { SettingStatus, SettingsChange, SettingsConflict, SettingsFieldDescriptor, SettingsHandler, SettingsResult } from './types';
 
 export { readDefaults, readCurrent, diffForm, describeChanges, adoptCurrentAsDefaults, sameValue, undescribedChanges, CHANGE_WORDS } from './diff';
@@ -66,8 +66,11 @@ function valuesOf(data: FormData): SettingsValues {
  * - `onsubmit` cancels the native post only when there is a handler; while pending, submits are
  *   ignored (and stopped before later listeners, for SvelteKit `enhance`).
  * - A handler result shows until the next submit: field errors (hidden once that field is edited),
- *   a form error, or a conflict (the draft is kept). Success makes the current values the new
- *   defaults, so the form is clean and Discard restores what was saved.
+ *   a form error, or a conflict (the draft is kept). Success makes the submitted values the new
+ *   defaults, so Discard restores what was saved and an edit made while the save was in flight
+ *   stays unsaved.
+ * - Only the form's own controls count: an input or change from a control of another form (a
+ *   nested dialog's own form) is not an edit.
  * - After a failed submit, focus goes to the first invalid control or `[data-form-error]`.
  * - `guard` holds a navigation while dirty: the app calls `guard.request(proceed)` from its
  *   router (SvelteKit `beforeNavigate`), SettingsForm asks, then calls `guard.decide(...)`.
@@ -201,7 +204,9 @@ export class SettingsDraft {
 	readonly attach: Attachment<HTMLFormElement> = (form) => {
 		this.#form = form;
 		const edited = (event: Event) => {
-			const target = event.target as (HTMLElement & { name?: unknown }) | null;
+			const target = event.target as (HTMLElement & { name?: unknown; form?: unknown }) | null;
+			// A control that posts with another form (a dialog's own form, a `form` attribute) bubbles here too.
+			if (target && 'form' in target && target.form !== form) return;
 			if (target instanceof HTMLElement) this.#lastEdited = target;
 			const name = target?.name;
 			if (typeof name === 'string' && name && !this.#edited.has(name)) this.#edited = new Set([...this.#edited, name]);
@@ -250,6 +255,7 @@ export class SettingsDraft {
 		event.preventDefault();
 		const form = event.currentTarget as HTMLFormElement;
 		const data = new FormData(form, event.submitter);
+		const submitted = snapshotForm(form);
 		const context: SettingsSubmitContext = { changes: this.changes, revision: this.#options.revision(), data, event };
 		this.#handled = true;
 		this.#result = undefined;
@@ -257,17 +263,17 @@ export class SettingsDraft {
 		try {
 			outcome = handler(valuesOf(data), context);
 		} catch {
-			this.#inflight = this.#finish(form, { error: this.#options.genericError() });
+			this.#inflight = this.#finish(form, submitted, { error: this.#options.genericError() });
 			return;
 		}
 		if (!isThenable(outcome)) {
-			this.#inflight = this.#finish(form, outcome);
+			this.#inflight = this.#finish(form, submitted, outcome);
 			return;
 		}
 		this.#running = true;
 		this.#inflight = Promise.resolve(outcome).then(
-			(result) => (generation === this.#generation ? this.#finish(form, result) : false),
-			() => (generation === this.#generation ? this.#finish(form, { error: this.#options.genericError() }) : false)
+			(result) => (generation === this.#generation ? this.#finish(form, submitted, result) : false),
+			() => (generation === this.#generation ? this.#finish(form, submitted, { error: this.#options.genericError() }) : false)
 		);
 	};
 
@@ -291,11 +297,12 @@ export class SettingsDraft {
 		return this.#lastEdited?.isConnected ? this.#lastEdited : null;
 	}
 
-	async #finish(form: HTMLFormElement, result: void | SettingsResult): Promise<boolean> {
+	/** `submitted`: the controls' values when the save was submitted, which become the saved ones on success. */
+	async #finish(form: HTMLFormElement, submitted: readonly ControlSnapshot[], result: void | SettingsResult): Promise<boolean> {
 		this.#running = false;
 		this.#result = result || undefined;
 		if (!hasFailure(result)) {
-			adoptCurrentAsDefaults(form);
+			adoptSnapshotAsDefaults(submitted);
 			this.#saved = true;
 			this.#version++;
 			return true;

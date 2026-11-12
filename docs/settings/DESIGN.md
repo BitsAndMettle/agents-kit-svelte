@@ -561,7 +561,7 @@ The shared layer is plain `.ts` and `.svelte.ts` only, with no `.svelte` files, 
   A single danger submit; Cancel is a link to `closeHref`; a footnote states reversibility; it becomes a sheet when narrow.
 - **Props.**
   ```ts
-  extends Omit<HTMLAttributes<HTMLDialogElement>,'class'|'children'|'title'> { title: string; description?: string|Snippet; icon?: Component; identity?: Snippet;
+  extends Omit<HTMLFormAttributes,'class'|'children'|'title'|'method'|'onsubmit'|'hidden'> { title: string; description?: string|Snippet; icon?: Component; identity?: Snippet;
     open?: boolean /*bindable*/; closeHref?: string; ssrOpen?: boolean; trigger?: Snippet<[Part<HTMLButtonElement>]>;
     consequences?: ConsequenceItem[] | ConsequenceGroup[]; warning?: string|Snippet; reassign?: ReassignSpec;
     confirmPhrase?: string; phraseOptions?: { caseSensitive?: boolean; trim?: boolean };
@@ -570,6 +570,7 @@ The shared layer is plain `.ts` and `.svelte.ts` only, with no `.svelte` files, 
     result?: SettingsResult; pending?: boolean; reversible?: boolean; footnote?: string|Snippet; size?: 'sm'|'md'|'lg';
     children?: Snippet; labels?: Partial<ConsequenceDialogLabels> /* cancel, pending, typeToConfirm(p), failed, irreversible, reversible, replacementFor(l), whatHappens, whatStays */ }
   ```
+- **Rest.** `...rest` and `ref` go on the component's own `<form>`, so `enhance` attaches there (as in `docs/auth/CONVENTIONS.md`). Inside a SettingsForm (draft mode) the dialog has no `<form>` in the markup and, without JavaScript, posts with the page form: form attributes and `enhance` belong on the SettingsForm, `rest` is not spread on anything, and development warns once when it has keys.
 - **Reports.** `onConfirm({typed, reassign, data})`, or a native post with intent, `confirm`, `reassign.<id>` and `hidden`. Errors stay inside the dialog (`role=alert`). On success the app navigates to `closeHref`. The server must re-check the phrase (documented).
 - **States.** Open via URL or bound; phrase unmatched (submit blocked and described); confirmable; reassign defaults or changed; pending (double-submit guard, Cancel disabled); error; sheet when narrow; focus returns to the opener.
 - **Built from.**
