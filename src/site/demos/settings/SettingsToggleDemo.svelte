@@ -87,6 +87,9 @@
 				checked={false}
 				onCommit={saveCompact}
 				lock={{ kind: 'plan', reason: 'Custom sidebars are on the Business plan.', action: { label: 'Compare plans', href: '?page=plans' } }}
+				onRequest={saveCompact}
+				requestAction="/settings-demo/access?setting=sidebar"
+				lockLabels={{ request: 'Ask an owner' }}
 			>
 				{#snippet leading()}<span class="inline-flex size-8 items-center justify-center rounded-control bg-canvas-secondary text-fg-main"><Moon class="size-4" aria-hidden="true" /></span>{/snippet}
 			</SettingsToggle>

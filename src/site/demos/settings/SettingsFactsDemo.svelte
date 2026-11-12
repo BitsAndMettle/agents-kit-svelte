@@ -40,15 +40,15 @@
 
 <div class="flex max-w-3xl flex-col gap-6">
 	<SettingsSection title="Connection" description="How this team is linked to the shared drive." status={{ label: 'Connected', tone: 'success', dot: true }} list={false}>
-		<SettingsFacts data-testid="facts-connection" items={connection} />
+		<div class="px-4"><SettingsFacts data-testid="facts-connection" items={connection} /></div>
 	</SettingsSection>
 
 	<SettingsSection title="About" description="Quote these when you ask for help." list={false}>
-		<SettingsFacts data-testid="facts-version" items={version} onCopy={(id, ok) => (copies = [...copies, `${id}:${ok ? 'copied' : 'failed'}`])} />
+		<div class="px-4"><SettingsFacts data-testid="facts-version" items={version} onCopy={(id, ok) => (copies = [...copies, `${id}:${ok ? 'copied' : 'failed'}`])} /></div>
 	</SettingsSection>
 	<p class="-mt-4 text-xs text-fg-light">Copy log: <span data-testid="facts-copies">{copies.join(', ') || 'nothing yet'}</span></p>
 
 	<SettingsSection title="This device" description="Read-only. Some values are managed elsewhere." list={false}>
-		<SettingsFacts data-testid="facts-grid" layout="grid" items={device} />
+		<div class="p-4"><SettingsFacts data-testid="facts-grid" layout="grid" items={device} /></div>
 	</SettingsSection>
 </div>

@@ -32,6 +32,10 @@
 	import { factCopyText } from './helpers';
 	import { SettingsHandlerRun } from '../shared/run.svelte';
 
+	/**
+	 * The facts carry no inset of their own, like every block in a `list={false}` SettingsSection:
+	 * put them in the same padded box (`px-4`) as the meter or note beside them, so labels line up.
+	 */
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		/** The facts, in order. */
 		items: SettingsFact[];
@@ -118,13 +122,13 @@
 </script>
 
 <div {...rest} class={cn('min-w-0', className)}>
-	<dl class={cn('m-0 min-w-0', grid ? 'grid grid-cols-1 gap-3 p-4 @lg/settings:grid-cols-2 @3xl/settings:grid-cols-3' : 'flex flex-col')}>
+	<dl class={cn('m-0 min-w-0', grid ? 'grid grid-cols-1 gap-3 @lg/settings:grid-cols-2 @3xl/settings:grid-cols-3' : 'flex flex-col')}>
 		{#each items as fact (fact.id)}
 			{@const copyText = factCopyText(fact)}
 			{@const refused = refusedId === fact.id}
 			{@const actionFailed = actionRun.status === 'failed' && runningId === fact.id}
 			{@const done = copier.status === 'copied' && copiedId === fact.id}
-			<div data-fact={fact.id} class={cn(ROW[layout], !grid && 'border-t border-canvas-border px-4 py-3 first:border-t-0')}>
+			<div data-fact={fact.id} class={cn(ROW[layout], !grid && 'border-t border-canvas-border py-3 first:border-t-0')}>
 				<dt class={cn('m-0 text-xs leading-5 text-fg-light', !grid && '@lg/settings:text-[13px]', LABEL[layout])}>{fact.label}</dt>
 				<dd class="m-0 flex min-w-0 flex-1 flex-col gap-0.5">
 					<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

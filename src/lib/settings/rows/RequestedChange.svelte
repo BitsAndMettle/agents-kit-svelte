@@ -45,10 +45,11 @@
 	import type { TimeInput } from '../../core/time';
 	import { cn } from '../../ui/cn';
 	import type { UiTone } from '../../ui/styles';
-	import { getSettingsDraft } from '../shared/context';
+	import { getSettingsDraft, getSettingsScope } from '../shared/context';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES } from '../shared/recipes';
 	import type { SettingsHandler } from '../shared/types';
-	import { formatRequestedAgo, withQuery } from './helpers';
+	import { formatRequestedAgo, postIntent, withQuery } from './helpers';
 	import { SettingsHandlerRun } from '../shared/run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, 'class' | 'children' | 'hidden'> {
@@ -75,7 +76,7 @@
 		onCancelRequest?: SettingsHandler<[]>;
 		/** Sends the request again. It never changes `status`. */
 		onResend?: SettingsHandler<[]>;
-		/** No-JavaScript path: Cancel and Send again post `intent=cancel|resend` in the body to this URL. Inside a SettingsForm they post the outer form there (`formaction`), so that form's fields go along; with JavaScript and no handler they post this row's intent alone. */
+		/** No-JavaScript path: Cancel and Send again post `intent=cancel|resend` in the body to this URL. Inside a SettingsForm they post the outer form there (`formaction`), so that form's fields go along; with JavaScript and no handler they post this row's intent alone. Without it, the buttons only call your handlers, so they stay soft-disabled until the page is interactive. */
 		action?: string;
 		/** Extra fields for that post (a request id). They always travel in the `action` URL's query, never the body, with or without JavaScript and inside a SettingsForm or not: the server reads them from `url.searchParams`. */
 		hidden?: Record<string, string>;
@@ -105,6 +106,8 @@
 
 	const uid = $props.id();
 	const draft = getSettingsDraft();
+	const scope = getSettingsScope();
+	const ready = new ReadyGate(() => (scope ? scope.ready() : undefined));
 	const startedAt = Date.now();
 	const cancel = new SettingsHandlerRun();
 	const resend = new SettingsHandlerRun();
@@ -162,7 +165,7 @@
 			// go through the form's own submit handler (as if Save), so post this row's fields alone.
 			if (formAction !== undefined) {
 				event.preventDefault();
-				postAlone(formAction, which);
+				postIntent(formAction, which);
 			}
 			return;
 		}
@@ -172,26 +175,13 @@
 		void (which === 'cancel' ? cancel : resend).run(handler);
 	}
 
-	/** The same post the row's own form makes (`hidden` fields in the URL's query, the intent in the body), from a form of its own. */
-	function postAlone(url: string, intent: 'cancel' | 'resend'): void {
-		const form = document.createElement('form');
-		form.method = 'post';
-		form.action = url;
-		form.hidden = true;
-		const input = document.createElement('input');
-		input.type = 'hidden';
-		input.name = 'intent';
-		input.value = intent;
-		form.append(input);
-		document.body.append(form);
-		form.submit();
-	}
-
 	/** Submit buttons need a form: their own, or (inside a SettingsForm) the outer one via `formaction`. */
 	const buttonType = $derived<'submit' | 'button'>(action !== undefined ? 'submit' : 'button');
 	/** Where the buttons post: `action` with the `hidden` fields in its query. Inside someone else's form they could not travel as inputs (they would post with its Save too), so every path puts them in the URL. */
 	const postUrl = $derived(action !== undefined ? withQuery(action, hidden) : undefined);
 	const formAction = $derived(!ownForm ? postUrl : undefined);
+	/** Without `action` the buttons only call back: they wait, soft-disabled, until the page is interactive. */
+	const waiting = $derived(action === undefined && !ready.current);
 </script>
 
 {#snippet buttons()}
@@ -206,6 +196,7 @@
 			size="sm"
 			variant="secondary"
 			loading={resend.pending}
+			softDisabled={waiting || undefined}
 			onclick={(event: MouseEvent) => run('resend', event)}
 		>
 			{words.resend}<span class="sr-only">for {label}</span>
@@ -222,6 +213,7 @@
 			size="sm"
 			variant="ghost"
 			loading={cancel.pending}
+			softDisabled={waiting || undefined}
 			onclick={(event: MouseEvent) => run('cancel', event)}
 		>
 			{words.cancel}<span class="sr-only">for {label}</span>

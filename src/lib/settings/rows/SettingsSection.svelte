@@ -34,10 +34,12 @@
 		lock?: SettingLock;
 		/** Request flow for the section's lock. */
 		onRequest?: SettingsHandler<[]>;
+		/** No-JavaScript path for that request: LockReason's `requestAction`. */
+		requestAction?: string;
 		lockLabels?: Partial<LockReasonLabels>;
 		/** `columns` lays nested sections side by side on wide containers. */
 		layout?: 'rows' | 'columns';
-		/** False renders the body as a plain block (facts, a paragraph) instead of a `<ul role="list">` of rows. */
+		/** False renders the body as a plain block (facts, a meter, a paragraph) instead of a `<ul role="list">` of rows. The block has no inset of its own and neither do the components you put in it: wrap them in one padded box (`px-4 py-3`) so everything lines up with the header. */
 		list?: boolean;
 		/** The rows: SettingsRow, SettingsToggle, RequestedChange or nested SettingsSection, each an `<li>`. */
 		children: Snippet;
@@ -66,6 +68,7 @@
 		tone = 'default',
 		lock,
 		onRequest,
+		requestAction,
 		lockLabels,
 		layout = 'rows',
 		list = true,
@@ -164,7 +167,7 @@
 				{#if description}<p class="m-0 text-xs leading-5 text-fg-light">{@render text(description)}</p>{/if}
 			</div>
 			{#if actions}<div class="flex shrink-0 items-center gap-2">{@render actions()}</div>{/if}
-			{#if effectiveLock && ownLock}<LockReason lock={effectiveLock} id={reasonId} {onRequest} labels={lockLabels} class="basis-full" />{/if}
+			{#if effectiveLock && ownLock}<LockReason lock={effectiveLock} id={reasonId} {onRequest} {requestAction} labels={lockLabels} class="basis-full" />{/if}
 		</div>
 		{@render body()}
 		{#if footer}<div class={cn(RECIPES.sectionFooter, 'border-t-0')}>{@render footer()}</div>{/if}
@@ -184,7 +187,7 @@
 							{#if description}<p class="m-0 text-xs leading-5 text-fg-light">{@render text(description)}</p>{/if}
 						</div>
 						{#if actions}<div class="flex shrink-0 flex-wrap items-center gap-2">{@render actions()}</div>{/if}
-						{#if effectiveLock && ownLock}<LockReason lock={effectiveLock} id={reasonId} {onRequest} labels={lockLabels} class="basis-full pt-1" />{/if}
+						{#if effectiveLock && ownLock}<LockReason lock={effectiveLock} id={reasonId} {onRequest} {requestAction} labels={lockLabels} class="basis-full pt-1" />{/if}
 					</header>
 					{@render body()}
 					{#if footer}<div class={RECIPES.sectionFooter}>{@render footer()}</div>{/if}

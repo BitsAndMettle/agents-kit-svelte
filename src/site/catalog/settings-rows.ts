@@ -41,7 +41,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/SettingsRow.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'One setting: label and description on the left, a control, read-only value or badge on the right, optional leading icon and trailing actions (more than two collapse into a menu, except links and form intents, which stay buttons). An action onSelect may return a promise (the button loads) or {error}; a failure or rejection shows in the row alert. Kit controls placed in it keep one label and are described by the description, status and lock reason. A control a label cannot name (a link) takes labelFor={false}: the label becomes plain text and the control spreads the given aria-describedby. Inside a staged form, a row with name registers itself, so editing shows "Unsaved" and "was 90 days" plus the impact line, and form errors for that name appear in place. status shows saving, saved or an error for instant changes; lock disables the control and shows the reason (or points at a shared one with reasonId). Below 32rem it stacks; summary plus editHref swaps the control for a summary and an Edit link there. It reports nothing itself: the control does.',
+			'One setting: label and description on the left, a control, read-only value or badge on the right, optional leading icon and trailing actions (more than two collapse into a "More actions for <label>" menu, except links and form intents, which stay buttons). An action onSelect may return a promise (the button loads) or {error}; a failure or rejection shows in the row alert. An action with only onSelect does nothing without JavaScript, so it stays soft-disabled until the page is interactive. Kit controls placed in it keep one label and are described by the description, status and lock reason. A control a label cannot name (a link) takes labelFor={false}: the label becomes plain text and the control spreads the given aria-describedby. Inside a staged form, a row with name registers itself, so editing shows "Unsaved" and "was 90 days" plus the impact line, and form errors for that name appear in place. status shows saving, saved or an error for instant changes; lock disables the control and shows the reason (or points at a shared one with reasonId). Below 32rem it stacks; layout="inline" keeps the control beside the label until the label would get less than 60% of the row, and layout="stacked" always puts it under the label; summary plus editHref swaps the control for a summary and an Edit link there. It reports nothing itself: the control does.',
 		usageSnippet: `<script lang="ts">
   import { SettingsRow, SettingsSection } from 'agents-kit-svelte/settings';
   import { NativeSelect } from 'agents-kit-svelte/primitives';
@@ -72,7 +72,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/SettingsFacts.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Read-only facts as a description list: label and value side by side (stacked on narrow containers), or a grid of tiles. A fact can be monospace, carry a tone dot, a detail line, a "managed elsewhere" source caption, a shorter value for narrow containers, a copy button and one action (a link, a callback, or an unavailable action with its reason). Copying happens locally; onCopy(id, ok) says whether the clipboard took it, and a refused copy says so and shows the exact text to copy, selected. A callback action loads while its promise runs and shows a returned {error}, or a generic line when it rejects. Nothing is sent anywhere.',
+			'Read-only facts as a description list: label and value side by side (stacked on narrow containers), or a grid of tiles. A fact can be monospace, carry a tone dot, a detail line, a "managed elsewhere" source caption, a shorter value for narrow containers, a copy button and one action (a link, a callback, or an unavailable action with its reason). Copying happens locally; onCopy(id, ok) says whether the clipboard took it, and a refused copy says so and shows the exact text to copy, selected. A callback action loads while its promise runs and shows a returned {error}, or a generic line when it rejects. Nothing is sent anywhere. Like every block in a list={false} section it has no inset of its own: wrap it in the same padded box as its neighbours.',
 		usageSnippet: `<script lang="ts">
   import { SettingsFacts, SettingsSection, type SettingsFact } from 'agents-kit-svelte/settings';
 
@@ -89,7 +89,10 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 </script>
 
 <SettingsSection title="Connection" list={false}>
-  <SettingsFacts items={facts} onCopy={copied} />
+  <!-- Blocks in a list={false} section bring no inset: one padded box lines them up with the header. -->
+  <div class="px-4">
+    <SettingsFacts items={facts} onCopy={copied} />
+  </div>
 </SettingsSection>`
 	},
 	{
@@ -130,7 +133,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/RequestedChange.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A change that waits for approval elsewhere (on a device, by an admin, at a provider): the value in effect against the value asked for, who it waits on, how long ago it was asked (with an injected now) and optional instructions. It offers Send again (onResend) and Cancel request (onCancelRequest), or posts intent=resend|cancel to action without JavaScript (hidden fields always ride in the query of action, so read them from url.searchParams; inside a SettingsForm without JavaScript the fields of the outer form go along, and with JavaScript the row posts its intent alone). It never shows success on click: approved, declined and expired appear only when your app passes a new status.',
+			'A change that waits for approval elsewhere (on a device, by an admin, at a provider): the value in effect against the value asked for, who it waits on, how long ago it was asked (with an injected now) and optional instructions. It offers Send again (onResend) and Cancel request (onCancelRequest), or posts intent=resend|cancel to action without JavaScript (hidden fields always ride in the query of action, so read them from url.searchParams; inside a SettingsForm without JavaScript the fields of the outer form go along, and with JavaScript the row posts its intent alone). Without action the buttons only call your handlers, so they stay soft-disabled until the page is interactive. It never shows success on click: approved, declined and expired appear only when your app passes a new status.',
 		usageSnippet: `<script lang="ts">
   import { RequestedChange, SettingsSection } from 'agents-kit-svelte/settings';
 
@@ -156,7 +159,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/rows/LockReason.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			"The one explanation of why something cannot be changed: an icon per kind (permission, plan, managed, inherited, read-only, unsupported, awaiting approval), the reason or the kind's default sentence, who holds the lock, and a way forward: lock.action (Upgrade, Open the managing place) or a Request access button that calls onRequest and moves through sending, sent or failed. Its id names only the sentence, so any number of disabled controls can point aria-describedby at one visible reason. variant is inline, a boxed note, or hidden (screen-reader only).",
+			"The one explanation of why something cannot be changed: an icon per kind (permission, plan, managed, inherited, read-only, unsupported, awaiting approval), the reason or the kind's default sentence, who holds the lock, and a way forward: lock.action (Upgrade, Open the managing place) or a Request access button that calls onRequest and moves through sending, sent or failed. Without JavaScript that button posts intent=request-access to requestAction; a button that can only call back (onRequest without requestAction, or a lock.action with only onSelect) stays soft-disabled until the page is interactive. Its id names only the sentence, so any number of disabled controls can point aria-describedby at one visible reason. variant is inline, a boxed note, or hidden (screen-reader only).",
 		usageSnippet: `<script lang="ts">
   import { LockReason, type SettingLock } from 'agents-kit-svelte/settings';
   import { Switch } from 'agents-kit-svelte/primitives';
@@ -168,7 +171,7 @@ export const SETTINGS_ROWS: CatalogItemMeta[] = [
   }
 </script>
 
-<LockReason id="security-lock" variant="note" {lock} onRequest={requestAccess} />
+<LockReason id="security-lock" variant="note" {lock} onRequest={requestAccess} requestAction="/settings/security/access-requests" />
 <Switch label="Two-step sign-in" disabled aria-describedby="security-lock" />
 <Switch label="Remember devices" disabled aria-describedby="security-lock" />`
 	}

@@ -1,14 +1,14 @@
 <!--
 	SettingsRow in a staged form. The form is wired by hand with the shared SettingsDraft (the same
 	model SettingsForm uses), so rows register, show "Unsaved" and "was X", and the form posts natively
-	without JavaScript.
+	without JavaScript. A hand-wired form needs its own default submit button (see the form below).
 -->
 <script lang="ts">
 	import { Globe, KeyRound } from '@lucide/svelte';
 	import { Button } from '$lib/primitives/actions';
 	import { Input, NativeSelect, Switch } from '$lib/primitives/form';
 	import { RequestedChange, SettingsRow, SettingsSection } from '$lib/settings/rows';
-	import { SettingsDraft, setSettingsDraft, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
+	import { ReadyGate, SettingsDraft, setSettingsDraft, type SettingStatus, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
 
 	const RETENTION = [
 		{ value: '30', label: '30 days' },
@@ -21,6 +21,11 @@
 		{ value: 'America/New_York', label: 'New York (UTC−5)' }
 	];
 	const retentionText = (raw: string | string[]) => RETENTION.find((o) => o.value === raw)?.label ?? String(raw);
+	const VIEWS = [
+		{ value: 'list', label: 'List' },
+		{ value: 'board', label: 'Board' },
+		{ value: 'calendar', label: 'Calendar' }
+	];
 
 	let saves = $state(0);
 	let requests = $state(0);
@@ -40,6 +45,22 @@
 		await wait();
 		regenerated += 1;
 		if (regenerated === 1) return { error: "Couldn't make new codes. Your old ones still work." };
+	}
+
+	/** An instant row: the app owns the value and the status; the fake server refuses Calendar, so the value goes back. */
+	let view = $state('list');
+	let viewStatus = $state<SettingStatus>('idle');
+	async function changeView(next: string): Promise<void> {
+		const before = view;
+		view = next;
+		viewStatus = 'pending';
+		await wait();
+		if (next === 'calendar') {
+			view = before;
+			viewStatus = 'error';
+			return;
+		}
+		viewStatus = 'saved';
 	}
 
 	async function emailCodes(): Promise<void> {
@@ -65,9 +86,16 @@
 		genericError: () => "Couldn't save. Your changes are still here."
 	});
 	setSettingsDraft(draft);
+	const ready = new ReadyGate();
 </script>
 
 <form method="post" action="/settings-demo/general" data-testid="row-form" class="max-w-3xl" {@attach draft.attach} onsubmit={draft.onsubmit}>
+	<!--
+		Enter in a field submits with the form's first submit button. Rows below hold other submit
+		buttons (Send again, Ask an owner to upgrade), so this hidden Save comes first. Once the page is
+		interactive it is disabled while nothing changed, so Enter on a clean form does nothing.
+	-->
+	<button type="submit" hidden data-testid="row-default-submit" disabled={ready.current && draft.dirtyCount === 0}>Save</button>
 	<SettingsSection title="General" description="Name, retention and access for Northwind Studio.">
 		<SettingsRow name="teamName" label="Team name" description="Shown on invites and in the browser tab." required>
 			{#snippet control()}
@@ -111,6 +139,7 @@
 			description="Require members to sign in through your identity provider."
 			lock={{ kind: 'plan', reason: 'Single sign-on is on the Business plan.' }}
 			onRequest={requestAccess}
+			requestAction="/settings-demo/access?setting=sso"
 			lockLabels={{ request: 'Ask an owner to upgrade' }}
 		>
 			{#snippet control()}
@@ -154,3 +183,13 @@
 </form>
 
 {#snippet zoneSummary()}Berlin (UTC+1){/snippet}
+
+<div class="mt-6 max-w-3xl">
+	<SettingsSection data-testid="row-instant" title="Your view" description="Instant: applies as soon as you pick it. Calendar fails, to show the error.">
+		<SettingsRow label="Default view" description="What opens first when you visit the team." status={viewStatus}>
+			{#snippet control()}
+				<NativeSelect value={view} options={VIEWS} onValueChange={changeView} class="w-full @lg/settings:w-36" />
+			{/snippet}
+		</SettingsRow>
+	</SettingsSection>
+</div>

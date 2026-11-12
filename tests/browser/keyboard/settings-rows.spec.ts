@@ -64,10 +64,11 @@ test.describe('SettingsSection', () => {
 		await expect(row.getByRole('link', { name: 'Change role for Chloé Martin' })).toBeVisible();
 		await expect(row.getByRole('link', { name: 'Remove Chloé Martin' })).toHaveAttribute('href', '?dialog=remove&member=chloe');
 		await expect(row.getByRole('button', { name: 'Reset two-step sign-in' })).toHaveCount(0);
-		const more = row.getByRole('button', { name: 'More actions' });
+		// The trigger is named for its row, and a menu item shows the action's fuller name (ariaLabel).
+		const more = row.getByRole('button', { name: 'More actions for Chloé Martin', exact: true });
 		await more.focus();
 		await press(page, 'Enter');
-		await expect(page.getByRole('menuitem')).toHaveText(['Reset two-step sign-in', 'Sign out everywhere']);
+		await expect(page.getByRole('menuitem')).toHaveText(['Reset two-step sign-in', 'Sign out Chloé Martin everywhere']);
 		await page.getByRole('menuitem', { name: 'Reset two-step sign-in' }).click();
 		await expect(section.getByTestId('section-resets')).toHaveText('1');
 		await expect(more).toBeFocused();
@@ -304,7 +305,9 @@ test.describe('SettingsToggle', () => {
 		await page.clock.runFor(SETTLE);
 		await expect(sounds).not.toBeChecked();
 		await expect(row.getByRole('alert')).toHaveText("Couldn't turn on sounds. Changed back.");
-		await expect(sounds).toHaveAttribute('aria-invalid', 'true');
+		// A failed save is not invalid input: the switch is described by the alert, not marked invalid.
+		await expect(sounds).not.toHaveAttribute('aria-invalid', 'true');
+		await expect(sounds).toHaveAccessibleDescription(/Couldn't turn on sounds. Changed back./);
 		await row.getByRole('button', { name: 'Retry' }).click();
 		await page.clock.runFor(SETTLE);
 		await expect(sounds).toBeChecked();
@@ -534,7 +537,7 @@ test.describe('Actions and failures', () => {
 		await expect(row.getByRole('alert')).toHaveText("Couldn't make new codes. Your old ones still work.");
 		await expect(regenerate).toBeFocused();
 
-		const more = row.getByRole('button', { name: 'More actions' });
+		const more = row.getByRole('button', { name: 'More actions for Recovery codes', exact: true });
 		await more.focus();
 		await press(page, 'Enter');
 		await expect(page.getByRole('menuitem')).toHaveText(['Email them to me', 'Mark as printed']);
@@ -840,5 +843,325 @@ test.describe('RequestedChange in a form', () => {
 		const sent = await request;
 		expect(new URL(sent.url()).search).toBe('?request=rq_2207');
 		expect(sent.postData()).toBe('intent=resend');
+	});
+});
+
+test.describe('Enter in a staged field', () => {
+	/** Every POST the page sends, by path. */
+	function postsOf(page: Page): string[] {
+		const posts: string[] = [];
+		page.on('request', (r) => {
+			if (r.method() === 'POST') posts.push(new URL(r.url()).pathname);
+		});
+		return posts;
+	}
+
+	test('with JavaScript, Enter on a clean form does nothing; after an edit it saves the form, never Send again', async ({ page }) => {
+		const posts = postsOf(page);
+		const section = await openOnClock(page, 'settings-row');
+		await stubPosts(page, '/settings-demo/requests');
+		const name = section.getByRole('textbox', { name: 'Team name' });
+		await pauseClock(page);
+		await name.focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('row-saves')).toHaveText('0');
+		await expect(section.getByTestId('row-dirty')).toHaveText('No unsaved changes');
+
+		await name.fill('Northwind Labs');
+		await press(page, 'Enter');
+		await expect(section.getByTestId('row-dirty')).toHaveText('Saving…');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('row-saves')).toHaveText('1');
+		expect(posts).toEqual([]);
+		expect(new URL(page.url()).pathname).toBe('/');
+	});
+
+	test('without JavaScript, Enter in a field posts the form to its own action, not Send again', async ({ browser, baseURL }) => {
+		const { page, close } = await noJsPage(browser, baseURL);
+		const posts = postsOf(page);
+		await stubPosts(page, '/settings-demo/general');
+		await stubPosts(page, '/settings-demo/requests');
+		const request = page.waitForRequest((r) => r.method() === 'POST');
+		await page.locator('#settings-row').getByRole('textbox', { name: 'Team name' }).press('Enter');
+		const sent = await request;
+		const body = new URLSearchParams(sent.postData() ?? '');
+		expect(new URL(sent.url()).pathname).toBe('/settings-demo/general');
+		expect(body.get('teamName')).toBe('Northwind Studio');
+		expect(body.getAll('intent')).toEqual([]);
+		expect(posts).toEqual(['/settings-demo/general']);
+		await close();
+	});
+});
+
+/** Opens the composed settings fixture at a width, ready for keys and clicks. */
+async function openComposed(page: Page, width = 1440): Promise<void> {
+	await page.setViewportSize({ width, height: 900 });
+	await page.goto('/fixtures/settings-composed/');
+	// An instant toggle with no `action` waits for the page: enabled means hydrated.
+	await expect(page.getByRole('switch', { name: 'Play a sound' })).toBeEnabled({ timeout: 45000 });
+}
+
+/** Left and right edges of an element, in page pixels. */
+async function edges(locator: Locator): Promise<{ left: number; right: number; width: number }> {
+	const box = await locator.boundingBox();
+	if (!box) throw new Error('not rendered');
+	return { left: box.x, right: box.x + box.width, width: box.width };
+}
+
+test.describe('Lock reasons in a composed page', () => {
+	test('a stronger page lock describes the row by its own reason, not by the shared reasonId of the row', async ({ page }) => {
+		await openComposed(page);
+		const security = page.locator('#security');
+		const controls = [security.getByRole('switch', { name: 'Two-step sign-in' }), security.getByRole('combobox', { name: 'Session length' })];
+		for (const control of controls) await expect(control).toHaveAccessibleDescription(/Sign-in rules are set for every workspace/);
+
+		await page.getByTestId('as-viewer').check();
+		for (const control of controls) {
+			await expect(rowOf(control)).toHaveAttribute('data-locked', 'permission');
+			await expect(control).toHaveAccessibleDescription(/Only admins can change workspace settings\./);
+			expect((await control.getAttribute('aria-describedby'))?.split(' ')).not.toContain('composed-security-lock');
+		}
+	});
+});
+
+test.describe('Buttons that need JavaScript', () => {
+	test('without JavaScript, a button that only calls back is soft-disabled; one with a native path is not', async ({ browser, baseURL }) => {
+		const { page, close } = await noJsPage(browser, baseURL);
+		const waiting = [
+			page.getByTestId('lock-request-fail').getByRole('button', { name: 'Ask for an upgrade' }),
+			page.getByTestId('section-locked').getByRole('button', { name: 'Request access' }),
+			page.getByTestId('requested-awaiting').getByRole('button', { name: 'Send again for Parallel runs' }),
+			page.getByTestId('requested-awaiting').getByRole('button', { name: 'Cancel request for Parallel runs' }),
+			page.getByTestId('row-codes').getByRole('button', { name: 'Regenerate' }),
+			page.getByTestId('facts-connection').getByRole('button', { name: 'Sync now' }),
+			page.getByTestId('lock-action-callback').getByRole('button', { name: 'Take the tour' })
+		];
+		for (const button of waiting) await expect(button).toHaveAttribute('aria-disabled', 'true');
+		const native = [
+			page.getByTestId('lock-request-ok').getByRole('button', { name: 'Request access' }),
+			page.locator('#settings-row').getByRole('button', { name: 'Ask an owner to upgrade' }),
+			page.getByTestId('requested-nojs').getByRole('button', { name: 'Send again for Billing access' }),
+			page.getByTestId('section-request-post').getByRole('button', { name: 'Ask an admin' }),
+			page.getByTestId('toggle-instant').getByRole('button', { name: 'Ask an owner' })
+		];
+		for (const button of native) await expect(button).not.toHaveAttribute('aria-disabled', 'true');
+		await close();
+	});
+
+	test('with JavaScript, the same buttons are enabled', async ({ page }) => {
+		await openSection(page, 'lock-reason');
+		await expect(page.getByTestId('lock-request-fail').getByRole('button', { name: 'Ask for an upgrade' })).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(page.getByTestId('section-locked').getByRole('button', { name: 'Request access' })).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(page.getByTestId('requested-awaiting').getByRole('button', { name: 'Send again for Parallel runs' })).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(page.getByTestId('row-codes').getByRole('button', { name: 'Regenerate' })).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(page.getByTestId('facts-connection').getByRole('button', { name: 'Sync now' })).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(page.getByTestId('lock-action-callback').getByRole('button', { name: 'Take the tour' })).not.toHaveAttribute('aria-disabled', 'true');
+	});
+
+	test("a lock's way forward that only calls back loads, then runs once the page is interactive", async ({ page }) => {
+		const section = await openOnClock(page, 'lock-reason');
+		const tour = section.getByTestId('lock-action-callback').getByRole('button', { name: 'Take the tour' });
+		await pauseClock(page);
+		await tour.click();
+		await expect(tour).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('lock-tours')).toHaveText('1');
+		await expect(tour).not.toHaveAttribute('aria-busy', 'true');
+	});
+
+	test('without JavaScript, Request access posts its intent to requestAction, on its own and inside a staged form', async ({ browser, baseURL }) => {
+		const { page, close } = await noJsPage(browser, baseURL);
+		await stubPosts(page, '/settings-demo/access');
+		const posted = () => page.waitForRequest((r) => new URL(r.url()).pathname === '/settings-demo/access' && r.method() === 'POST');
+		let request = posted();
+		await page.getByTestId('lock-request-ok').getByRole('button', { name: 'Request access' }).click();
+		let sent = await request;
+		expect(new URL(sent.url()).search).toBe('?setting=plan');
+		expect(sent.postData()).toBe('intent=request-access');
+
+		await page.goto('/');
+		request = posted();
+		await page.locator('#settings-row').getByRole('button', { name: 'Ask an owner to upgrade' }).click();
+		sent = await request;
+		expect(new URL(sent.url()).search).toBe('?setting=sso');
+		expect(new URLSearchParams(sent.postData() ?? '').getAll('intent')).toEqual(['request-access']);
+
+		// A section's and a toggle's lock pass requestAction on to their reason.
+		for (const [testId, name, query] of [
+			['section-request-post', 'Ask an admin', '?setting=export'],
+			['toggle-instant', 'Ask an owner', '?setting=sidebar']
+		]) {
+			await page.goto('/');
+			request = posted();
+			await page.getByTestId(testId).getByRole('button', { name }).click();
+			sent = await request;
+			expect(new URL(sent.url()).search, name).toBe(query);
+			expect(sent.postData(), name).toBe('intent=request-access');
+		}
+		await close();
+	});
+
+	test('with JavaScript, a request with requestAction runs its handler and posts nothing, inside a staged form too', async ({ page }) => {
+		const posts: string[] = [];
+		page.on('request', (r) => {
+			if (r.method() === 'POST') posts.push(r.url());
+		});
+		const section = await openOnClock(page, 'settings-row');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Ask an owner to upgrade' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('row-requests')).toHaveText('1');
+		await expect(section.getByText('Request sent', { exact: true }).first()).toBeVisible();
+		expect(posts).toEqual([]);
+	});
+});
+
+test.describe('Row layout', () => {
+	test('a switch ends on the same right edge as every other control', async ({ page }) => {
+		for (const width of [1440, 768, 360]) {
+			await openComposed(page, width);
+			let inline = 0;
+			for (const name of ['Compact lists', 'Play a sound', 'Allow guests']) {
+				const control = page.getByRole('switch', { name });
+				await control.scrollIntoViewIfNeeded();
+				const row = rowOf(control);
+				const [own, box] = [await control.boundingBox(), await row.boundingBox()];
+				const label = await row.locator('label').first().boundingBox();
+				// A narrow row may wrap the switch under its label; beside the label it ends where the
+				// row's content ends, 16px (px-4) inside its edge, like every other control.
+				if (own!.y >= label!.y + label!.height) continue;
+				inline += 1;
+				expect(Math.abs(box!.x + box!.width - 16 - (own!.x + own!.width)), `${name} at ${width}`).toBeLessThan(1.5);
+			}
+			if (width === 1440) expect(inline).toBe(3);
+		}
+	});
+
+	test('a stacked row puts its control under the label, not pushed to the right', async ({ page }) => {
+		await openComposed(page);
+		const row = rowOf(page.getByText('What people get when they join.'));
+		await row.scrollIntoViewIfNeeded();
+		const label = await edges(row.getByText('Default role', { exact: true }));
+		const card = await edges(row.getByText('Can see everything, change nothing.'));
+		expect(card.left - label.left).toBeLessThan(48);
+	});
+
+	test('on a narrow container a toggle or badge row keeps 60% for its label and wraps the control under it', async ({ page }) => {
+		const section = await openSection(page, 'settings-toggle');
+		await page.setViewportSize({ width: 320, height: 800 });
+		const instant = section.getByTestId('toggle-instant');
+		for (const [name, text] of [
+			['Compact lists', 'Tighter rows, more on screen.'],
+			['Play sounds', 'A short chime when something finishes.']
+		]) {
+			const row = rowOf(instant.getByRole('switch', { name }));
+			await row.scrollIntoViewIfNeeded();
+			const [description, box] = [await edges(row.getByText(text)), await edges(row)];
+			expect(description.width, name).toBeGreaterThanOrEqual(0.6 * (box.width - 32) - 1);
+		}
+		// A leading icon and a lock reason do not squeeze the text either.
+		const dark = rowOf(instant.getByRole('switch', { name: 'Dark sidebar' }));
+		const [lockLine, darkBox] = [await edges(dark.locator('[data-lock]')), await edges(dark)];
+		expect(lockLine.width).toBeGreaterThanOrEqual(0.6 * (darkBox.width - 32) - 1);
+		const downloads = rowOf(section.getByTestId('toggle-staged-form').getByRole('switch', { name: 'Allow downloads' }));
+		await downloads.scrollIntoViewIfNeeded();
+		const [reason, box] = [await edges(downloads.locator('[data-lock]')), await edges(downloads)];
+		expect(reason.width).toBeGreaterThanOrEqual(0.6 * (box.width - 32) - 1);
+		await expect(downloads.getByText('Always on')).toBeVisible();
+	});
+
+	// Ordinary labels, not just a short one: a label that fills its line must not be rewrapped by
+	// Saving or Saved either (the label is renamed in place, as an app's own words would be).
+	for (const width of [393, 400, 412]) {
+		for (const text of ['Compact lists', 'Show line numbers in diffs', 'Email me when a run finishes', 'Compact lists in every project view']) {
+			test(`at ${width}px a save never moves the switch or the rows below, label "${text}"`, async ({ page }) => {
+				await page.clock.install();
+				await openComposed(page, width);
+				const id = await page.getByRole('switch', { name: 'Compact lists' }).getAttribute('id');
+				const compact = page.locator(`[id="${id}"]`);
+				const row = rowOf(compact);
+				const label = row.locator(`label[for="${id}"]`);
+				await label.evaluate((node, words) => {
+					const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, { acceptNode: (t) => (t.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+					walker.nextNode()!.textContent = words;
+				}, text);
+				// The label line: the label and the status slot beside it.
+				const line = label.locator('xpath=..');
+				await expect(compact).toHaveAccessibleName(text);
+				await compact.scrollIntoViewIfNeeded();
+				const next = row.locator('xpath=following-sibling::li[1]');
+				const where = async () => {
+					const [own, box, below] = [await compact.boundingBox(), await line.boundingBox(), await next.boundingBox()];
+					return { x: own!.x, y: own!.y, label: box!.height, next: below!.y };
+				};
+				const idle = await where();
+				await pauseClock(page);
+				await compact.click();
+				await expect(row).toHaveAttribute('data-status', 'pending');
+				const pending = await where();
+				await page.clock.runFor(SETTLE);
+				await expect(row).toHaveAttribute('data-status', 'saved');
+				await expect(row.locator('[data-row-saved]:visible')).toHaveText('Saved');
+				const saved = await where();
+				await page.clock.runFor(2500);
+				await expect(row).toHaveAttribute('data-status', 'idle');
+				await expect(row.locator('[data-row-saved]:visible')).toHaveCount(0);
+				const after = await where();
+				for (const [phase, at] of [
+					['pending', pending],
+					['saved', saved],
+					['idle again', after]
+				] as const) {
+					expect(Math.abs(at.x - idle.x), `x while ${phase}`).toBeLessThan(0.5);
+					expect(Math.abs(at.y - idle.y), `y while ${phase}`).toBeLessThan(0.5);
+					expect(Math.abs(at.label - idle.label), `label line height while ${phase}`).toBeLessThan(0.5);
+				}
+				// The rows below stay put while saving, and when Saved clears (Undo arrives with the save).
+				expect(Math.abs(pending.next - idle.next), 'next row while pending').toBeLessThan(0.5);
+				expect(Math.abs(after.next - saved.next), 'next row when Saved clears').toBeLessThan(0.5);
+			});
+		}
+	}
+
+	test('facts line up with the meter beside them in a list={false} section', async ({ page }) => {
+		for (const width of [1440, 320]) {
+			await openComposed(page, width);
+			const usage = page.locator('#usage');
+			await usage.scrollIntoViewIfNeeded();
+			const [meter, fact] = [await edges(usage.getByText('Seats', { exact: true })), await edges(usage.locator('dt', { hasText: 'Created' }))];
+			expect(Math.abs(meter.left - fact.left), `at ${width}`).toBeLessThan(1);
+		}
+	});
+});
+
+test.describe('Instant status', () => {
+	test('in forced colors a switch shows its state as text, since its thumb cannot be seen', async ({ page }) => {
+		await page.emulateMedia({ forcedColors: 'active' });
+		const section = await openSection(page, 'settings-toggle');
+		const sounds = section.getByTestId('toggle-instant').getByRole('switch', { name: 'Play sounds' });
+		const state = rowOf(sounds).locator('[data-state-text]');
+		await expect(state).toBeVisible();
+		await expect(state).toHaveText('Off', { useInnerText: true });
+		await page.emulateMedia({ forcedColors: 'none' });
+		await expect(state).toBeHidden();
+	});
+
+	test('a failed instant row says the value changed back and is described by the alert, not marked invalid', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-row');
+		const select = section.getByTestId('row-instant').getByRole('combobox', { name: 'Default view' });
+		const row = rowOf(select);
+		await pauseClock(page);
+		await select.selectOption('calendar');
+		await expect(row).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(row.getByRole('alert')).toHaveText("Couldn't save. Changed back.");
+		await expect(select).toHaveValue('list');
+		await expect(select).not.toHaveAttribute('aria-invalid', 'true');
+		await expect(select).toHaveAccessibleDescription(/Couldn't save\. Changed back\./);
+		await select.selectOption('board');
+		await page.clock.runFor(SETTLE);
+		await expect(row.getByRole('status')).toHaveText('Saved');
+		await expect(row.getByRole('alert')).toHaveText('');
 	});
 });

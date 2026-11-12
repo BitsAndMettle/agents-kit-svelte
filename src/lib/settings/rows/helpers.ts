@@ -87,3 +87,22 @@ export function flippedByPerson(input: HTMLInputElement): boolean {
 		return true;
 	}
 }
+
+/**
+ * Posts `intent` to `url` from a hidden form of its own, as a native post would. Used inside
+ * someone else's form, whose own submit handler would otherwise take the post (as if Save). Call
+ * it in the browser only.
+ */
+export function postIntent(url: string, intent: string): void {
+	const form = document.createElement('form');
+	form.method = 'post';
+	form.action = url;
+	form.hidden = true;
+	const input = document.createElement('input');
+	input.type = 'hidden';
+	input.name = 'intent';
+	input.value = intent;
+	form.append(input);
+	document.body.append(form);
+	form.submit();
+}

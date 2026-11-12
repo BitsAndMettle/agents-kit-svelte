@@ -18,14 +18,14 @@
 		saving: string;
 		/** Shown and announced after a save. */
 		saved: string;
-		/** Shown when `status` is `error` and no `error` text is given. */
+		/** Shown when `status` is `error` and no `error` text is given. Say what happened to the value. */
 		failed: string;
 		/** Shown when `status` is `conflict`. */
 		conflict: string;
 		/** The summary mode's link. */
 		edit: string;
-		/** Name of the menu that holds the actions beyond the second. */
-		moreActions: string;
+		/** Name of the button that opens the menu of actions beyond the second; gets the row's label ("More actions for Ada Park"). */
+		moreActions: (label: string) => string;
 		/** Shown when an action's `onSelect` rejects or throws (a returned `{error}` shows its own text). */
 		actionFailed: string;
 	}
@@ -75,14 +75,16 @@
 		leading?: Snippet;
 		/** One trailing action, or your own snippet. An `onSelect` may return `{error}` or a promise: the button loads, and a failure shows in the row's alert. */
 		action?: SettingsAction | Snippet;
-		/** Trailing actions. More than two collapse into a "More actions" menu once the page is interactive; links and form intents always stay buttons. */
+		/** Trailing actions. More than two collapse into a "More actions" menu once the page is interactive; links and form intents always stay buttons. An action that only calls back (`onSelect`, no `href` or `intent`) is soft-disabled until then, since it can do nothing without JavaScript. */
 		actions?: SettingsAction[];
-		/** Where the row's own change stands (instant controls set it). Wins over the form's state. */
+		/** Where the row's own change stands (instant controls set it, `idle` included, so the label line keeps room for Saving and Saved). Wins over the form's state. */
 		status?: SettingStatus;
-		/** Error text; marks the control invalid. Inside a SettingsForm, the form's error for `name` is used when this is not set. */
+		/** Error text, shown in the row's alert and describing the control. It marks the control invalid unless `status` is `error` or `conflict` (a failed instant save: nothing the person entered is invalid). Inside a SettingsForm, the form's error for `name` is used when this is not set. */
 		error?: string;
 		/** Polite status text that replaces the default for the current status ("Undone"). */
 		statusText?: string;
+		/** Other texts `statusText` may show (an instant control's "Undone"): the label line keeps room for the longest of them too. */
+		statusWords?: string[];
 		/** Marks an unsaved change. Default: from the SettingsForm (`name`). */
 		dirty?: boolean;
 		/** The saved value's text while dirty. Default: from the SettingsForm (`name`). */
@@ -91,14 +93,16 @@
 		impact?: string | Snippet;
 		/** Locks this row. The strongest of this, its section's and its page's lock applies. A `badge` hides a single disabled switch or checkbox behind it (still there for assistive technology); anything focusable stays visible beside the badge, and a `group` row always does. */
 		lock?: SettingLock;
-		/** Id of a reason shown elsewhere (one LockReason describing several rows). The row then shows no reason of its own. */
+		/** Id of a reason shown elsewhere (one LockReason describing several rows), for this row's own `lock`. The row then shows no reason of its own. When a stronger section or page lock wins, the control is described by that lock's reason instead. */
 		reasonId?: string;
 		/** Request flow for the row's own lock reason. */
 		onRequest?: SettingsHandler<[]>;
+		/** No-JavaScript path for that request: LockReason's `requestAction`. */
+		requestAction?: string;
 		required?: boolean;
 		/** Turns a posted value into display text for change summaries ("30" → "30 days"). */
 		format?: (raw: string | string[]) => string;
-		/** `auto` stacks on narrow containers and goes inline from 32rem; `inline` and `stacked` fix it. */
+		/** `auto` stacks on narrow containers and goes inline from 32rem. `inline` keeps the control beside the label while the label keeps at least 60% of the row (and 14rem), and wraps it under the label otherwise. `stacked` always puts the control under the label. */
 		layout?: 'auto' | 'inline' | 'stacked';
 		/** Narrow summary mode: below 32rem, this summary and an Edit link replace the control. */
 		summary?: Snippet;
@@ -128,12 +132,14 @@
 		status,
 		error,
 		statusText,
+		statusWords = [],
 		dirty,
 		previous,
 		impact,
 		lock,
 		reasonId,
 		onRequest,
+		requestAction,
 		required = false,
 		format,
 		layout = 'auto',
@@ -156,10 +162,10 @@
 		was: (v) => `was ${v}`,
 		saving: 'Saving…',
 		saved: 'Saved',
-		failed: "Couldn't save.",
+		failed: "Couldn't save. Changed back.",
 		conflict: 'Changed elsewhere. Review it before saving.',
 		edit: 'Edit',
-		moreActions: 'More actions',
+		moreActions: (label) => (label ? `More actions for ${label}` : 'More actions'),
 		actionFailed: "Couldn't do that. Try again.",
 		...labels
 	});
@@ -174,8 +180,9 @@
 	const effectiveLock = $derived(pickLock(lock, scope?.lock?.lock));
 	/** The row draws its own reason only for its own lock, and only when no shared reason is named. */
 	const ownReason = $derived(Boolean(effectiveLock && effectiveLock === lock && !reasonId));
+	/** The reason of the lock that applies: the row's own (shared `reasonId` or drawn here), else the section's or page's. */
 	const lockReasonId = $derived(
-		effectiveLock ? (reasonId ?? (effectiveLock === lock ? `${uid}-reason` : scope?.lock?.reasonId)) : undefined
+		effectiveLock ? (effectiveLock === lock ? (reasonId ?? `${uid}-reason`) : scope?.lock?.reasonId) : undefined
 	);
 
 	const isDirty = $derived(dirty ?? (draft && name ? draft.isDirty(name) : false));
@@ -184,6 +191,8 @@
 		error ?? (draft && name ? draft.fieldError(name) : undefined) ?? (status === 'error' ? words.failed : status === 'conflict' ? words.conflict : undefined)
 	);
 	const shownStatus = $derived<SettingStatus>(status ?? (errorText ? 'error' : 'idle'));
+	/** A field error marks the control invalid. A failed instant save (`status` error or conflict) only describes it: nothing the person entered is invalid. */
+	const fieldInvalid = $derived(Boolean(errorText) && status !== 'error' && status !== 'conflict');
 	/** The row's own actions: one runs at a time; its failure shows in the alert, its notice in the status. */
 	const actionRun = new SettingsHandlerRun();
 	let running = $state.raw<SettingsAction | undefined>(undefined);
@@ -192,6 +201,11 @@
 		statusText ??
 			(shownStatus === 'pending' ? words.saving : shownStatus === 'saved' ? words.saved : actionRun.status === 'done' ? (actionRun.notice ?? '') : '')
 	);
+
+	/** A row with a `status` (an instant row, even while `idle`) keeps a status slot on its label line, as wide as its longest word and empty while idle, so a save never changes the label line. */
+	const reservesStatus = $derived(status !== undefined);
+	const savedText = $derived(statusText ?? words.saved);
+	const slotWords = $derived([...new Set([words.saved, ...(statusText ? [statusText] : []), ...statusWords])]);
 
 	const changeId = `${uid}-change`;
 	const impactId = `${uid}-impact`;
@@ -202,11 +216,17 @@
 		id: uid,
 		controlId: () => controlId,
 		description: () => Boolean(description),
-		error: () => Boolean(errorText),
+		error: () => fieldInvalid,
 		required: () => required,
 		disabled: () => Boolean(effectiveLock),
 		group: () => group,
-		describedBy: () => [isDirty ? changeId : undefined, isDirty && impact ? impactId : undefined, liveText ? statusId : undefined, lockReasonId]
+		describedBy: () => [
+			isDirty ? changeId : undefined,
+			isDirty && impact ? impactId : undefined,
+			liveText ? statusId : undefined,
+			lockReasonId,
+			errorText && !fieldInvalid ? `${uid}-error` : undefined
+		]
 	});
 	// In a group row the fieldset is the one group the label names, so the control gets no label id:
 	// a RadioGroup would otherwise name itself by it too ("Size, group" then "Size, radio group").
@@ -226,7 +246,8 @@
 	const menuItems = $derived<MenuEntry[]>(
 		split.overflow.map((a, index) => ({
 			value: `action-${index}`,
-			label: a.label,
+			// A menu item's text is its name, so the action's fuller name (`ariaLabel`) is shown.
+			label: a.ariaLabel ?? a.label,
 			tone: a.tone === 'danger' ? 'danger' : 'neutral',
 			disabled: Boolean(a.unavailable),
 			// Links and intents never reach the menu (splitActions), so an item only calls back.
@@ -249,7 +270,7 @@
 
 	const layoutClass = $derived(
 		layout === 'inline'
-			? 'flex-row items-start justify-between gap-4 @lg/settings:items-center @lg/settings:gap-6'
+			? 'flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2 @lg/settings:items-center @lg/settings:gap-x-6'
 			: layout === 'stacked'
 				? '@lg/settings:flex-col @lg/settings:items-stretch @lg/settings:justify-start @lg/settings:gap-2'
 				: ''
@@ -294,16 +315,27 @@
 	data-locked={effectiveLock?.kind}
 	class={cn(RECIPES.row, isDirty && RECIPES.rowStaged, layoutClass, className)}
 >
-	<div class="flex min-w-0 flex-1 items-start gap-3">
+	<!-- Inline: the label keeps at least 60% of the row (and 14rem, room for a leading icon and a lock reason); a control that needs more wraps under it. -->
+	<div class={cn('flex min-w-0 items-start gap-3', layout === 'inline' ? 'flex-[1_1_max(60%,14rem)]' : 'flex-1')}>
 		{#if leading}<div class="shrink-0 pt-0.5">{@render leading()}</div>{/if}
 		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+			<!-- An instant row never wraps this line: the label wraps inside its own box beside a status slot that is always there. -->
+			<div class={cn('flex gap-x-2 gap-y-1', reservesStatus ? 'items-start' : 'flex-wrap items-center')}>
 				{#if control && !group && labelFor}
-					<label id={labelId} for={field.controlId} class="text-[13px] leading-5 font-medium text-fg-main">{@render text(label)}{#if required}<span aria-hidden="true" class="text-status-danger"> *</span>{/if}</label>
+					<label id={labelId} for={field.controlId} class="min-w-0 text-[13px] leading-5 font-medium break-words text-fg-main">{@render text(label)}{#if required}<span aria-hidden="true" class="text-status-danger"> *</span>{/if}</label>
 				{:else}
-					<span id={labelId} class="text-[13px] leading-5 font-medium text-fg-main">{@render text(label)}</span>
+					<span id={labelId} class="min-w-0 text-[13px] leading-5 font-medium break-words text-fg-main">{@render text(label)}</span>
 				{/if}
-				{#if isDirty}<Badge tone="accent" size="sm" aria-hidden="true">{words.unsaved}</Badge>{/if}
+				{#if isDirty}<Badge tone="accent" size="sm" aria-hidden="true" class="shrink-0">{words.unsaved}</Badge>{/if}
+				<!-- Saving and Saved sit on the label line, never beside the control, in a slot as wide as its longest word: every word shares one grid cell and only the current one shows. The control, the label's wrap and the rows below stay put whatever the save state. -->
+				{#if reservesStatus}
+					<span aria-hidden="true" data-row-status-slot class="grid shrink-0 items-center justify-items-start *:[grid-area:1/1]">
+						{#each slotWords as word (word)}
+							<span data-row-saved={word} class={cn('inline-flex items-center gap-1 text-xs leading-5 font-medium whitespace-nowrap', STATUS_TEXT_CLASS.success, (shownStatus !== 'saved' || word !== savedText) && 'invisible')}><Check class="size-3.5" />{word}</span>
+						{/each}
+						{#if shownStatus === 'pending'}<Spinner size="sm" decorative class="text-fg-light" />{/if}
+					</span>
+				{/if}
 			</div>
 			{#if description}
 				<p id="{uid}-description" class="m-0 text-xs leading-5 text-fg-light">{@render text(description)}</p>
@@ -317,7 +349,7 @@
 				{/if}
 			{/if}
 			{#if effectiveLock && ownReason}
-				<LockReason lock={effectiveLock} id={lockReasonId} {onRequest} labels={lockLabels} class="mt-1" />
+				<LockReason lock={effectiveLock} id={lockReasonId} {onRequest} {requestAction} labels={lockLabels} class="mt-1" />
 			{/if}
 			<div id="{uid}-error" role="alert" class={cn('text-xs leading-5 font-medium', DANGER_TEXT)}>{#if errorText}<p class="m-0">{errorText}</p>{/if}{#if actionError}<p class="m-0">{actionError}</p>{/if}</div>
 			{#if feedback}<div class="flex flex-wrap items-center gap-2 empty:hidden">{@render feedback()}</div>{/if}
@@ -326,13 +358,8 @@
 			{/each}
 		</div>
 	</div>
-	{#if control || value !== undefined || badgeOnly || actionList.length || (action && typeof action === 'function') || shownStatus === 'pending' || shownStatus === 'saved'}
-		<div class="flex min-w-0 flex-wrap items-center gap-2 @lg/settings:shrink-0 @lg/settings:flex-nowrap @lg/settings:justify-end">
-			{#if shownStatus === 'pending'}
-				<Spinner size="sm" decorative class="text-fg-light" />
-			{:else if shownStatus === 'saved'}
-				<span aria-hidden="true" class={cn('inline-flex items-center gap-1 text-xs font-medium', STATUS_TEXT_CLASS.success)}><Check class="size-3.5" />{statusText ?? words.saved}</span>
-			{/if}
+	{#if control || value !== undefined || badgeOnly || actionList.length || (action && typeof action === 'function')}
+		<div class={cn('flex min-w-0 flex-wrap items-center gap-2', layout !== 'stacked' && '@lg/settings:shrink-0 @lg/settings:flex-nowrap @lg/settings:justify-end')}>
 			{#if summary}
 				<div class="flex min-w-0 items-center gap-2 @lg/settings:hidden">
 					<span class="min-w-0 text-[13px] text-fg-main">{@render summary()}</span>
@@ -353,7 +380,7 @@
 			{#if split.overflow.length}
 				<DropdownMenu items={menuItems} placement="bottom-end">
 					{#snippet trigger(part)}
-						<button {...part} type="button" aria-label={words.moreActions} class={cn(buttonClass('ghost', 'icon-sm'), TOUCH_TARGET_CLASS, 'relative')}><Ellipsis aria-hidden="true" /></button>
+						<button {...part} type="button" aria-label={words.moreActions(labelText)} class={cn(buttonClass('ghost', 'icon-sm'), TOUCH_TARGET_CLASS, 'relative')}><Ellipsis aria-hidden="true" /></button>
 					{/snippet}
 				</DropdownMenu>
 			{/if}

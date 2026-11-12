@@ -25,6 +25,13 @@
 		requests += 1;
 	}
 
+	/** A way forward that only calls back (no link, no form): it waits for the page to be interactive. */
+	let tours = $state(0);
+	async function startTour(): Promise<void> {
+		await wait();
+		tours += 1;
+	}
+
 	async function refuse(): Promise<void | SettingsResult> {
 		await wait();
 		throw new Error('offline');
@@ -59,14 +66,19 @@
 
 	<SettingsSection data-testid="lock-request" title="Billing" description="You can see the plan but not change it." list={false}>
 		<div class="flex flex-col gap-3 px-4 py-3">
-			<LockReason data-testid="lock-request-ok" lock={{ kind: 'permission', reason: 'Only billing owners can change the plan.' }} onRequest={request} />
+			<!-- With requestAction the button also works without JavaScript; the next one has only a handler, so it waits for the page. -->
+			<LockReason data-testid="lock-request-ok" lock={{ kind: 'permission', reason: 'Only billing owners can change the plan.' }} onRequest={request} requestAction="/settings-demo/access?setting=plan" />
 			<LockReason data-testid="lock-request-fail" lock={{ kind: 'plan', reason: 'Seat limits are fixed on the Starter plan.' }} onRequest={refuse} labels={{ request: 'Ask for an upgrade' }} />
 			<LockReason
 				lock={{ kind: 'managed', reason: 'Payment details are managed in the billing portal.', action: { label: 'Open billing portal', href: '?page=billing-portal' } }}
 				variant="note"
 			/>
+			<LockReason
+				data-testid="lock-action-callback"
+				lock={{ kind: 'plan', reason: 'Usage reports are on the Business plan.', action: { label: 'Take the tour', onSelect: startTour } }}
+			/>
 			<LockReason data-testid="lock-hidden" variant="hidden" id="hidden-reason" lock={{ kind: 'readonly', reason: 'Archived teams are read-only.' }} />
-			<p class="m-0 text-xs text-fg-light">Requests sent: <span data-testid="lock-requests">{requests}</span></p>
+			<p class="m-0 text-xs text-fg-light">Requests sent: <span data-testid="lock-requests">{requests}</span>; tours started: <span data-testid="lock-tours">{tours}</span>.</p>
 		</div>
 	</SettingsSection>
 </div>

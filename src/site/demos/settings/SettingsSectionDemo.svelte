@@ -46,7 +46,7 @@
 			actions={[
 				{ label: 'Change role', ariaLabel: 'Change role for Chloé Martin', href: '?dialog=role&member=chloe' },
 				{ label: 'Reset two-step sign-in', onSelect: () => (resets += 1) },
-				{ label: 'Sign out everywhere', onSelect: () => (signOuts += 1) },
+				{ label: 'Sign out everywhere', ariaLabel: 'Sign out Chloé Martin everywhere', onSelect: () => (signOuts += 1) },
 				{ label: 'Remove', ariaLabel: 'Remove Chloé Martin', href: '?dialog=remove&member=chloe', tone: 'danger' }
 			]}
 		/>
@@ -66,6 +66,19 @@
 	>
 		<SettingsToggle label="Pay yearly" description="Two months free, billed once a year." checked={false} onCommit={save} />
 		<SettingsRow label="Billing contact" value="finance@northwind.example" />
+	</SettingsSection>
+
+	<!-- With requestAction the section's request also posts without JavaScript. -->
+	<SettingsSection
+		data-testid="section-request-post"
+		title="Data export"
+		description="Download everything this team has made."
+		lock={{ kind: 'permission', source: 'Admins only' }}
+		onRequest={requestAccess}
+		requestAction="/settings-demo/access?setting=export"
+		lockLabels={{ request: 'Ask an admin' }}
+	>
+		<SettingsRow label="Export format" value="ZIP of Markdown files" />
 	</SettingsSection>
 
 	<SettingsSection data-testid="section-group" title="Appearance" description="How lists look for you on this device.">
