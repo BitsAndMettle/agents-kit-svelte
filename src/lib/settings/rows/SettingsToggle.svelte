@@ -278,6 +278,7 @@
 	{status}
 	error={errorText}
 	{statusText}
+	statusWords={[words.undone]}
 	labels={{ saving: words.saving, saved: words.saved }}
 	class={cn('min-w-0', className)}
 />

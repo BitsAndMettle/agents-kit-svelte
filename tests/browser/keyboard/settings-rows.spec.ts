@@ -1071,42 +1071,57 @@ test.describe('Row layout', () => {
 		await expect(downloads.getByText('Always on')).toBeVisible();
 	});
 
+	// Ordinary labels, not just a short one: a label that fills its line must not be rewrapped by
+	// Saving or Saved either (the label is renamed in place, as an app's own words would be).
 	for (const width of [393, 400, 412]) {
-		test(`at ${width}px a save never moves the switch: Saving and Saved sit on the label line`, async ({ page }) => {
-			await page.clock.install();
-			await openComposed(page, width);
-			const compact = page.getByRole('switch', { name: 'Compact lists' });
-			await compact.scrollIntoViewIfNeeded();
-			const row = rowOf(compact);
-			const next = row.locator('xpath=following-sibling::li[1]');
-			const where = async () => {
-				const [own, below] = [await compact.boundingBox(), await next.boundingBox()];
-				return { x: own!.x, y: own!.y, next: below!.y };
-			};
-			const idle = await where();
-			await pauseClock(page);
-			await compact.click();
-			await expect(row).toHaveAttribute('data-status', 'pending');
-			const pending = await where();
-			await page.clock.runFor(SETTLE);
-			await expect(row).toHaveAttribute('data-status', 'saved');
-			await expect(row.locator('[aria-hidden="true"]', { hasText: 'Saved' })).toBeVisible();
-			const saved = await where();
-			await page.clock.runFor(2500);
-			await expect(row).toHaveAttribute('data-status', 'idle');
-			const after = await where();
-			for (const [phase, at] of [
-				['pending', pending],
-				['saved', saved],
-				['idle again', after]
-			] as const) {
-				expect(Math.abs(at.x - idle.x), `x while ${phase}`).toBeLessThan(0.5);
-				expect(Math.abs(at.y - idle.y), `y while ${phase}`).toBeLessThan(0.5);
-			}
-			// The rows below stay put while saving, and when Saved clears (Undo arrives with the save).
-			expect(Math.abs(pending.next - idle.next), 'next row while pending').toBeLessThan(0.5);
-			expect(Math.abs(after.next - saved.next), 'next row when Saved clears').toBeLessThan(0.5);
-		});
+		for (const text of ['Compact lists', 'Show line numbers in diffs', 'Email me when a run finishes', 'Compact lists in every project view']) {
+			test(`at ${width}px a save never moves the switch or the rows below, label "${text}"`, async ({ page }) => {
+				await page.clock.install();
+				await openComposed(page, width);
+				const id = await page.getByRole('switch', { name: 'Compact lists' }).getAttribute('id');
+				const compact = page.locator(`[id="${id}"]`);
+				const row = rowOf(compact);
+				const label = row.locator(`label[for="${id}"]`);
+				await label.evaluate((node, words) => {
+					const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, { acceptNode: (t) => (t.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
+					walker.nextNode()!.textContent = words;
+				}, text);
+				// The label line: the label and the status slot beside it.
+				const line = label.locator('xpath=..');
+				await expect(compact).toHaveAccessibleName(text);
+				await compact.scrollIntoViewIfNeeded();
+				const next = row.locator('xpath=following-sibling::li[1]');
+				const where = async () => {
+					const [own, box, below] = [await compact.boundingBox(), await line.boundingBox(), await next.boundingBox()];
+					return { x: own!.x, y: own!.y, label: box!.height, next: below!.y };
+				};
+				const idle = await where();
+				await pauseClock(page);
+				await compact.click();
+				await expect(row).toHaveAttribute('data-status', 'pending');
+				const pending = await where();
+				await page.clock.runFor(SETTLE);
+				await expect(row).toHaveAttribute('data-status', 'saved');
+				await expect(row.locator('[data-row-saved]:visible')).toHaveText('Saved');
+				const saved = await where();
+				await page.clock.runFor(2500);
+				await expect(row).toHaveAttribute('data-status', 'idle');
+				await expect(row.locator('[data-row-saved]:visible')).toHaveCount(0);
+				const after = await where();
+				for (const [phase, at] of [
+					['pending', pending],
+					['saved', saved],
+					['idle again', after]
+				] as const) {
+					expect(Math.abs(at.x - idle.x), `x while ${phase}`).toBeLessThan(0.5);
+					expect(Math.abs(at.y - idle.y), `y while ${phase}`).toBeLessThan(0.5);
+					expect(Math.abs(at.label - idle.label), `label line height while ${phase}`).toBeLessThan(0.5);
+				}
+				// The rows below stay put while saving, and when Saved clears (Undo arrives with the save).
+				expect(Math.abs(pending.next - idle.next), 'next row while pending').toBeLessThan(0.5);
+				expect(Math.abs(after.next - saved.next), 'next row when Saved clears').toBeLessThan(0.5);
+			});
+		}
 	}
 
 	test('facts line up with the meter beside them in a list={false} section', async ({ page }) => {
