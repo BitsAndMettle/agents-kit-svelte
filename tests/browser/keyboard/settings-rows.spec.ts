@@ -22,6 +22,17 @@ function rowOf(control: Locator): Locator {
 	return control.locator('xpath=ancestor::li[1]');
 }
 
+/** True when the element sits in a visually hidden box (`sr-only`: 1px, overflow hidden), so nobody sees it. */
+function clippedAway(control: Locator): Promise<boolean> {
+	return control.evaluate((node) => {
+		for (let el: Element | null = node; el; el = el.parentElement) {
+			const rect = el.getBoundingClientRect();
+			if ((rect.width <= 1 || rect.height <= 1) && getComputedStyle(el).overflow !== 'visible') return true;
+		}
+		return false;
+	});
+}
+
 /** Longer than the demos' 600 ms answer. */
 const SETTLE = 700;
 
@@ -611,6 +622,23 @@ test.describe('Focus and hydration', () => {
 		await expect(page.getByTestId('toggle-motion-bound')).toHaveText('on');
 	});
 
+	test('a staged switch keeps its unsaved edit on Back, like every other control in the form', async ({ page }) => {
+		const section = await openSection(page, 'settings-toggle');
+		const form = section.getByTestId('toggle-staged-form');
+		const publicLinks = form.getByRole('switch', { name: 'Public links' });
+		const invites = form.getByRole('switch', { name: 'Invite people outside the team' });
+		await publicLinks.click();
+		await invites.click();
+		await expect(form.getByTestId('toggle-staged-status')).toHaveText('2 unsaved');
+		await page.goto('/?away=3');
+		await page.goBack();
+		await expect(page.getByRole('button', { name: 'Toggle global color theme' })).toBeEnabled({ timeout: 45000 });
+		await expect(publicLinks).not.toBeChecked();
+		await expect(invites).toBeChecked();
+		await expect(form.getByTestId('toggle-staged-status')).toHaveText('2 unsaved');
+		await expect(form.getByRole('switch', { name: 'Allow downloads' })).toBeChecked();
+	});
+
 	test('a switch changed before hydration by a script, not a person, is put back and not committed', async ({ page }) => {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		let release: () => void = () => undefined;
@@ -726,17 +754,32 @@ test.describe('Group rows', () => {
 		// The single switch still hides behind the badge, disabled, so it takes no focus either.
 		const remember = box.getByRole('switch', { name: 'Remember this device' });
 		await expect(remember).toBeDisabled();
-		await expect(box.getByText('Set by IT')).toHaveCount(2);
-		const hiddenStops = await box.evaluate((node) =>
-			[...node.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')]
-				.filter((el) => el.tabIndex >= 0 && !(el as HTMLInputElement).disabled && el.getAttribute('type') !== 'hidden')
-				.filter((el) => {
-					const rect = el.getBoundingClientRect();
-					return rect.width < 4 || rect.height < 4;
-				})
-				.map((el) => el.outerHTML.slice(0, 80))
-		);
+		expect(await clippedAway(remember)).toBe(true);
+		await expect(box.getByText('Set by IT')).toHaveCount(3);
+		const stops = box.locator('a[href], button, input:not([type=hidden]), select, textarea, [tabindex]');
+		const hiddenStops: string[] = [];
+		for (const stop of await stops.all()) {
+			const focusable = await stop.evaluate((el: HTMLElement) => el.tabIndex >= 0 && !(el as HTMLInputElement).disabled);
+			if (focusable && (await clippedAway(stop))) hiddenStops.push(await stop.evaluate((el) => el.outerHTML.slice(0, 80)));
+		}
 		expect(hiddenStops).toEqual([]);
+	});
+
+	test('under a badge lock a control that stays focusable (a link) is shown beside the badge, with and without JavaScript', async ({ page, browser, baseURL }) => {
+		const linkStaysVisible = async (scope: Page) => {
+			const link = scope.getByTestId('section-managed').getByRole('link', { name: 'See the list of authenticator apps' });
+			await expect(link).toBeVisible();
+			expect(await clippedAway(link)).toBe(false);
+			await expect(rowOf(link).getByText('Set by IT')).toBeVisible();
+		};
+		await openSection(page, 'settings-section');
+		await linkStaysVisible(page);
+		const noJs = await noJsPage(browser, baseURL);
+		try {
+			await linkStaysVisible(noJs.page);
+		} finally {
+			await noJs.close();
+		}
 	});
 });
 

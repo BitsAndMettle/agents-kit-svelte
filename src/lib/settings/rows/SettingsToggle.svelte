@@ -147,9 +147,10 @@
 
 	// A switch flipped before hydration (the no-JS form makes it live early) keeps its new state in
 	// the DOM, but nothing saw the change: commit it once, as soon as the input is bound. Only a
-	// person's flip counts. `autocomplete="off"` stops the browser restoring an old state on Back or
-	// reload, and `flippedByPerson` checks the browser saw a real activation, so restored state never
-	// reaches `onCommit` with nobody touching the page: the switch goes back to the saved state.
+	// person's flip counts. On the instant switch `autocomplete="off"` stops the browser restoring an
+	// old state on Back or reload, and `flippedByPerson` checks the browser saw a real activation, so
+	// restored state never reaches `onCommit` with nobody touching the page. A staged switch keeps the
+	// browser's restore, like every other control in a SettingsForm: nothing commits until Save.
 	let reconciled = false;
 	$effect(() => {
 		const node = ref;
@@ -223,7 +224,7 @@
 			</span>
 		{/if}
 		{#if draft}
-			<Switch autocomplete="off" {...rest} bind:ref {name} value="true" defaultChecked={start} disabled={disabled || undefined} />
+			<Switch {...rest} bind:ref {name} value="true" defaultChecked={start} disabled={disabled || undefined} />
 		{:else}
 			<Switch autocomplete="off" {...rest} bind:ref {name} value="true" checked={current} disabled={disabled || notReady || undefined} onCheckedChange={change} />
 		{/if}

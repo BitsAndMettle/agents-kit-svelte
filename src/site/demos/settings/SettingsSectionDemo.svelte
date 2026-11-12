@@ -88,6 +88,12 @@
 				<RadioGroup options={SESSION} defaultValue="8h" orientation="horizontal" />
 			{/snippet}
 		</SettingsRow>
+		<!-- A control the lock cannot disable (a link) stays visible beside the badge: no Tab stop hides. -->
+		<SettingsRow label="Authenticator apps" description="Only these apps can give sign-in codes.">
+			{#snippet control()}
+				<Button href="?page=authenticators" size="sm" variant="secondary">See the list<span class="sr-only"> of authenticator apps</span></Button>
+			{/snippet}
+		</SettingsRow>
 	</SettingsSection>
 
 	<SettingsSection data-testid="section-columns" title="Notifications" description="Choose where each kind of message reaches you." layout="columns">

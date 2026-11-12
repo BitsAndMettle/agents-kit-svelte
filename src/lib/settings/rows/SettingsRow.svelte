@@ -1,6 +1,12 @@
 <script lang="ts" module>
-	/** What can take focus with Tab: a control the badge must not hide. */
-	const FOCUSABLE = 'a[href], button:not(:disabled), input:not(:disabled):not([type="hidden"]), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+	/**
+	 * Only a disabled native control (a switch, a checkbox) may hide behind a lock badge: it takes no
+	 * focus. A copy that holds anything focusable (a link, or a button that ignores the field's
+	 * disabled) shows itself again. It is CSS, so it holds before hydration and without
+	 * JavaScript too; a Tab stop is never invisible.
+	 */
+	const HIDDEN_COPY_CLASS =
+		"sr-only [&:has(:is(a[href],button:not(:disabled),input:not(:disabled):not([type=hidden]),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex^='-'])))]:not-sr-only";
 
 	/** Words of a SettingsRow. */
 	export interface SettingsRowLabels {
@@ -81,7 +87,7 @@
 		previous?: string;
 		/** What the change will do, shown only while dirty. */
 		impact?: string | Snippet;
-		/** Locks this row. The strongest of this, its section's and its page's lock applies. */
+		/** Locks this row. The strongest of this, its section's and its page's lock applies. A `badge` hides a single disabled switch or checkbox behind it (still there for assistive technology); anything focusable stays visible beside the badge, and a `group` row always does. */
 		lock?: SettingLock;
 		/** Id of a reason shown elsewhere (one LockReason describing several rows). The row then shows no reason of its own. */
 		reasonId?: string;
@@ -247,17 +253,8 @@
 	);
 	/** A lock badge ("Always on") replaces what the row shows. A control stays in the page, visually hidden and disabled, so assistive technology meets the same switch either way. */
 	const badgeOnly = $derived(Boolean(effectiveLock?.badge));
-	/**
-	 * Only a single disabled native control (a switch, a checkbox) hides behind the badge: it cannot
-	 * take focus. A group, or a control that stays focusable while disabled (a RadioGroup's
-	 * aria-disabled radios), shows disabled beside the badge instead, so no tab stop is invisible.
-	 */
-	let hiddenFocusable = $state(false);
-	const hideControl = $derived(badgeOnly && !group && !hiddenFocusable);
-	let hiddenCopy = $state<HTMLElement | null>(null);
-	$effect(() => {
-		if (hiddenCopy?.querySelector(FOCUSABLE)) hiddenFocusable = true;
-	});
+	/** A group row shows its controls disabled beside the badge; a single control hides (see HIDDEN_COPY_CLASS). */
+	const hideControl = $derived(badgeOnly && !group);
 </script>
 
 {#snippet text(content: string | Snippet)}
@@ -274,7 +271,7 @@
 
 {#snippet controlArea()}
 	{#if control && hideControl}
-		<div bind:this={hiddenCopy} class="sr-only">{@render controlBody(control)}</div>
+		<div class={HIDDEN_COPY_CLASS}>{@render controlBody(control)}</div>
 		<Badge tone="neutral" variant="outline" size="lg" aria-hidden="true">{effectiveLock?.badge}</Badge>
 	{:else if control}
 		{@render controlBody(control)}
