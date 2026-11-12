@@ -283,7 +283,7 @@
 
 {#snippet feedback()}
 	{#if instant && (status === 'error' || keepRetry)}
-		<Button size="xs" variant="secondary" loading={keepRetry && retrying} onclick={retry} class={cn(keepRetry && !retrying && 'invisible')}>{words.retry}<span class="sr-only"> {label}</span></Button>
+		<Button size="xs" variant="secondary" data-retry-in-place={keepRetry ? '' : undefined} loading={keepRetry && retrying} onclick={retry} class={cn(keepRetry && !retrying && 'invisible')}>{words.retry}<span class="sr-only"> {label}</span></Button>
 	{:else if committing && instant?.canUndo && !locked}
 		<Button size="xs" variant="ghost" onclick={undo}>{words.undo}<span class="sr-only"> {label}</span></Button>
 	{/if}

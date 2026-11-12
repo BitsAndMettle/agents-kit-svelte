@@ -1410,13 +1410,14 @@ test.describe('Integration fixes: a retry holds the failure line', () => {
 	}
 });
 
-test.describe('Integration review fixes: Saving over a short failure', () => {
+test.describe('Integration review fixes: a retry after a short failure', () => {
 	// The failure ("Offline") is narrower than Saving; the second row's Saving and Retry are longer
-	// (translated) and Saving has spaces. Saving sets the held line's width too: on one line, and
-	// never under the loading Retry beside it.
-	for (const width of [360, 1440]) {
+	// (translated). While the retry runs, Retry shows its own loading state where it was pressed:
+	// it never moves under the pointer, the row keeps its height, and the visible Saving text steps
+	// aside (the row's status still says Saving to screen readers).
+	for (const width of [320, 360, 1440]) {
 		for (const testId of ['short-fail', 'short-fail-long']) {
-			test(`at ${width}px Saving over a short failure (${testId === 'short-fail' ? 'default' : 'longer'} words) never runs under Retry`, async ({ page }) => {
+			test(`at ${width}px Retry after a short failure (${testId === 'short-fail' ? 'default' : 'longer'} words) stays where it was pressed`, async ({ page }) => {
 				await page.clock.install();
 				await page.setViewportSize({ width, height: 900 });
 				await page.goto('/fixtures/settings-retry/');
@@ -1428,18 +1429,20 @@ test.describe('Integration review fixes: Saving over a short failure', () => {
 				await page.clock.runFor(SETTLE);
 				await expect(row.getByRole('alert')).toHaveText('Offline');
 				const retry = row.getByRole('button', { name: /^(Retry|Erneut versuchen)/ });
+				const before = (await retry.boundingBox())!;
+				const rowBefore = (await row.boundingBox())!;
 				await retry.click();
 				await expect(retry).toHaveAttribute('aria-busy', 'true');
-				const saving = row.locator('[data-held-failure] [data-row-saving]');
-				await expect(saving).toBeVisible();
-				const [a, b] = [(await saving.boundingBox())!, (await retry.boundingBox())!];
-				const apart = a.x + a.width <= b.x + 0.5 || b.x + b.width <= a.x + 0.5 || a.y + a.height <= b.y + 0.5 || b.y + b.height <= a.y + 0.5;
-				expect(apart, `Saving ${JSON.stringify(a)} and Retry ${JSON.stringify(b)} do not intersect`).toBe(true);
-				expect(a.height, 'Saving on one line').toBeLessThan(21);
-				const rowBox = (await row.boundingBox())!;
-				expect(a.y + a.height, 'Saving inside the row').toBeLessThanOrEqual(rowBox.y + rowBox.height + 0.5);
+				const during = (await retry.boundingBox())!;
+				expect(Math.abs(during.x - before.x), 'Retry x while retrying').toBeLessThan(0.5);
+				expect(Math.abs(during.y - before.y), 'Retry y while retrying').toBeLessThan(0.5);
+				expect(Math.abs((await row.boundingBox())!.height - rowBefore.height), 'row height while retrying').toBeLessThan(0.5);
+				await expect(row.locator('[data-held-failure] [data-row-saving]')).toBeHidden();
+				await expect(row.getByRole('status')).toHaveText(/Saving|Wird gespeichert/);
 				await page.clock.runFor(SETTLE);
 				await expect(row.getByRole('alert')).toHaveText('Offline');
+				const after = (await retry.boundingBox())!;
+				expect(Math.abs(after.x - before.x), 'Retry x after the retry fails again').toBeLessThan(0.5);
 			});
 		}
 	}
