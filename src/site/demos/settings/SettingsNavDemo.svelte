@@ -50,9 +50,9 @@
 		</div>
 	</div>
 	<div class="flex min-w-0 flex-col gap-2">
-		<p class="m-0 text-xs font-medium text-fg-light">Index, two up</p>
-		<div class="rounded-window border border-card-border bg-canvas-secondary p-3">
-			<SettingsNav data-testid="nav-two-up" groups={groups.slice(1)} {current} variant="index" columns={2} labels={{ nav: 'Team settings' }} />
+		<p class="m-0 text-xs font-medium text-fg-light">Index, two up (<code>auto</code>: two cards from 32rem, the rail from 48rem)</p>
+		<div class="max-w-[44rem] rounded-window border border-card-border bg-canvas-secondary p-3">
+			<SettingsNav data-testid="nav-two-up" groups={groups.slice(1)} {current} variant="auto" columns={2} labels={{ nav: 'Team settings' }} />
 		</div>
 	</div>
 	<p class="m-0 text-xs text-fg-light">Current: <span data-testid="nav-current" class="text-fg-main">{current}</span> · Filter reported: <span data-testid="nav-filter" class="text-fg-main">{reported || '—'}</span></p>

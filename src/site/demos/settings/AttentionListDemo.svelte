@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Mail, PencilLine, UsersRound } from '@lucide/svelte';
 	import { AttentionList } from '$lib/settings/shell';
-	import type { AttentionItem, SettingsIcon } from '$lib/settings/shared';
+	import type { AttentionItem, SettingsIcon, SettingsResult } from '$lib/settings/shared';
 	import { SAMPLE_ATTENTION } from '$lib/fixtures/settings';
 
 	const ICONS: Record<string, SettingsIcon> = { unsaved: PencilLine, seats: UsersRound, email: Mail };
@@ -14,13 +14,18 @@
 	let wide = $state(fresh('attention-wide'));
 	let narrow = $state(fresh('attention-narrow', true));
 	let attempts = $state(0);
+	let seatRefusals = $state(0);
 	let followed = $state('');
 
-	/** A slow server call. In the wide list, dismissing the email reminder fails the first time, so the error shows. */
+	/**
+	 * A slow server call. In the wide list, dismissing the email reminder fails the first time (the
+	 * generic message shows), and the server refuses the seats warning once with its own reason.
+	 */
 	function dismisser(list: 'wide' | 'narrow') {
-		return async (id: string): Promise<void> => {
+		return async (id: string): Promise<SettingsResult | void> => {
 			await new Promise((resolve) => setTimeout(resolve, 600));
 			if (list === 'wide' && id === 'email' && attempts++ === 0) throw new Error('offline');
+			if (list === 'wide' && id === 'seats' && seatRefusals++ === 0) return { error: 'The server is busy, so the warning stays for now. Try again in a moment.' };
 			if (list === 'wide') wide = wide.filter((item) => item.id !== id);
 			else narrow = narrow.filter((item) => item.id !== id);
 		};
@@ -37,6 +42,7 @@
 		wide = fresh('attention-wide');
 		narrow = fresh('attention-narrow', true);
 		attempts = 0;
+		seatRefusals = 0;
 		followed = '';
 	}
 </script>

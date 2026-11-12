@@ -9,7 +9,7 @@
 		count: (count: number) => string;
 		/** Accessible name of an item's dismiss button. */
 		dismiss: (label: string) => string;
-		/** Shown (as an alert) when a dismissal failed; the item stays. */
+		/** Shown (as an alert) when a dismissal rejected; the item stays. A returned `{ error }` is shown instead. */
 		dismissFailed: (label: string) => string;
 		/** Shown after the last item was dismissed, where focus lands. */
 		allClear: string;
@@ -21,15 +21,18 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { ChevronRight, CircleAlert, Info, OctagonAlert, TriangleAlert, X } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
 	import { isThenable } from '../../core/promise';
 	import { IconButton } from '../../primitives/actions';
 	import { Badge } from '../../primitives/display';
+	import { getSettingsScope } from '../shared/context';
 	import { nextFocusAfterRemoval } from '../shared/focus';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES } from '../shared/recipes';
 	import type { SettingsIcon } from '../shared/types';
+	import { resultMessage } from './shell';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title'> {
 		/** What needs attention. Your app decides; the count is always `items.length`. With none, the list is `hidden`. */
@@ -45,8 +48,10 @@
 		layout?: 'auto' | 'cards' | 'list';
 		/**
 		 * Dismissing an item marked `dismissible`. Remove it from `items`; focus moves to the next
-		 * item, the previous one, or the heading. A returned promise shows loading on the button; a
-		 * rejection keeps the item and shows `labels.dismissFailed`.
+		 * item, the previous one, or the heading. A returned promise shows loading on the button. A
+		 * returned `{ error }` keeps the item and shows that error; a rejection shows
+		 * `labels.dismissFailed`. Dismissing needs JavaScript, so the button appears once the page
+		 * is ready (the settings scope's `ready()`, or after mount).
 		 */
 		onDismiss?: (id: string) => unknown;
 		/** Words, merged over the English defaults. */
@@ -69,7 +74,11 @@
 	const id = $props.id();
 	const headingTag = $derived(`h${headingLevel}`);
 	const pending = new SvelteSet<string>();
-	const failed = new SvelteSet<string>();
+	/** Item id to the message its last failed dismissal shows. */
+	const failed = new SvelteMap<string, string>();
+	const scope = getSettingsScope();
+	const gate = new ReadyGate();
+	const ready = $derived(scope ? scope.ready() : gate.current);
 	/** The last item went away by a dismissal here: keep the card, so focus has somewhere to land. */
 	let clearedHere = $state(false);
 	let list = $state<HTMLUListElement | null>(null);
@@ -82,17 +91,23 @@
 	async function dismiss(item: AttentionItem, index: number): Promise<void> {
 		if (!onDismiss || pending.has(item.id)) return;
 		failed.delete(item.id);
+		let result: unknown;
 		try {
-			const result = onDismiss(item.id);
+			result = onDismiss(item.id);
 			if (isThenable(result)) {
 				pending.add(item.id);
-				await result;
+				result = await result;
 			}
 		} catch {
-			failed.add(item.id);
+			failed.set(item.id, text.dismissFailed(item.label));
 			return;
 		} finally {
 			pending.delete(item.id);
+		}
+		const message = resultMessage(result);
+		if (message) {
+			failed.set(item.id, message);
+			return;
 		}
 		await tick();
 		if (items.some((i) => i.id === item.id)) return;
@@ -161,7 +176,7 @@
 								{#if text.tone[item.tone]}<span class="sr-only">{text.tone[item.tone]} </span>{/if}{item.label}
 							</p>
 							{#if item.description}<p id="{id}-{item.id}-description" class="m-0 text-xs leading-5 text-fg-light">{item.description}</p>{/if}
-							{#if failed.has(item.id)}<p role="alert" class="m-0 text-xs font-medium text-fg-main">{text.dismissFailed(item.label)}</p>{/if}
+							{#if failed.has(item.id)}<p role="alert" data-attention-error class="m-0 text-xs font-medium text-fg-main">{failed.get(item.id)}</p>{/if}
 						</div>
 					</div>
 					<div class={cn('flex items-center', CONTROLS[layout])}>
@@ -174,7 +189,7 @@
 								{item.action.label}<ChevronRight aria-hidden="true" class={cn('size-3.5 rtl:-scale-x-100', CHEVRON[layout])} />
 							</button>
 						{/if}
-						{#if item.dismissible && onDismiss}
+						{#if item.dismissible && onDismiss && ready}
 							<IconButton size="icon-sm" aria-label={text.dismiss(item.label)} loading={busy} onclick={() => dismiss(item, index)} class="relative z-[2]">
 								<X aria-hidden="true" />
 							</IconButton>

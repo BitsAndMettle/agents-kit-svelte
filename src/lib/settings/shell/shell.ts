@@ -2,7 +2,7 @@
  * Pure helpers for the Settings shell group. A leaf: type-only imports, no DOM, no runes, so
  * node tests can load it with an explicit `.ts` path.
  */
-import type { SettingsNavGroup } from '../shared/types';
+import type { SettingLock, SettingsNavGroup } from '../shared/types';
 
 /** What a narrow settings container shows: the grouped index, or one section's page. */
 export type SettingsLayoutView = 'index' | 'section';
@@ -72,4 +72,45 @@ export function matchesShortcut(shortcut: SearchShortcut, event: ShortcutEvent, 
 	if (event.metaKey !== wantMeta || event.ctrlKey !== wantCtrl || event.altKey !== shortcut.alt) return false;
 	const bare = !shortcut.mod && !shortcut.ctrl && !shortcut.alt;
 	return bare && shortcut.key.length === 1 ? true : event.shiftKey === shortcut.shift;
+}
+
+/** A lock covering a subtree, with the id of its visible reason (the `SettingsScope['lock']` shape). */
+export interface CoveringLock {
+	lock: SettingLock;
+	reasonId: string;
+}
+
+/**
+ * The lock a page passes down: the stronger of its own and the one from above. A tie goes to the
+ * page's own lock, so its reason (the nearer one) describes the controls.
+ *
+ * @param own - The page's own lock, if any.
+ * @param ownReasonId - Id of the element that shows the page's own reason.
+ * @param inherited - The lock from an enclosing scope, if any.
+ * @param pick - The shared precedence (`pickLock`); passed in so this file stays a leaf.
+ */
+export function coveringLock(
+	own: SettingLock | undefined,
+	ownReasonId: string,
+	inherited: CoveringLock | undefined,
+	pick: (...locks: (SettingLock | undefined)[]) => SettingLock | undefined
+): CoveringLock | undefined {
+	const strongest = pick(own, inherited?.lock);
+	if (!strongest) return undefined;
+	return own && strongest === own ? { lock: own, reasonId: ownReasonId } : inherited;
+}
+
+/**
+ * The message a settings callback's result asks to show: its `error`, else its field `errors`
+ * joined, else nothing. Anything that is not a `SettingsResult` shows nothing.
+ */
+export function resultMessage(result: unknown): string | undefined {
+	if (!result || typeof result !== 'object') return undefined;
+	const { error, errors } = result as { error?: unknown; errors?: unknown };
+	if (typeof error === 'string' && error.trim()) return error;
+	if (errors && typeof errors === 'object') {
+		const messages = Object.values(errors).filter((m): m is string => typeof m === 'string' && m.trim() !== '');
+		if (messages.length) return messages.join(' ');
+	}
+	return undefined;
 }

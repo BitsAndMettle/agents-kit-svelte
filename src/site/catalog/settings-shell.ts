@@ -46,7 +46,7 @@ export const SETTINGS_SHELL: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/shell/SettingsNav.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Grouped settings links as a compact rail or a phone-style index (44px rows with an icon tile, description, meta and chevron, optionally two up). A link can carry a count badge, an unsaved-changes dot and a lock mark, each with screen-reader text; the current one gets aria-current and an accent bar; an unavailable one is plain text with its reason, never a dead link. The optional filter is a GET form (`?q=`) that also filters in place and reports through onFilterChange. It navigates only through its links: your app renders the destination.',
+			'Grouped settings links as a compact rail or a phone-style index (44px rows with an icon tile, description, meta and chevron, optionally two up). A link is named by its label alone and described by its count badge, unsaved-changes dot, lock mark, description and meta; `columns={2}` sets the index look two up (in `auto` too, until the rail takes over); the current one gets aria-current and an accent bar; an unavailable one is plain text with its reason, never a dead link. The optional filter is a GET form (`?q=`) that also filters in place and reports through onFilterChange. It navigates only through its links: your app renders the destination.',
 		usageSnippet: `<script lang="ts">
   import { SettingsNav, type SettingsNavGroup } from 'agents-kit-svelte/settings';
 
@@ -73,7 +73,7 @@ export const SETTINGS_SHELL: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/shell/SettingsPage.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'The frame of one settings page: a back link that shows only in a narrow container, a breadcrumb for sub-pages, an icon tile, the heading with badges, a one-sentence lead and trailing actions, then an optional banner, the body and a footnote. A `scope` adds a non-dismissible note about the whole page (preview, read-only, sample) with up to two actions; with `scope.lock` every control below is locked and described by the visible reason (settings rows read it from context; plain controls get it from the children snippet). Scope actions are links or callbacks; the page itself reports nothing.',
+			'The frame of one settings page: a back link that shows only in a narrow container, a breadcrumb for sub-pages, an icon tile, the heading with badges, a one-sentence lead and trailing actions, then an optional banner, the body and a footnote. A `scope` adds a non-dismissible note about the whole page (preview, read-only, sample) with up to two actions; with `scope.lock` every control below is locked and described by the visible reason (settings rows read it from context; plain controls get it from the children snippet). Scope actions are links, posts (`intent`, from a small post form that works without JavaScript) or callbacks; a callback’s returned `{ error }` or rejection is shown under the note as an alert. The page itself reports nothing.',
 		usageSnippet: `<script lang="ts">
   import { SettingsPage, lockAttrs, type SettingsPageScope } from 'agents-kit-svelte/settings';
   import { Switch } from 'agents-kit-svelte/primitives';
@@ -126,7 +126,7 @@ export const SETTINGS_SHELL: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/shell/AttentionList.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A data-driven "needs attention" list. The count is always the number of items; each item shows a tone tile (with the tone spoken), a label, one line and one action, and the whole item follows that action without nesting controls. Wide containers show boxed cards, narrow ones rows. A dismissible item reports onDismiss(id) (a promise shows loading; a rejection keeps the item and says so); your app removes it and focus moves to the next item, the previous one or the heading. With no items the list is hidden. Your app decides what needs attention.',
+			'A data-driven "needs attention" list. The count is always the number of items; each item shows a tone tile (with the tone spoken), a label, one line and one action, and the whole item follows that action without nesting controls. Wide containers show boxed cards, narrow ones rows. A dismissible item reports onDismiss(id) (a promise shows loading; a returned `{ error }` or a rejection keeps the item and says why). Dismissing needs JavaScript, so the dismiss button appears once the page is ready; your app removes it and focus moves to the next item, the previous one or the heading. With no items the list is hidden. Your app decides what needs attention.',
 		usageSnippet: `<script lang="ts">
   import { AttentionList, type AttentionItem } from 'agents-kit-svelte/settings';
 

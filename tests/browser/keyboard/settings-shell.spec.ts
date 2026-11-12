@@ -132,11 +132,25 @@ test.describe('SettingsNav', () => {
 			await expect(section.getByTestId(id).locator('[aria-current="page"]')).toHaveCount(1);
 		}
 		const index = section.getByTestId('nav-index');
-		await expect(index.getByRole('link', { name: /^General/ })).toHaveAccessibleName('General (Unsaved changes) Team name and address.');
-		await expect(index.getByRole('link', { name: /^Billing/ })).toHaveAccessibleName(/^Billing \(Locked\)/);
-		await expect(index.getByRole('link', { name: /^Notifications/ })).toHaveAccessibleName(/\(2\)$/);
+		// One name (the label); the marks, badge, description and meta describe it.
+		const general = index.getByRole('link', { name: 'General', exact: true });
+		await expect(general).toHaveAccessibleName('General');
+		await expect(general).toHaveAccessibleDescription('Unsaved changes. Team name and address.');
+		await expect(index.getByRole('link', { name: 'Billing', exact: true })).toHaveAccessibleDescription(/^Locked\./);
+		await expect(index.getByRole('link', { name: 'Notifications', exact: true })).toHaveAccessibleDescription(/^2\b/);
 		await expect(index.getByRole('heading', { name: 'Settings', level: 2 })).toBeVisible();
 		await expect(index.getByRole('heading', { name: 'Team', level: 3 })).toBeVisible();
+	});
+
+	test('two up applies to the auto look too, until the rail takes over', async ({ page }) => {
+		const section = await openSection(page, 'settings-nav');
+		const twoUp = section.getByTestId('nav-two-up');
+		await expect(twoUp).toHaveAttribute('data-variant', 'auto');
+		const list = twoUp.locator('ul').first();
+		expect(await list.evaluate((ul) => getComputedStyle(ul).gridTemplateColumns.split(' ').length)).toBe(2);
+		// Wider than the rail breakpoint: one column of rail links.
+		await twoUp.evaluate((nav) => ((nav.parentElement as HTMLElement).style.maxWidth = '60rem'));
+		await expect.poll(() => list.evaluate((ul) => getComputedStyle(ul).display)).toBe('flex');
 	});
 
 	test('an unavailable link is text with its reason and never takes focus', async ({ page }) => {
@@ -225,13 +239,29 @@ test.describe('SettingsPage', () => {
 		await press(page, 'Enter');
 		await expect(request).toHaveAttribute('aria-busy', 'true');
 		await page.clock.runFor(SETTLE);
-		await expect(locked.getByRole('alert')).toContainText('Couldn’t send your request');
+		// The page itself shows the callback's `{ error }`: the demo draws no banner of its own.
+		await expect(locked.getByRole('alert')).toHaveText('Couldn’t send your request: nothing was sent. Try again.');
 		await expect(request).not.toHaveAttribute('aria-busy', 'true');
+		// With a callback the native post is cancelled: still the same page.
+		expect(page.url()).not.toContain('intent');
 		await press(page, 'Enter');
+		await expect(locked.getByRole('alert')).toHaveCount(0);
 		await page.clock.runFor(SETTLE);
 		const done = locked.getByRole('button', { name: 'Access requested' });
 		await expect(done).toHaveAttribute('aria-disabled', 'true');
 		await expect(done).toHaveAccessibleDescription('An admin has your request and will get back to you.');
+	});
+
+	test('without JavaScript an intent scope action posts its intent from the page’s own form', async ({ browser, baseURL }) => {
+		const { page, close } = await openWithoutJs(browser, baseURL);
+		const request = page.getByTestId('page-locked').getByRole('button', { name: 'Request access' });
+		await expect(request).toHaveAttribute('type', 'submit');
+		const form = await request.evaluate((button: HTMLButtonElement) => button.form && { method: button.form.method, scope: button.form.hasAttribute('data-settings-scope-form') });
+		expect(form).toEqual({ method: 'post', scope: true });
+		const posted = page.waitForRequest((r) => r.method() === 'POST');
+		await request.click();
+		expect((await posted).postData()).toBe('intent=request-access');
+		await close();
 	});
 });
 
@@ -267,9 +297,41 @@ test.describe('SettingsSearch', () => {
 		await expect(results.nth(1)).toBeFocused();
 		await press(page, 'ArrowUp', 'ArrowUp');
 		await expect(box).toBeFocused();
+		// Escape from any result returns to the box too.
+		await press(page, 'ArrowDown', 'ArrowDown');
+		await expect(results.nth(1)).toBeFocused();
+		await press(page, 'Escape');
+		await expect(box).toBeFocused();
+		await expect(box).toHaveValue('name');
 		await press(page, 'ArrowDown', 'ArrowDown', 'Enter');
 		await expect(section.getByTestId('search-opened')).toHaveText('?setting=team-name#settings-search');
 		await expect(page).toHaveURL(/\?setting=team-name#settings-search$/);
+	});
+
+	test('with JavaScript, Enter in a box without a results page stays put: the results are already shown', async ({ page }) => {
+		const section = await openSection(page, 'settings-search');
+		const inline = section.getByTestId('search-inline');
+		const box = inline.getByRole('searchbox', { name: 'Search settings' });
+		await box.fill('retention');
+		await expect(inline.locator('[data-search-result]')).toHaveCount(1);
+		const navigated = page.waitForEvent('framenavigated', { timeout: 1000 }).then(
+			() => true,
+			() => false
+		);
+		await press(page, 'Enter');
+		expect(await navigated).toBe(false);
+		expect(page.url()).not.toContain('q=');
+		await expect(box).toBeFocused();
+		await expect(inline.locator('[data-search-result]')).toHaveCount(1);
+	});
+
+	test('a result is named by its label and described by its section and description', async ({ page }) => {
+		const section = await openSection(page, 'settings-search');
+		const inline = section.getByTestId('search-inline');
+		await inline.getByRole('searchbox', { name: 'Search settings' }).fill('retention');
+		const result = inline.locator('[data-search-result]');
+		await expect(result).toHaveAccessibleName('Data retention');
+		await expect(result).toHaveAccessibleDescription(/^in Data/);
 	});
 
 	test('the shortcut focuses the box from anywhere outside a text field', async ({ page }) => {
@@ -359,12 +421,29 @@ test.describe('AttentionList', () => {
 		await email.click();
 		await page.clock.runFor(SETTLE);
 		await expect(wide.locator('[data-attention-item]')).toHaveCount(2);
-		await wide.getByRole('button', { name: 'Dismiss: Almost out of seats' }).click();
+		// The server answers `{ error }`: the item stays, and the alert gives the server's reason.
+		const seats = wide.getByRole('button', { name: 'Dismiss: Almost out of seats' });
+		await seats.click();
+		await page.clock.runFor(SETTLE);
+		await expect(wide.getByRole('alert')).toHaveText('The server is busy, so the warning stays for now. Try again in a moment.');
+		await expect(wide.locator('[data-attention-item]')).toHaveCount(2);
+		await expect(seats).toBeFocused();
+		await seats.click();
+		await expect(wide.getByRole('alert')).toHaveCount(0);
 		await page.clock.runFor(SETTLE);
 		// "Unsaved changes" is not dismissible: it stays until the app resolves it.
 		await expect(wide.locator('[data-attention-item]')).toHaveCount(1);
 		await expect(wide.getByRole('button', { name: /Dismiss/ })).toHaveCount(0);
 		await expect(wide.getByRole('link', { name: 'Review' })).toBeFocused();
+	});
+
+	test('without JavaScript there is no dismiss button: dismissing needs it, and the items and their links stay', async ({ browser, baseURL }) => {
+		const { page, close } = await openWithoutJs(browser, baseURL);
+		const narrow = page.getByTestId('attention-narrow');
+		await expect(narrow.locator('[data-attention-item]')).toHaveCount(3);
+		await expect(narrow.getByRole('button', { name: /Dismiss/ })).toHaveCount(0);
+		await expect(narrow.getByRole('link', { name: 'Add seats' })).toHaveAttribute('href', '?attention=attention-narrow-seats#attention-list');
+		await close();
 	});
 
 	test('dismissing the last item keeps the heading, says all is clear and takes focus there', async ({ page }) => {

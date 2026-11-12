@@ -54,7 +54,10 @@
 		 * description, meta and chevron. `auto`: index in a narrow settings container, rail in a wide one.
 		 */
 		variant?: 'rail' | 'index' | 'auto';
-		/** Index only: two cards side by side when there is room. */
+		/**
+		 * The index look: two cards side by side when there is room (from the `@lg/settings` width).
+		 * Applies to `index`, and to `auto` while it shows the index; the rail is always one column.
+		 */
 		columns?: 1 | 2;
 		/** A heading above the links (and the nav's accessible name). */
 		title?: string;
@@ -134,8 +137,12 @@
 		index: 'overflow-hidden rounded-card border border-card-border bg-card-bg divide-y divide-canvas-border',
 		auto: 'overflow-hidden rounded-card border border-card-border bg-card-bg divide-y divide-canvas-border @3xl/settings:flex @3xl/settings:flex-col @3xl/settings:gap-0.5 @3xl/settings:overflow-visible @3xl/settings:rounded-none @3xl/settings:border-0 @3xl/settings:bg-transparent @3xl/settings:divide-y-0'
 	} as const;
-	// Two-up index: tiles in a grid instead of one inset card.
-	const TILES = 'grid gap-2 @lg/settings:grid-cols-2 [&>li]:overflow-hidden [&>li]:rounded-card [&>li]:border [&>li]:border-card-border [&>li]:bg-card-bg';
+	// Two-up index: tiles in a grid instead of one inset card. `auto` switches back to the rail list when wide.
+	const TILES = {
+		rail: LIST.rail,
+		index: 'grid gap-2 @lg/settings:grid-cols-2 [&>li>a]:h-full [&>li]:overflow-hidden [&>li]:rounded-card [&>li]:border [&>li]:border-card-border [&>li]:bg-card-bg',
+		auto: 'grid gap-2 @lg/settings:grid-cols-2 [&>li>a]:h-full [&>li]:overflow-hidden [&>li]:rounded-card [&>li]:border [&>li]:border-card-border [&>li]:bg-card-bg @3xl/settings:flex @3xl/settings:flex-col @3xl/settings:gap-0.5 @3xl/settings:[&>li]:overflow-visible @3xl/settings:[&>li]:rounded-none @3xl/settings:[&>li]:border-0 @3xl/settings:[&>li]:bg-transparent'
+	} as const;
 	const ROW = {
 		rail: 'min-h-8 gap-2.5 rounded-control px-2.5 py-1.5 text-[13px]',
 		index: 'min-h-11 gap-3 px-3 py-2.5 text-sm',
@@ -152,18 +159,20 @@
 		'group relative flex w-full items-center text-fg-main no-underline outline-none transition-colors hover:bg-canvas-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary aria-[current=page]:bg-accent-subtle aria-[current=page]:font-medium aria-[current=page]:shadow-[inset_3px_0_0_var(--color-accent-primary)]';
 </script>
 
-{#snippet marks(link: SettingsLink)}
+<!-- The link's name is its label alone. Marks, badge, description and meta describe it
+     (aria-describedby); inside the link they are aria-hidden so they stay out of the name. -->
+{#snippet marks(link: SettingsLink, base: string)}
 	{#if link.dirty}
 		<span class="inline-flex shrink-0 items-center">
 			<span aria-hidden="true" class="size-1.5 rounded-full bg-accent-primary"></span>
-			<span class="sr-only">({text.unsaved})</span>
+			<span id="{base}-dirty" aria-hidden="true" class="sr-only">{text.unsaved}.</span>
 		</span>
 	{/if}
 	{#if link.lock}
 		{@const LockIcon = LOCK_ICONS[link.lock]}
 		<span class="inline-flex shrink-0 items-center text-fg-light [&_svg]:size-3.5">
 			<span aria-hidden="true" class="inline-flex"><LockIcon /></span>
-			<span class="sr-only">({text.locked})</span>
+			<span id="{base}-lock" aria-hidden="true" class="sr-only">{text.locked}.</span>
 		</span>
 	{/if}
 {/snippet}
@@ -180,23 +189,26 @@
 			</span>
 		</div>
 	{:else}
-		<a href={link.href} aria-current={link.id === current ? 'page' : undefined} data-nav-link={link.id} class={cn(LINK, ROW[variant])}>
+		{@const base = `${id}-link-${link.id}`}
+		{@const hasBadge = link.badge !== undefined && link.badge !== ''}
+		{@const described = [link.dirty && `${base}-dirty`, link.lock && `${base}-lock`, hasBadge && `${base}-badge`, link.description && `${base}-description`, link.meta && `${base}-meta`].filter(Boolean).join(' ')}
+		<a href={link.href} aria-current={link.id === current ? 'page' : undefined} aria-describedby={described || undefined} data-nav-link={link.id} class={cn(LINK, ROW[variant])}>
 			{#if Icon}<span aria-hidden="true" class={TILE[variant]}><Icon /></span>{/if}
 			<span class="min-w-0 flex-1">
 				<span class="flex min-w-0 items-center gap-1.5">
 					<span class="truncate">{link.label}</span>
-					{@render marks(link)}
+					{@render marks(link, base)}
 				</span>
 				{#if link.description}
-					<span class={cn('mt-0.5 block text-xs leading-4 font-normal text-fg-light', INDEX_ONLY[variant])}>{link.description}</span>
+					<span id="{base}-description" aria-hidden="true" class={cn('mt-0.5 block text-xs leading-4 font-normal text-fg-light', INDEX_ONLY[variant])}>{link.description}</span>
 				{/if}
 			</span>
 			{#if link.meta}
-				<span class={cn('shrink-0 text-xs font-normal text-fg-light', link.description && '@max-lg/settings:hidden', INDEX_ONLY[variant])}>{link.meta}</span>
+				<span id="{base}-meta" aria-hidden="true" class={cn('shrink-0 text-xs font-normal text-fg-light', link.description && '@max-lg/settings:hidden', INDEX_ONLY[variant])}>{link.meta}</span>
 			{/if}
-			{#if link.badge !== undefined && link.badge !== ''}
+			{#if hasBadge}
 				<Badge tone={link.badgeTone ?? 'neutral'} size="sm" aria-hidden="true">{link.badge}</Badge>
-				<span class="sr-only">({text.badge(link.badge)})</span>
+				<span id="{base}-badge" aria-hidden="true" class="sr-only">{text.badge(link.badge!)}</span>
 			{/if}
 			<ChevronRight aria-hidden="true" class={cn('size-4 shrink-0 text-fg-light rtl:-scale-x-100', INDEX_ONLY[variant])} />
 		</a>
@@ -246,7 +258,7 @@
 				<svelte:element this={groupTag} id="{id}-{group.id}" class="m-0 px-1 text-xs font-medium text-fg-light">{group.label}</svelte:element>
 			{/if}
 			{#if group.description}<p class={cn('m-0 px-1 text-xs leading-5 text-fg-light', INDEX_ONLY[variant])}>{group.description}</p>{/if}
-			<ul role="list" aria-labelledby={group.label ? `${id}-${group.id}` : undefined} class={cn('m-0 list-none p-0', columns === 2 && variant === 'index' ? TILES : LIST[variant])}>
+			<ul role="list" aria-labelledby={group.label ? `${id}-${group.id}` : undefined} class={cn('m-0 list-none p-0', columns === 2 ? TILES[variant] : LIST[variant])}>
 				{#each group.items as link (link.id)}
 					<li class="min-w-0">{@render entry(link)}</li>
 				{/each}

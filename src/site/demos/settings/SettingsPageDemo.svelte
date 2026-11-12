@@ -2,9 +2,9 @@
 	import { Bell, Database, Download, UserRound } from '@lucide/svelte';
 	import { SettingsPage, type SettingsPageScope } from '$lib/settings/shell';
 	import { Button } from '$lib/primitives/actions';
-	import { Alert, Badge } from '$lib/primitives/display';
+	import { Badge } from '$lib/primitives/display';
 	import { NativeSelect, Switch } from '$lib/primitives/form';
-	import { lockAttrs, RECIPES, type SettingsScope } from '$lib/settings/shared';
+	import { lockAttrs, RECIPES, type SettingsResult, type SettingsScope } from '$lib/settings/shared';
 
 	const RETENTION = [
 		{ value: '30', label: '30 days' },
@@ -14,17 +14,12 @@
 
 	let requests = $state(0);
 	let requested = $state(false);
-	let requestFailed = $state(false);
 
-	/** A slow server call that fails the first time, so the error and the retry can both be seen. */
-	async function requestAccess(): Promise<void> {
-		requestFailed = false;
+	/** A slow server call that refuses the first time, so the error the page shows and the retry can both be seen. */
+	async function requestAccess(): Promise<SettingsResult | void> {
 		await new Promise((resolve) => setTimeout(resolve, 600));
 		requests += 1;
-		if (requests === 1) {
-			requestFailed = true;
-			throw new Error('offline');
-		}
+		if (requests === 1) return { error: 'Couldn’t send your request: nothing was sent. Try again.' };
 		requested = true;
 	}
 
@@ -35,7 +30,8 @@
 		lock: { kind: 'permission', reason: 'Only admins can change data settings.', source: 'Set by your team’s owner' },
 		actions: requested
 			? [{ label: 'Access requested', unavailable: 'An admin has your request and will get back to you.' }]
-			: [{ label: 'Request access', tone: 'accent', onSelect: requestAccess }]
+			: // Without JavaScript the button posts intent=request-access; with it, the callback runs instead.
+				[{ label: 'Request access', tone: 'accent', intent: 'request-access', onSelect: requestAccess }]
 	});
 </script>
 
@@ -67,7 +63,7 @@
 
 <div class="flex min-w-0 flex-col gap-6">
 	<div class="flex min-w-0 flex-col gap-2">
-		<p class="m-0 text-xs font-medium text-fg-light">A plain page, at full width: no back link</p>
+		<p class="m-0 text-xs font-medium text-fg-light">A plain page: the back link shows only while the frame is narrow</p>
 		<div data-testid="page-wide" class="rounded-window border border-card-border bg-canvas-primary">
 			<SettingsPage headingLevel={2} title="Notifications" lead="What we tell you about, and where." icon={Bell} backHref="?page=index#settings-page" actions={notificationActions} footnote="Security notices are always sent, whatever you choose here.">
 				{#snippet badges()}<Badge tone="accent" size="sm">2 new</Badge>{/snippet}
@@ -103,9 +99,6 @@
 		<p class="m-0 text-xs font-medium text-fg-light">A page locked by its scope: every control below is disabled and says why</p>
 		<div data-testid="page-locked" class="rounded-window border border-card-border bg-canvas-primary">
 			<SettingsPage headingLevel={2} title="Data" lead="Retention, exports and deletion." icon={Database} scope={readOnly} width="lg">
-				{#snippet banner()}
-					{#if requestFailed}<Alert tone="danger" live title="Couldn’t send your request" description="Nothing was sent. Check your connection and try again." />{/if}
-				{/snippet}
 				{#snippet children(scope: SettingsScope)}
 					{@const locked = lockAttrs(scope.lock?.lock, scope.lock?.reasonId)}
 					<section class={RECIPES.section} aria-labelledby="page-demo-retention-title">

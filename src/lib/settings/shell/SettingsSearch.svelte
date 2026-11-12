@@ -181,10 +181,14 @@
 			<ul {...nav.root} role="list" class={cn('m-0 flex list-none flex-col p-0', page ? 'overflow-hidden rounded-card border border-card-border bg-card-bg divide-y divide-canvas-border' : 'gap-0.5 rounded-card border border-card-border bg-card-bg p-1 shadow-sm')}>
 				{#each results as hit, index (hit.entry.id)}
 					{@const Icon = hit.entry.icon}
+					{@const base = `${id}-result-${index}`}
+					{@const showDescription = !!hit.entry.description && (page || hit.descriptionRanges.length > 0)}
 					<li class="min-w-0">
+						<!-- Named by the setting's label; its section and description describe it. -->
 						<a
 							{...nav.item({ value: hit.entry.id, textValue: hit.entry.label })}
 							href={hit.entry.href}
+							aria-describedby={showDescription ? `${base}-section ${base}-description` : `${base}-section`}
 							data-search-result={hit.entry.id}
 							onkeydown={(event) => onResultKeydown(event, index)}
 							class={cn(
@@ -196,10 +200,10 @@
 							<span class="flex min-w-0 flex-1 flex-col gap-0.5">
 								<span class="flex min-w-0 flex-wrap items-baseline gap-x-2">
 									<span class={cn('font-medium break-words', page ? 'text-sm' : 'text-[13px]')}>{@render marked(hit.entry.label, hit.ranges)}</span>
-									<span class="text-xs text-fg-light">{text.inSection(hit.entry.section)}</span>
+									<span id="{base}-section" aria-hidden="true" class="text-xs text-fg-light">{text.inSection(hit.entry.section)}</span>
 								</span>
-								{#if hit.entry.description && (page || hit.descriptionRanges.length)}
-									<span class={cn('text-xs leading-5 text-fg-light', !page && 'line-clamp-1')}>{@render marked(hit.entry.description, hit.descriptionRanges)}</span>
+								{#if showDescription}
+									<span id="{base}-description" aria-hidden="true" class={cn('text-xs leading-5 text-fg-light', !page && 'line-clamp-1')}>{@render marked(hit.entry.description ?? '', hit.descriptionRanges)}</span>
 								{/if}
 							</span>
 						</a>

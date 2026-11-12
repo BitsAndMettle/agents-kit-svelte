@@ -8,6 +8,8 @@
 		back: string;
 		/** Accessible name of the breadcrumb. */
 		breadcrumb: string;
+		/** Shown (as an alert) when a scope action's callback rejected. A returned `{ error }` is shown instead. */
+		actionFailed: string;
 	}
 
 	/**
@@ -18,8 +20,15 @@
 		label: string;
 		description?: string | Snippet;
 		tone?: 'neutral' | 'accent' | 'warning';
-		/** Up to two ways forward ("Request access"). */
+		/**
+		 * Up to two ways forward ("Request access"). An `href` is a link. An `intent` posts
+		 * `intent=<value>` from a small `<form method="post">` (to `formAction`), which works without
+		 * JavaScript; with an `onSelect` as well, the callback runs instead and the post is cancelled.
+		 * A callback's `{ error }` or rejection is shown under the note.
+		 */
 		actions?: SettingsAction[];
+		/** Where an `intent` action posts. Default: the current page. */
+		formAction?: string;
 		lock?: SettingLock;
 	}
 </script>
@@ -32,13 +41,14 @@
 	import { Button } from '../../primitives/actions';
 	import { Alert } from '../../primitives/display';
 	import { Breadcrumb } from '../../primitives/navigation';
-	import { getSettingsScope, setSettingsScope, type SettingsScope } from '../shared/context';
+	import { getSettingsDraft, getSettingsScope, setSettingsScope, type SettingsScope } from '../shared/context';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { lockReasonText, pickLock } from '../shared/lock';
 	import { LOCK_ICONS } from '../shared/lock-icons';
 	import { actionButtonProps, RECIPES } from '../shared/recipes';
 	import type { SettingsIcon } from '../shared/types';
 	import { insideSettingsLayout } from './layout-context';
+	import { coveringLock, resultMessage } from './shell';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'title'> {
 		/** The page heading. */
@@ -93,22 +103,23 @@
 		...rest
 	}: Props = $props();
 
-	const text = $derived<SettingsPageLabels>({ back: 'All settings', breadcrumb: 'Breadcrumb', ...labels });
+	const text = $derived<SettingsPageLabels>({
+		back: 'All settings',
+		breadcrumb: 'Breadcrumb',
+		actionFailed: 'Couldn’t complete that. Nothing changed; try again.',
+		...labels
+	});
 
 	const id = $props.id();
 	const reasonId = `${id}-scope-reason`;
 	const parent = getSettingsScope();
 	const gate = parent ? undefined : new ReadyGate();
 	const ownContainer = !insideSettingsLayout();
+	/** Inside a SettingsForm the intent buttons post with it: forms never nest. */
+	const insideDraft = getSettingsDraft() !== undefined;
 
 	/** The strongest of the page's own lock and one from above. */
-	const covering = $derived.by(() => {
-		const own = scope?.lock;
-		const inherited = parent?.lock;
-		const strongest = pickLock(own, inherited?.lock);
-		if (!strongest) return undefined;
-		return strongest === own ? { lock: strongest, reasonId } : inherited;
-	});
+	const covering = $derived(coveringLock(scope?.lock, reasonId, parent?.lock, pickLock));
 
 	const pageScope: SettingsScope = {
 		ready: () => parent?.ready() ?? gate?.current ?? false,
@@ -119,20 +130,35 @@
 	setSettingsScope(pageScope);
 
 	const scopeActions = $derived((scope?.actions ?? (scope?.lock?.action ? [scope.lock.action] : [])).slice(0, 2));
+	const postsIntent = $derived(scopeActions.some((action) => action.intent !== undefined && !action.unavailable && action.href === undefined));
 	let busy = $state<Record<number, boolean>>({});
+	/** What the last scope action's callback reported: its `{ error }`, or the generic label after a rejection. */
+	let failure = $state<string | undefined>();
 
 	async function run(index: number, onSelect: () => unknown): Promise<void> {
 		if (busy[index]) return;
-		const result = onSelect();
-		if (!isThenable(result)) return;
-		busy[index] = true;
+		failure = undefined;
+		let result: unknown;
 		try {
-			await result;
+			result = onSelect();
+			if (isThenable(result)) {
+				busy[index] = true;
+				result = await result;
+			}
 		} catch {
-			// The app reports its own failure (a banner, a notice); the button only stops loading.
+			failure = text.actionFailed;
+			return;
 		} finally {
 			busy[index] = false;
 		}
+		failure = resultMessage(result);
+	}
+
+	function select(event: MouseEvent, index: number, action: SettingsAction): void {
+		if (!action.onSelect) return;
+		// A handler takes over from the native post.
+		if (action.intent !== undefined) event.preventDefault();
+		void run(index, action.onSelect);
 	}
 
 	const WIDTH = { md: 'max-w-3xl', lg: 'max-w-5xl', full: '' } as const;
@@ -145,12 +171,20 @@
 	{#if ScopeIcon}<ScopeIcon />{:else}<Info />{/if}
 {/snippet}
 
-{#snippet scopeButtons()}
+{#snippet scopeButtonList()}
 	{#each scopeActions as action, index (index)}
 		{@const reason = `${id}-action-${index}`}
-		<Button size="sm" {...actionButtonProps(action, reason)} loading={busy[index] ?? false} onclick={action.onSelect ? () => run(index, action.onSelect!) : undefined}>{action.label}</Button>
+		<Button size="sm" {...actionButtonProps(action, reason)} loading={busy[index] ?? false} onclick={action.onSelect ? (event: MouseEvent) => select(event, index, action) : undefined}>{action.label}</Button>
 		{#if action.unavailable}<span id={reason} class="text-xs text-fg-light">{action.unavailable}</span>{/if}
 	{/each}
+{/snippet}
+
+{#snippet scopeButtons()}
+	{#if postsIntent && !insideDraft}
+		<form method="post" action={scope?.formAction} data-settings-scope-form class="contents">{@render scopeButtonList()}</form>
+	{:else}
+		{@render scopeButtonList()}
+	{/if}
 {/snippet}
 
 <div {...rest} class={cn('w-full min-w-0 text-fg-main', ownContainer && '@container/settings', className)}>
@@ -182,6 +216,7 @@
 				{#if scope.lock}
 					<p id={reasonId} class="m-0 text-[13px] text-fg-main/80">{lockReasonText(scope.lock)}{#if scope.lock.source}<span class="block text-xs text-fg-main/70">{scope.lock.source}</span>{/if}</p>
 				{/if}
+				{#if failure}<p role="alert" data-settings-scope-error class="m-0 text-[13px] font-medium text-fg-main">{failure}</p>{/if}
 			</Alert>
 		{/if}
 		{@render banner?.()}

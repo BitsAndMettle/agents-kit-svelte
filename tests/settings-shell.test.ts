@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { countLinks, layoutView, matchesShortcut, parseShortcut, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
+import { countLinks, coveringLock, layoutView, matchesShortcut, parseShortcut, resultMessage, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
+import { pickLock } from '../src/lib/settings/shared/lock.ts';
 import { SAMPLE_SETTINGS_NAV } from '../src/lib/fixtures/settings.ts';
 import { filterSettingsLinks } from '../src/lib/settings/shared/search.ts';
 
@@ -55,4 +56,30 @@ test('matchesShortcut: a bare printable key ignores Shift but not other modifier
 	const shifted = parseShortcut('ctrl+shift+p')!;
 	assert.equal(matchesShortcut(shifted, key('P', { ctrlKey: true, shiftKey: true }), true), true);
 	assert.equal(matchesShortcut(shifted, key('p', { ctrlKey: true }), true), false);
+});
+
+test('coveringLock: the stronger lock wins, with its own reason; a tie goes to the page', () => {
+	const own = { kind: 'permission' as const };
+	const weakParent = { lock: { kind: 'plan' as const }, reasonId: 'parent-reason' };
+	const strongParent = { lock: { kind: 'readonly' as const }, reasonId: 'parent-reason' };
+	assert.equal(coveringLock(undefined, 'own-reason', undefined, pickLock), undefined);
+	assert.deepEqual(coveringLock(own, 'own-reason', undefined, pickLock), { lock: own, reasonId: 'own-reason' });
+	// A weaker lock from above never beats the page's own.
+	assert.deepEqual(coveringLock(own, 'own-reason', weakParent, pickLock), { lock: own, reasonId: 'own-reason' });
+	assert.equal(coveringLock(own, 'own-reason', strongParent, pickLock), strongParent);
+	assert.equal(coveringLock(undefined, 'own-reason', weakParent, pickLock), weakParent);
+	const tie = { lock: { kind: 'permission' as const }, reasonId: 'parent-reason' };
+	assert.deepEqual(coveringLock(own, 'own-reason', tie, pickLock), { lock: own, reasonId: 'own-reason' });
+});
+
+test('resultMessage shows a returned error, else field errors, else nothing', () => {
+	assert.equal(resultMessage(undefined), undefined);
+	assert.equal(resultMessage('done'), undefined);
+	assert.equal(resultMessage({}), undefined);
+	assert.equal(resultMessage({ error: '  ' }), undefined);
+	assert.equal(resultMessage({ error: 'Server said no' }), 'Server said no');
+	assert.equal(resultMessage({ error: 'Server said no', errors: { name: 'Too long' } }), 'Server said no');
+	assert.equal(resultMessage({ errors: { name: 'Too long.', email: 'Taken.' } }), 'Too long. Taken.');
+	assert.equal(resultMessage({ errors: { name: undefined } }), undefined);
+	assert.equal(resultMessage({ notice: 'Saved' }), undefined);
 });
