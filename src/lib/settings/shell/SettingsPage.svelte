@@ -130,7 +130,6 @@
 	setSettingsScope(pageScope);
 
 	const scopeActions = $derived((scope?.actions ?? (scope?.lock?.action ? [scope.lock.action] : [])).slice(0, 2));
-	const postsIntent = $derived(scopeActions.some((action) => action.intent !== undefined && !action.unavailable && action.href === undefined));
 	let busy = $state<Record<number, boolean>>({});
 	/**
 	 * What each scope action's last run reported: its `{ error }`, or the generic label after a
@@ -182,8 +181,12 @@
 	{/each}
 {/snippet}
 
+<!--
+	The wrapper never changes while the page is shown: swapping it as actions come and go would
+	rebuild every button and drop focus. Links and unavailable buttons inside the form post nothing.
+-->
 {#snippet scopeButtons()}
-	{#if postsIntent && !insideDraft}
+	{#if !insideDraft}
 		<form method="post" action={scope?.formAction} data-settings-scope-form class="contents">{@render scopeButtonList()}</form>
 	{:else}
 		{@render scopeButtonList()}

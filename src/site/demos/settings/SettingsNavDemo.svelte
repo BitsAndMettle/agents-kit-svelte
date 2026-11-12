@@ -19,7 +19,13 @@
 	const groups: SettingsNavGroup[] = SAMPLE_SETTINGS_NAV.map((group) => ({
 		...group,
 		description: group.id === 'team' ? 'Changes here apply to everyone on the team.' : undefined,
-		items: group.items.map((link) => ({ ...link, icon: ICONS[link.id], href: `?section=${link.id}#settings-nav` }))
+		items: group.items.map((link) => ({
+			...link,
+			icon: ICONS[link.id],
+			href: `?section=${link.id}#settings-nav`,
+			// Written without a full stop, as many apps do: the nav still speaks it as its own sentence.
+			...(link.id === 'members' && { description: 'Who has access, and their roles' })
+		}))
 	}));
 
 	let current = $state('general');

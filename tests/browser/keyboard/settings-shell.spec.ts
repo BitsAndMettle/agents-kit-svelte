@@ -137,7 +137,8 @@ test.describe('SettingsNav', () => {
 		await expect(general).toHaveAccessibleName('General');
 		await expect(general).toHaveAccessibleDescription('Unsaved changes. Team name and address.');
 		await expect(index.getByRole('link', { name: 'Billing', exact: true })).toHaveAccessibleDescription('Locked. Plan, seats and invoices.');
-		// Each part is its own sentence, and a count badge says it is a count.
+		// Each part is its own sentence, and a count badge says it is a count. The demo writes the
+		// Members description without a full stop: the nav adds one before the meta.
 		await expect(index.getByRole('link', { name: 'Notifications', exact: true })).toHaveAccessibleDescription('Count: 2. What we tell you about, and where.');
 		await expect(index.getByRole('link', { name: 'Members', exact: true })).toHaveAccessibleDescription('Who has access, and their roles. 6 members.');
 		await expect(index.getByRole('heading', { name: 'Settings', level: 2 })).toBeVisible();
@@ -271,6 +272,45 @@ test.describe('SettingsPage', () => {
 		// Running the failed action again clears its own error.
 		await locked.getByRole('button', { name: 'Request access' }).click();
 		await expect(alert).toHaveCount(0);
+	});
+
+	test('starting another action after an error is shown leaves that error in place', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-page');
+		const locked = section.getByTestId('page-locked');
+		await pauseClock(page);
+		await locked.getByRole('button', { name: 'Request access' }).click();
+		await page.clock.runFor(SETTLE);
+		const alert = locked.getByRole('alert');
+		await expect(alert).toHaveText('Couldn’t send your request: nothing was sent. Try again.');
+		// Notify me starts (and is still running): Request access was never retried, so its error stays.
+		await locked.getByRole('button', { name: 'Notify me' }).click();
+		await expect(locked.getByRole('button', { name: 'Notify me' })).toHaveAttribute('aria-busy', 'true');
+		await expect(alert).toHaveText('Couldn’t send your request: nothing was sent. Try again.');
+		await page.clock.runFor(SETTLE);
+		await expect(locked.getByRole('button', { name: 'You’ll be notified' })).toHaveAttribute('aria-disabled', 'true');
+		await expect(alert).toHaveText('Couldn’t send your request: nothing was sent. Try again.');
+	});
+
+	test('focus stays on an action that finishes last, after every intent action has become unavailable', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-page');
+		const locked = section.getByTestId('page-locked');
+		await pauseClock(page);
+		await locked.getByRole('button', { name: 'Notify me' }).focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(locked.getByRole('button', { name: 'You’ll be notified' })).toBeFocused();
+		const request = locked.getByRole('button', { name: 'Request access' });
+		await request.focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(request).toBeFocused();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		// Nothing posts any more, yet the buttons keep their wrapper: none is rebuilt, so focus stays.
+		const done = locked.getByRole('button', { name: 'Access requested' });
+		await expect(done).toHaveAttribute('aria-disabled', 'true');
+		await expect(done).toBeFocused();
+		await expect(locked.locator('form[data-settings-scope-form]')).toHaveCount(1);
 	});
 
 	test('without JavaScript an intent scope action posts its intent from the page’s own form', async ({ browser, baseURL }) => {
