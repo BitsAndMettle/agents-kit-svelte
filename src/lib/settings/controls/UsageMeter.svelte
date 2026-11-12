@@ -26,6 +26,8 @@
 		overBy: (amount: string) => string;
 		/** Shown (and announced) when there is no data. */
 		none: string;
+		/** Shown when the action failed without a message of its own. */
+		failed: string;
 	}
 
 	export type UsageMeterVariant = 'bar' | 'row' | 'compact';
@@ -37,10 +39,11 @@
 	import { cn } from '../../ui/cn';
 	import { TONE_FILL_CLASS, type UiTone } from '../../ui/styles';
 	import { toMillis, type TimeInput } from '../../core/time';
-	import { isThenable } from '../../core/promise';
 	import { Button } from '../../primitives/actions';
 	import { Badge } from '../../primitives/display';
-	import { actionButtonProps, type MeterSegment, type SettingsAction } from '../shared';
+	import { DANGER_TEXT } from '../../primitives/form/classes';
+	import { ActionRun } from './run.svelte';
+	import { actionButtonProps, getSettingsScope, ReadyGate, type MeterSegment, type SettingsAction } from '../shared';
 	import { timeUntil, usageLevel, usagePercent, usageScale, usageTone, type UsageThresholds } from './meter';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
@@ -74,7 +77,7 @@
 		projected?: { value: number; label: string };
 		/** Replaces the value text (and what screen readers hear). */
 		valueText?: string | ((value: number, limit: number | null) => string);
-		/** A way forward ("Add seats"). A returned promise makes the button load. */
+		/** A way forward ("Add seats"). A returned promise makes the button load; a returned `{ error }` or a rejection shows under it. */
 		action?: SettingsAction;
 		/** `bar` (stacked lines), `row` (one line in a table of meters) or `compact` (a small tile). Default `bar`. */
 		variant?: UsageMeterVariant;
@@ -121,6 +124,7 @@
 		remaining: (amount) => `${amount} left`,
 		overBy: (amount) => `${amount} over`,
 		none: 'No data yet',
+		failed: "Couldn't do that. Try again.",
 		...labels
 	});
 
@@ -174,21 +178,15 @@
 
 	const BAR: Record<NonNullable<Props['size']>, string> = { sm: 'h-1', md: 'h-1.5', lg: 'h-2.5' };
 	const fillFor = (t: UiTone | 'muted' | undefined) => (t === 'muted' ? 'bg-fg-light/40' : TONE_FILL_CLASS[t ?? 'accent']);
+	/** Forced colours drop backgrounds: the fill keeps a system colour so the amount still shows. */
+	const FORCED_FILL = 'forced-color-adjust-none forced-colors:bg-[Highlight]';
 
-	let acting = $state(false);
-	async function runAction(): Promise<void> {
-		if (!action?.onSelect || acting) return;
-		const result = action.onSelect();
-		if (!isThenable(result)) return;
-		acting = true;
-		try {
-			await result;
-		} catch {
-			// The app reports its own failure; the button only stops loading.
-		} finally {
-			acting = false;
-		}
-	}
+	// The action: loading while its promise is open, then its `{error}` (or the generic label).
+	const run = new ActionRun();
+	const scope = getSettingsScope();
+	const ready = new ReadyGate(() => scope?.ready());
+	/** Only a click handler can carry it out (no link, no post): it waits for the page to be ready. */
+	const waits = $derived(Boolean(action) && !ready.current && !action?.unavailable && action?.href === undefined && action?.intent === undefined);
 	const hasNotes = $derived(Boolean(levelWords || headroom || resetText || period?.label || marker || projected));
 </script>
 
@@ -203,15 +201,15 @@
 			aria-valuetext={ariaValueText}
 			aria-describedby={[description ? descriptionId : '', hasNotes ? notesId : '', segments?.length ? legendId : ''].filter(Boolean).join(' ') || undefined}
 			data-level={level}
-			class={cn('relative w-full min-w-0 rounded-full bg-canvas-secondary', BAR[size])}
+			class={cn('relative w-full min-w-0 rounded-full bg-canvas-secondary forced-colors:border forced-colors:border-solid forced-colors:border-[CanvasText]', BAR[size])}
 		>
 			<div class="absolute inset-0 flex overflow-hidden rounded-full">
 				{#if segments?.length}
 					{#each segments as segment (segment.id)}
-						<span class={cn('block h-full shrink-0 border-r border-card-bg last:border-r-0 motion-safe:transition-[width] motion-safe:duration-300', fillFor(segment.tone))} style:width="{usagePercent(segment.value, scale)}%"></span>
+						<span class={cn('block h-full shrink-0 border-r border-card-bg last:border-r-0 motion-safe:transition-[width] motion-safe:duration-300 forced-colors:border-[Canvas]', fillFor(segment.tone), FORCED_FILL)} style:width="{usagePercent(segment.value, scale)}%"></span>
 					{/each}
 				{:else}
-					<span class={cn('block h-full rounded-full motion-safe:transition-[width] motion-safe:duration-300', fillFor(shownTone))} style:width="{usagePercent(total, scale)}%"></span>
+					<span class={cn('block h-full rounded-full motion-safe:transition-[width] motion-safe:duration-300', fillFor(shownTone), FORCED_FILL)} style:width="{usagePercent(total, scale)}%"></span>
 				{/if}
 			</div>
 			{#if projected}
@@ -283,9 +281,11 @@
 
 {#snippet actionButton()}
 	{#if action}
+		{@const act = action}
 		<span class="inline-flex flex-col items-start gap-1">
-			<Button size="sm" {...actionButtonProps(action, reasonId)} loading={acting} onclick={action.onSelect && !action.unavailable ? runAction : undefined}>{action.label}</Button>
-			{#if action.unavailable}<span id={reasonId} class="text-xs leading-5 text-fg-light">{action.unavailable}</span>{/if}
+			<Button size="sm" {...actionButtonProps(act, reasonId)} softDisabled={Boolean(act.unavailable) || waits || undefined} loading={run.pending} onclick={act.onSelect && !act.unavailable ? () => run.run(act.onSelect) : undefined}>{act.label}</Button>
+			{#if act.unavailable}<span id={reasonId} class="text-xs leading-5 text-fg-light">{act.unavailable}</span>{/if}
+			{#if run.status === 'failed'}<span role="alert" class={cn('text-xs leading-5 font-medium', DANGER_TEXT)}>{run.error ?? text.failed}</span>{/if}
 		</span>
 	{/if}
 {/snippet}

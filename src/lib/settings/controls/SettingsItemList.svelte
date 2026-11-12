@@ -1,7 +1,7 @@
 <script lang="ts" module>
 	/** Every word SettingsItemList shows or announces. */
 	export interface SettingsItemListLabels {
-		/** Badge on the item that is you, or this device. */
+		/** Badge on the item that is you, or this device ("You", "This device"). */
 		current: string;
 		/** Badge on a new item. */
 		isNew: string;
@@ -13,14 +13,18 @@
 		selected: (count: number) => string;
 		/** Accessible name of a row's selection checkbox. */
 		select: (label: string) => string;
-		/** Accessible name of the filter box. */
-		filter: string;
+		/** Accessible name of the filter box and its search region, from the list's title: "Filter Members". */
+		filter: (title: string | undefined) => string;
 		filterPlaceholder: string;
 		/** The filter's submit button, shown until the page is ready (no JavaScript). */
 		applyFilter: string;
 		clearFilter: string;
 		/** Shown when the filter matches nothing. */
 		noMatch: (query: string) => string;
+		/** Announced while a filter is typed: "3 shown". */
+		matches: (count: number) => string;
+		/** Shown when an add or empty-state action failed without a message of its own. */
+		actionFailed: string;
 		/** Shown when there are no items and no `empty` prop. */
 		empty: string;
 		cancel: string;
@@ -42,9 +46,11 @@
 	import { DANGER_TEXT } from '../../primitives/form/classes';
 	import { DropdownMenu } from '../../primitives/menus';
 	import { AlertDialog } from '../../primitives/overlays';
+	import { ActionRun } from './run.svelte';
 	import {
 		actionButtonProps,
 		getSettingsDraft,
+		getSettingsScope,
 		LOCK_ICONS,
 		lockReasonText,
 		nextFocusAfterRemoval,
@@ -90,8 +96,13 @@
 		addAction?: SettingsAction;
 		/** What an empty list says. */
 		empty?: { title: string; description?: string; action?: SettingsAction };
-		/** A filter box. Without JavaScript it is a GET form (`name`, default `q`); with it, the list filters as you type. `false` or absent: no filter. */
-		filter?: { value?: string; name?: string } | false;
+		/**
+		 * A filter box. Without JavaScript it is a GET form (`name`, default `q`) to `action` (default:
+		 * this page), carrying `hidden` as hidden fields so the page's other query parameters survive;
+		 * with it, the list filters as you type. Inside a SettingsForm it waits for the page to be
+		 * ready. `false` or absent: no filter.
+		 */
+		filter?: { value?: string; name?: string; action?: string; hidden?: Record<string, string> } | false;
 		onFilterChange?: (query: string) => void;
 		/** Adds a checkbox to each row (locked rows cannot be selected). */
 		selectable?: boolean;
@@ -143,17 +154,19 @@
 	}: Props = $props();
 
 	const text = $derived<SettingsItemListLabels>({
-		current: 'This device',
+		current: 'Current',
 		isNew: 'New',
 		actionsFor: (label) => `More actions for ${label}`,
 		failed: (label) => `Couldn't finish that for ${label}. Try again.`,
 		selected: (n) => `${n} selected`,
 		select: (label) => `Select ${label}`,
-		filter: 'Filter',
+		filter: (t) => (t ? `Filter ${t}` : 'Filter'),
 		filterPlaceholder: 'Filter…',
 		applyFilter: 'Filter',
 		clearFilter: 'Clear filter',
 		noMatch: (q) => `Nothing matches “${q}”.`,
+		matches: (n) => `${n} shown`,
+		actionFailed: "Couldn't do that. Try again.",
 		empty: 'Nothing here yet.',
 		cancel: 'Cancel',
 		confirm: 'Confirm',
@@ -163,8 +176,11 @@
 	const uid = $props.id();
 	const headingId = `${uid}-title`;
 	const addReasonId = `${uid}-add-reason`;
+	const errorId = `${uid}-error`;
 	const draft = getSettingsDraft();
-	const ready = new ReadyGate();
+	const scope = getSettingsScope();
+	// The scope's readiness (SettingsLayout `ready`) holds back JS-only affordances too.
+	const ready = new ReadyGate(() => scope?.ready());
 	// Row controls (a role pill, a switch) are their own controls: a surrounding Field must not name them.
 	setFieldContext(createFieldState({ id: `${uid}-rows`, group: () => true }));
 
@@ -175,6 +191,7 @@
 	let root = $state<HTMLElement | null>(null);
 	let heading = $state<HTMLElement | null>(null);
 	let query = $state(untrack(() => (filter ? (filter.value ?? '') : '')));
+	let filterInput = $state<HTMLInputElement | null>(null);
 	let pending = $state<Record<string, string>>({});
 	let failed = $state<Record<string, string>>({});
 	let bulkPending = $state<string | null>(null);
@@ -188,6 +205,10 @@
 	const shown = $derived(filterSettingsItems(items, query));
 	const split = $derived(groupSettingsItems(shown, groups));
 	const selected = $derived(new Set(value));
+	/** Selected ids that are still in `items`: what the summary counts and bulk actions see. */
+	const present = $derived(value.filter((id) => items.some((item) => item.id === id)));
+	/** A server error for the selection, from the surrounding SettingsForm; hidden once it is edited. */
+	const fieldError = $derived(draft ? draft.fieldError(name) : undefined);
 	const hiddenSelected = $derived(value.filter((id) => !shown.some((item) => item.id === id) && items.some((item) => item.id === id)));
 	const actionable = $derived(selectableIds(items, value));
 	/**
@@ -344,28 +365,77 @@
 		}
 	}
 
-	let addLoading = $state(false);
-	async function runAdd(): Promise<void> {
-		if (!addAction?.onSelect || addAction.unavailable || addLoading) return;
-		const result = addAction.onSelect();
-		if (!isThenable(result)) return;
-		addLoading = true;
-		try {
-			await result;
-		} catch {
-			// The app reports its own failure.
-		} finally {
-			addLoading = false;
-		}
-	}
+	// The add and empty-state actions: loading while a promise is open, then their `{error}` (or the generic label).
+	const addRun = new ActionRun();
+	const emptyRun = new ActionRun();
+	/** An action only a click handler can carry out (no link, no post) waits for the page to be ready. */
+	const waitsForReady = (action: SettingsAction) => !ready.current && !action.unavailable && action.href === undefined && action.intent === undefined;
 
 	function setQuery(next: string): void {
 		query = next;
 		onFilterChange?.(next);
 	}
 
+	/** Clearing unmounts the Clear button: focus goes back to the filter box. */
+	async function clearFilter(): Promise<void> {
+		setQuery('');
+		await tick();
+		filterInput?.focus();
+	}
+
+	// Text typed (or restored on Back) before the page was ready stays in the box: filter by it.
+	$effect(() => {
+		const input = filterInput;
+		if (!input) return;
+		untrack(() => {
+			if (input.value !== query) setQuery(input.value);
+		});
+	});
+
+	/**
+	 * The selection as the checkboxes show it. Boxes ticked before the page was ready, restored on Back
+	 * or put back by a form reset (Discard) are what posts, so the summary and bulk actions follow them.
+	 * Selected rows the filter hides keep their state.
+	 */
+	function readSelection(): void {
+		if (!root || !selectable) return;
+		const boxes = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="checkbox"][data-select]'));
+		const shownIds = new Set(boxes.map((box) => box.value));
+		const on = new Set(boxes.filter((box) => box.checked).map((box) => box.value));
+		const current = value;
+		const next = [...current.filter((id) => !shownIds.has(id) || on.has(id)), ...[...on].filter((id) => !current.includes(id))];
+		if (next.length === current.length && next.every((id, i) => id === current[i])) return;
+		value = next;
+		onValueChange?.(next);
+	}
+	$effect(() => {
+		if (!root) return;
+		untrack(readSelection);
+		const form = root.closest('form') ?? postForm;
+		if (!form) return;
+		// `reset` fires before the controls reset: read them on the next task.
+		const onReset = () => setTimeout(readSelection);
+		form.addEventListener('reset', onReset);
+		return () => form.removeEventListener('reset', onReset);
+	});
+
+	/** A row's status that changes after it was shown ("Paused", "Sync failed") is announced politely. */
+	let statusNews = $state('');
+	let seenStatus: Map<string, string> | null = null;
+	$effect(() => {
+		const now = new Map(items.map((item) => [item.id, item.status?.label ?? '']));
+		untrack(() => {
+			const before = seenStatus;
+			seenStatus = now;
+			if (!before) return;
+			const changed = items.filter((item) => item.status && before.has(item.id) && before.get(item.id) !== item.status.label);
+			if (changed.length > 0) statusNews = changed.map((item) => `${item.label}: ${item.status?.label}`).join('. ');
+		});
+	});
+
 	const reasonId = (item: T, suffix: string) => `${uid}-${idPart(item.id)}-${suffix}`;
 	const actionReasonId = (item: T, action: SettingsItemAction) => reasonId(item, `a${idPart(action.id)}`);
+	const bulkReasonId = (action: SettingsItemAction) => `${uid}-bulk-${idPart(action.id)}`;
 	/** A link stays a link unless it must ask first and can (ready, with a handler): then it opens the confirm. */
 	const asLink = (action: SettingsItemAction, item: T) =>
 		Boolean(action.href) && !action.unavailable && !item.lock && !(action.confirm && ready.current && onAction);
@@ -405,7 +475,7 @@
 				type={posts(action, item) ? 'submit' : 'button'}
 				name={posts(action, item) ? action.id : undefined}
 				value={posts(action, item) ? item.id : undefined}
-				softDisabled={Boolean(action.unavailable) || Boolean(item.lock) || (Boolean(action.confirm) && !ready.current)}
+				softDisabled={Boolean(action.unavailable) || Boolean(item.lock) || (!ready.current && !posts(action, item))}
 				aria-label={action.ariaLabel}
 				aria-describedby={action.unavailable ? actionReasonId(item, action) : item.lock ? reasonId(item, 'lock') : undefined}
 				loading={pending[item.id] === action.id}
@@ -446,8 +516,10 @@
 					value={item.id}
 					checked={isSelected}
 					disabled={Boolean(item.lock)}
+					invalid={Boolean(fieldError)}
 					aria-label={text.select(item.label)}
-					aria-describedby={item.lock ? reasonId(item, 'lock') : undefined}
+					aria-describedby={[item.lock ? reasonId(item, 'lock') : '', fieldError ? errorId : ''].filter(Boolean).join(' ') || undefined}
+					data-select=""
 					onCheckedChange={(on) => setSelected(item.id, on)}
 				/>
 			{/if}
@@ -504,17 +576,29 @@
 		{#if empty}
 			<EmptyState size="compact" title={empty.title} description={empty.description} headingLevel={subHeading as 3 | 4 | 5}>
 				{#snippet primaryAction()}
-					{#if empty.action}<Button size="sm" {...actionButtonProps(empty.action, `${uid}-empty-reason`)}>{empty.action.label}</Button>{/if}
+					{#if empty.action}
+					{@const emptyAction = empty.action}
+					<Button
+						size="sm"
+						{...actionButtonProps(emptyAction, `${uid}-empty-reason`)}
+						softDisabled={Boolean(emptyAction.unavailable) || waitsForReady(emptyAction) || undefined}
+						loading={emptyRun.pending}
+						onclick={emptyAction.onSelect && !emptyAction.unavailable ? () => emptyRun.run(emptyAction.onSelect) : undefined}
+					>
+						{emptyAction.label}
+					</Button>
+				{/if}
 				{/snippet}
 			</EmptyState>
 			{#if empty.action?.unavailable}<p id="{uid}-empty-reason" class="m-0 px-4 pb-4 text-center text-xs text-fg-light">{empty.action.unavailable}</p>{/if}
+			{#if emptyRun.status === 'failed'}<p role="alert" class={cn('m-0 px-4 pb-4 text-center text-xs font-medium', DANGER_TEXT)}>{emptyRun.error ?? text.actionFailed}</p>{/if}
 		{:else}
 			<p class="m-0 px-4 py-6 text-center text-[13px] text-fg-light">{text.empty}</p>
 		{/if}
 	{:else if shown.length === 0}
 		<div class="flex flex-col items-center gap-2 px-4 py-6 text-center">
 			<p class="m-0 text-[13px] text-fg-light">{text.noMatch(query)}</p>
-			<Button size="xs" variant="ghost" onclick={() => setQuery('')}>{text.clearFilter}</Button>
+			<Button size="xs" variant="ghost" onclick={clearFilter}>{text.clearFilter}</Button>
 		</div>
 	{:else}
 		{#if split.main.length > 0}
@@ -539,36 +623,48 @@
 	{/if}
 
 	<p role="status" data-list-status="" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, hiddenFailures ? 'border-t border-canvas-border px-4 py-2' : 'sr-only')}>{hiddenFailures}</p>
+	<p role="status" data-item-status="" class="sr-only">{statusNews}</p>
+	{#if draft}
+		<p id={errorId} role="alert" data-field-error="" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, fieldError ? 'border-t border-canvas-border px-4 py-2' : 'sr-only')}>{fieldError ?? ''}</p>
+	{/if}
 
 	<!-- Selected rows the filter hides still post. -->
 	{#each hiddenSelected as id (id)}<input type="hidden" {name} value={id} />{/each}
 
 	{#if selectable}
 		<div class={cn(RECIPES.sectionFooter, 'justify-between')} data-selection="">
-			<p role="status" class="m-0 font-medium text-fg-main tabular-nums">{value.length > 0 && selectionSummary ? selectionSummary(value) : text.selected(value.length)}</p>
+			<p role="status" class="m-0 font-medium text-fg-main tabular-nums">{present.length > 0 && selectionSummary ? selectionSummary(present) : text.selected(present.length)}</p>
 			{#if bulkActions.length > 0}
 				<div class="flex flex-wrap items-center gap-2">
 					{#each bulkActions as action (action.id)}
-						<Button
-							size="sm"
-							variant={action.tone === 'danger' ? 'danger' : 'secondary'}
-							type={posts(action) ? 'submit' : 'button'}
-							name={posts(action) ? 'intent' : undefined}
-							value={posts(action) ? action.id : undefined}
-							softDisabled={Boolean(action.unavailable) || (Boolean(action.confirm) && !ready.current) || (ready.current && actionable.length === 0)}
-							aria-label={action.ariaLabel}
-							loading={bulkPending === action.id}
-							data-bulk={action.id}
-							onclick={(event: MouseEvent) => {
-								if (!onBulkAction && !action.confirm) return;
-								event.preventDefault();
-								chooseBulk(action);
-							}}
-						>
-							{action.label}
-						</Button>
+						{#if action.href && !action.unavailable}
+							<Button size="sm" variant={action.tone === 'danger' ? 'danger' : 'secondary'} href={action.href} aria-label={action.ariaLabel} data-bulk={action.id}>{action.label}</Button>
+						{:else}
+							<Button
+								size="sm"
+								variant={action.tone === 'danger' ? 'danger' : 'secondary'}
+								type={posts(action) ? 'submit' : 'button'}
+								name={posts(action) ? 'intent' : undefined}
+								value={posts(action) ? action.id : undefined}
+								softDisabled={Boolean(action.unavailable) || (!ready.current && !posts(action)) || (ready.current && actionable.length === 0)}
+								aria-label={action.ariaLabel}
+								aria-describedby={action.unavailable ? bulkReasonId(action) : undefined}
+								loading={bulkPending === action.id}
+								data-bulk={action.id}
+								onclick={(event: MouseEvent) => {
+									if (!onBulkAction && !action.confirm) return;
+									event.preventDefault();
+									chooseBulk(action);
+								}}
+							>
+								{action.label}
+							</Button>
+						{/if}
 					{/each}
 				</div>
+				{#each bulkActions.filter((a) => a.unavailable) as action (action.id)}
+					<p id={bulkReasonId(action)} class="m-0 w-full text-xs leading-5 font-normal text-fg-light">{action.label}: {action.unavailable}</p>
+				{/each}
 			{/if}
 			<p role="status" class={cn('m-0 text-xs font-medium', DANGER_TEXT, bulkFailed ? 'w-full' : 'sr-only')}>{bulkFailed}</p>
 		</div>
@@ -577,11 +673,19 @@
 	{#if addAction || footer}
 		<div class={RECIPES.sectionFooter}>
 			{#if addAction}
-				<Button size="sm" {...actionButtonProps(addAction, addReasonId)} loading={addLoading} onclick={addAction.onSelect && !addAction.unavailable ? runAdd : undefined}>
+				{@const add = addAction}
+				<Button
+					size="sm"
+					{...actionButtonProps(add, addReasonId)}
+					softDisabled={Boolean(add.unavailable) || waitsForReady(add) || undefined}
+					loading={addRun.pending}
+					onclick={add.onSelect && !add.unavailable ? () => addRun.run(add.onSelect) : undefined}
+				>
 					{#snippet leading()}<Plus aria-hidden="true" />{/snippet}
-					{addAction.label}
+					{add.label}
 				</Button>
-				{#if addAction.unavailable}<span id={addReasonId} class="text-xs leading-5 text-fg-light">{addAction.unavailable}</span>{/if}
+				{#if add.unavailable}<span id={addReasonId} class="text-xs leading-5 text-fg-light">{add.unavailable}</span>{/if}
+				{#if addRun.status === 'failed'}<p role="alert" class={cn('m-0 w-full text-xs leading-5 font-medium', DANGER_TEXT)}>{addRun.error ?? text.actionFailed}</p>{/if}
 			{/if}
 			{#if footer}{@render footer()}{/if}
 		</div>
@@ -594,7 +698,7 @@
 			<div class="min-w-0 flex-1">
 				<div class="flex min-w-0 flex-wrap items-center gap-2">
 					{#if title}
-						<svelte:element this={`h${headingLevel}`} id={headingId} bind:this={heading} tabindex="-1" class="m-0 text-sm font-semibold text-fg-main outline-none">{title}</svelte:element>
+						<svelte:element this={`h${headingLevel}`} id={headingId} bind:this={heading} tabindex="-1" class="m-0 rounded-sm text-sm font-semibold text-fg-main outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-accent-primary">{title}</svelte:element>
 					{/if}
 					{#if count !== undefined}<Badge size="sm" tone="neutral">{count}</Badge>{/if}
 				</div>
@@ -609,9 +713,11 @@
 			<Input
 				type="search"
 				size="sm"
+				bind:ref={filterInput}
 				name={draft ? undefined : (filter && filter.name) || 'q'}
 				value={query}
-				aria-label={text.filter}
+				disabled={Boolean(draft) && !ready.current}
+				aria-label={text.filter(title)}
 				placeholder={text.filterPlaceholder}
 				autocomplete="off"
 				onValueChange={setQuery}
@@ -621,11 +727,14 @@
 				}}
 				class="min-w-0 flex-1"
 			/>
+			<p role="status" class="sr-only" data-filter-status="">{query.trim() ? (shown.length > 0 ? text.matches(shown.length) : text.noMatch(query.trim())) : ''}</p>
 		{/snippet}
 		{#if draft}
-			<div role="search" class="flex items-center gap-2 border-b border-canvas-border px-4 py-2.5">{@render filterBox()}</div>
+			<!-- Inside a SettingsForm there is no GET form to post: the box waits for the page to be ready. -->
+			<div role="search" aria-label={text.filter(title)} class="flex items-center gap-2 border-b border-canvas-border px-4 py-2.5">{@render filterBox()}</div>
 		{:else}
-			<form method="get" role="search" class="m-0 flex items-center gap-2 border-b border-canvas-border px-4 py-2.5" onsubmit={(event) => event.preventDefault()}>
+			<form method="get" action={filter.action} role="search" aria-label={text.filter(title)} class="m-0 flex items-center gap-2 border-b border-canvas-border px-4 py-2.5" onsubmit={(event) => event.preventDefault()}>
+				{#each Object.entries(filter.hidden ?? {}) as [field, fieldValue] (field)}<input type="hidden" name={field} value={fieldValue} />{/each}
 				{@render filterBox()}
 				{#if !ready.current}<Button type="submit" size="sm" variant="secondary">{text.applyFilter}</Button>{/if}
 			</form>

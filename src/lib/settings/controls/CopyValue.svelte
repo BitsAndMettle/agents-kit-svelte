@@ -40,7 +40,7 @@
 	import { Button } from '../../primitives/actions';
 	import { Alert } from '../../primitives/display';
 	import { Checkbox } from '../../primitives/form';
-	import { CopyState, ReadyGate } from '../shared';
+	import { CopyState, getSettingsScope, ReadyGate } from '../shared';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		/** The value to show and copy: an ID, a URL, a command, a token. Never written to `data-*`, the URL, the console or storage. */
@@ -126,7 +126,9 @@
 	const hiddenId = `${uid}-hidden`;
 	const ackReasonId = `${uid}-ack`;
 
-	const ready = new ReadyGate();
+	// The scope's readiness (SettingsLayout `ready`) holds back Copy, Reveal and Download too.
+	const scope = getSettingsScope();
+	const ready = new ReadyGate(() => scope?.ready());
 	const copier = new CopyState();
 	const clock = useClock(() => now);
 
@@ -226,6 +228,10 @@
 					spellcheck="false"
 					aria-describedby={[concealed ? hiddenId : '', copier.status === 'failed' ? statusId : ''].filter(Boolean).join(' ') || undefined}
 					onfocus={(event) => !concealed && event.currentTarget.select()}
+					onkeydown={(event) => {
+						// Read-only: inside a form, Enter here must not submit it (a SettingsForm would save).
+						if (event.key === 'Enter') event.preventDefault();
+					}}
 					class={cn(
 						'h-full min-w-0 flex-1 truncate border-0 bg-transparent text-fg-main focus:outline-none',
 						prompt ? 'pl-2' : 'pl-3',
