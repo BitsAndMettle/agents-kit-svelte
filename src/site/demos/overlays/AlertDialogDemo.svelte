@@ -4,6 +4,7 @@
 
 	let failNext = $state(false);
 	let status = $state('');
+	let understood = $state(false);
 
 	/** Pretends to delete on a server: settles after a short wait, or fails when asked to. */
 	function deleteRun(): Promise<void> {
@@ -43,6 +44,26 @@
 		{#snippet trigger(t)}
 			<button {...t} class={buttonClass('secondary', 'md')}>Sign out</button>
 		{/snippet}
+	</AlertDialog>
+
+	<AlertDialog
+		title="Remove 3 members?"
+		description="Ada, Ben and Chloé will no longer see this team's projects."
+		confirmLabel="Remove members"
+		tone="danger"
+		confirmDisabled={!understood}
+		confirmDescribedBy={understood ? undefined : 'alert-dialog-demo-ack'}
+		onOpenChange={(open) => open && (understood = false)}
+		onConfirm={() => (status = '3 members removed')}
+	>
+		{#snippet trigger(t)}
+			<button {...t} class={buttonClass('secondary', 'md')}>Remove 3 members</button>
+		{/snippet}
+		<label class="flex items-center gap-2">
+			<input type="checkbox" bind:checked={understood} class="size-4" />
+			They lose access at once
+		</label>
+		<p id="alert-dialog-demo-ack" class="mt-1 text-xs text-fg-light" class:sr-only={understood}>Tick the box to confirm.</p>
 	</AlertDialog>
 
 	<label class="inline-flex items-center gap-2 text-xs text-fg-light">

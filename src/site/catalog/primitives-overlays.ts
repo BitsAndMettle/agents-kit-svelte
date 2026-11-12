@@ -11,7 +11,7 @@ export const PRIMITIVES_OVERLAYS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/overlays/Dialog.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Modal dialog on a native <dialog>: title and description wired for screen readers, focus trapped inside and returned to the trigger, Escape, backdrop press and a close button to dismiss. The body scrolls between a fixed header and footer; sizes sm, md, lg, and full (fills a phone screen). bind:open or defaultOpen, onOpenChange, initialFocus, bind:ref.',
+			'Modal dialog on a native <dialog>: title and description wired for screen readers, focus trapped inside and returned to the trigger, Escape, backdrop press and a close button to dismiss. The body scrolls between a fixed header and footer; sizes sm, md, lg, and full (fills a phone screen); narrow="sheet" docks it to the bottom on phones ("fullscreen" fills them). Route mode: closeHref makes the close button a link and Escape or a backdrop press follow it; ssrOpen renders an open dialog open on the server (a fixed panel before hydration and without JavaScript) and upgrades it to a modal on mount; returnFocus says where focus goes after a close when there was no opener. bind:open or defaultOpen, onOpenChange, initialFocus, bind:ref.',
 		usageSnippet: `<script lang="ts">
   import { Dialog, buttonClass, INPUT_CLASS } from 'agents-kit-svelte/primitives';
 
@@ -37,7 +37,7 @@ export const PRIMITIVES_OVERLAYS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/overlays/AlertDialog.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Confirmation with role="alertdialog": a backdrop press does nothing, Escape cancels, and focus starts on the safe Cancel action. tone (UiTone): "danger" for destructive actions. When onConfirm returns a Promise, the confirm button shows a loading state and the dialog stays open until it resolves; a rejection keeps it open and shows the error.',
+			'Confirmation with role="alertdialog": a backdrop press does nothing, Escape cancels, and focus starts on the safe Cancel action. tone (UiTone): "danger" for destructive actions. When onConfirm returns a Promise, the confirm button shows a loading state and the dialog stays open until it resolves; a rejection keeps it open and shows the error. confirmDisabled keeps the confirm action focusable but inert (aria-disabled), with confirmDescribedBy pointing at the visible reason. Route mode as on Dialog: closeHref makes Cancel a link that Escape follows, and ssrOpen renders it open on the server.',
 		usageSnippet: `<script lang="ts">
   import { AlertDialog, buttonClass } from 'agents-kit-svelte/primitives';
 
@@ -67,7 +67,7 @@ export const PRIMITIVES_OVERLAYS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/overlays/Sheet.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Modal panel that slides in from an edge (right, left, bottom or top): full height on the sides, full width on the top and bottom, clear of phone safe-area insets. Same behaviour as Dialog (focus trap, Escape, backdrop press, focus return); bottom sheets show a drag handle.',
+			'Modal panel that slides in from an edge (right, left, bottom or top): full height on the sides, full width on the top and bottom, clear of phone safe-area insets. Same behaviour as Dialog (focus trap, Escape, backdrop press, focus return); bottom sheets show a drag handle. Dialog’s route props work here too: closeHref, ssrOpen and returnFocus.',
 		usageSnippet: `<script lang="ts">
   import { Sheet, buttonClass } from 'agents-kit-svelte/primitives';
 

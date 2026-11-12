@@ -3,7 +3,9 @@
 	A confirmation that interrupts: `role="alertdialog"` over the headless `Dialog`. A backdrop
 	press does nothing, Escape cancels, and focus starts on the safe (cancel) action. When
 	`onConfirm` returns a Promise the confirm button shows a loading state and the dialog stays
-	open until it resolves; a rejection keeps it open and shows the error.
+	open until it resolves; a rejection keeps it open and shows the error. Route mode as on
+	Dialog: with `closeHref` Cancel is a link and Escape follows it; `ssrOpen` renders it open on
+	the server.
 -->
 <script lang="ts" module>
 	import type { Snippet } from 'svelte';
@@ -45,6 +47,14 @@
 		/** Extra content between the description and the actions. */
 		children?: Snippet;
 		onOpenChange?: (open: boolean, reason: ChangeReason) => void;
+		/** Route mode, as on Dialog: Cancel becomes a link to this URL, and Escape follows it. */
+		closeHref?: string;
+		/** As on Dialog: server-rendered open when `open` is true, a real modal on mount. */
+		ssrOpen?: boolean;
+		/** Blocks the confirm action (it stays focusable and says it is unavailable), e.g. until a box is ticked. */
+		confirmDisabled?: boolean;
+		/** Id(s) of visible text that describes the confirm action, such as why it is unavailable. */
+		confirmDescribedBy?: string;
 		class?: string;
 	}
 </script>
@@ -52,6 +62,7 @@
 <script lang="ts">
 	import { LoaderCircle } from '@lucide/svelte';
 	import { Dialog } from '../../headless/patterns/dialog.svelte';
+	import { followLink, NOT_MODAL, upgradeServerOpen } from './Dialog.svelte';
 	import { cn } from '../../ui/cn';
 	import { buttonClass } from '../../ui/styles';
 	import { BACKDROP, FADE_SCALE_MOTION, MODAL_DESCRIPTION, MODAL_SURFACE, MODAL_TITLE } from './overlay';
@@ -73,13 +84,17 @@
 		trigger,
 		children,
 		onOpenChange,
+		closeHref,
+		ssrOpen = false,
+		confirmDisabled = false,
+		confirmDescribedBy,
 		class: className = '',
 		...rest
 	}: Props = $props();
 
 	let pending = $state(false);
 	let error = $state<string | null>(null);
-	let cancelButton = $state<HTMLButtonElement | null>(null);
+	let cancelButton = $state<HTMLElement | null>(null);
 
 	const id = $props.id();
 	const dialog = new Dialog({
@@ -89,12 +104,22 @@
 		onOpenChange: (next, reason) => {
 			open = next;
 			onOpenChange?.(next, reason);
+			if (!next && closeHref !== undefined && reason === 'escape') followLink(ref, closeHref);
 		},
 		// The safe action, whatever order the buttons are in.
 		initialFocus: () => cancelButton,
 		// A pending confirm keeps the dialog open.
 		dismiss: { escape: () => !pending }
 	});
+
+	let hydrated = $state(false);
+	$effect(() => {
+		hydrated = true;
+	});
+	/** The `open` attribute of a server-rendered route: written on the server only. */
+	const serverOpen = $derived(typeof document === 'undefined' && ssrOpen && open ? { open: true } : {});
+	const shownState = $derived(ssrOpen && open && !hydrated ? 'open' : dialog.state);
+	const upgrade = upgradeServerOpen(() => undefined);
 
 	// A fresh open starts without the last attempt's error.
 	$effect(() => {
@@ -112,7 +137,7 @@
 	}
 
 	async function confirm(): Promise<void> {
-		if (pending) return;
+		if (pending || confirmDisabled) return;
 		error = null;
 		let result: unknown;
 		try {
@@ -140,9 +165,13 @@
 {@render trigger?.(dialog.trigger)}
 
 <dialog {...rest} bind:this={ref}
+	{...serverOpen}
+	{@attach upgrade}
 	{...dialog.content}
+	data-state={shownState}
+	aria-labelledby={dialog.content['aria-labelledby'] ?? (ssrOpen ? dialog.title.id : undefined)}
 	aria-busy={pending}
-	class={cn(MODAL_SURFACE, 'm-auto w-[min(26rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] rounded-card', FADE_SCALE_MOTION, BACKDROP, className)}
+	class={cn(MODAL_SURFACE, 'm-auto w-[min(26rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] rounded-card', ssrOpen && NOT_MODAL, ssrOpen && '[&:not(:modal)]:h-fit', FADE_SCALE_MOTION, BACKDROP, className)}
 >
 	<div class="min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-4">
 		<h2 {...dialog.title} class={MODAL_TITLE}>{title}</h2>
@@ -157,14 +186,32 @@
 		{/if}
 	</div>
 	<div class="flex shrink-0 flex-wrap items-center justify-end gap-2 px-5 pb-5">
-		<button {...dialog.close} bind:this={cancelButton} disabled={pending} onclick={() => onCancel?.()} class={buttonClass('secondary', 'md')}>
-			{cancelLabel}
-		</button>
+		{#if closeHref !== undefined}
+			<a
+				href={pending ? undefined : closeHref}
+				bind:this={cancelButton}
+				role={pending ? 'link' : undefined}
+				aria-disabled={pending || undefined}
+				onclick={() => {
+					if (pending) return;
+					dialog.open = false;
+					onCancel?.();
+				}}
+				class={buttonClass('secondary', 'md', 'aria-disabled:pointer-events-none aria-disabled:opacity-50')}
+			>
+				{cancelLabel}
+			</a>
+		{:else}
+			<button {...dialog.close} bind:this={cancelButton} disabled={pending} onclick={() => onCancel?.()} class={buttonClass('secondary', 'md')}>
+				{cancelLabel}
+			</button>
+		{/if}
 		<button
 			type="button"
-			aria-disabled={pending}
+			aria-disabled={pending || confirmDisabled}
+			aria-describedby={confirmDescribedBy}
 			onclick={confirm}
-			class={buttonClass(tone === 'danger' ? 'danger' : tone === 'accent' ? 'accent' : 'primary', 'md', 'aria-disabled:cursor-progress')}
+			class={buttonClass(tone === 'danger' ? 'danger' : tone === 'accent' ? 'accent' : 'primary', 'md', pending ? 'aria-disabled:cursor-progress' : 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50')}
 		>
 			{#if pending}
 				<LoaderCircle aria-hidden="true" class="animate-spin motion-reduce:animate-none" />
