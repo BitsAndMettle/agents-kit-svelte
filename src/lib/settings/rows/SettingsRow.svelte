@@ -43,7 +43,7 @@
 	import type { MenuEntry } from '../../primitives/menus/types';
 	import { cn } from '../../ui/cn';
 	import { buttonClass, STATUS_TEXT_CLASS, TOUCH_TARGET_CLASS } from '../../ui/styles';
-	import { getSettingsDraft, getSettingsScope } from '../shared/context';
+	import { getSettingsDraft, getSettingsScope, setSettingsScope } from '../shared/context';
 	import { pickLock } from '../shared/lock';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { actionButtonProps, RECIPES } from '../shared/recipes';
@@ -71,20 +71,18 @@
 		value?: string | Snippet;
 		/** Shows `value` in the monospace face (ids, versions, paths). */
 		mono?: boolean;
-		/** An icon or avatar before the label. */
+		/** An icon or avatar before the label, up to 2rem wide (like `RECIPES.iconTile`): the label and the status line start after a 2rem column. */
 		leading?: Snippet;
 		/** One trailing action, or your own snippet. An `onSelect` may return `{error}` or a promise: the button loads, and a failure shows in the row's alert. */
 		action?: SettingsAction | Snippet;
 		/** Trailing actions. More than two collapse into a "More actions" menu once the page is interactive; links and form intents always stay buttons. An action that only calls back (`onSelect`, no `href` or `intent`) is soft-disabled until then, since it can do nothing without JavaScript. */
 		actions?: SettingsAction[];
-		/** Where the row's own change stands (instant controls set it, `idle` included, so the label line keeps room for Saving and Saved). Wins over the form's state. */
+		/** Where the row's own change stands (instant controls set it). Saving and Saved show on the status line under the row. Wins over the form's state. */
 		status?: SettingStatus;
 		/** Error text, shown in the row's alert and describing the control. It marks the control invalid unless `status` is `error` or `conflict` (a failed instant save: nothing the person entered is invalid). Inside a SettingsForm, the form's error for `name` is used when this is not set. */
 		error?: string;
-		/** Polite status text that replaces the default for the current status ("Undone"). */
+		/** Polite status text that replaces the default for the current status ("Changed back"). */
 		statusText?: string;
-		/** Other texts `statusText` may show (an instant control's "Undone"): the label line keeps room for the longest of them too. */
-		statusWords?: string[];
 		/** Marks an unsaved change. Default: from the SettingsForm (`name`). */
 		dirty?: boolean;
 		/** The saved value's text while dirty. Default: from the SettingsForm (`name`). */
@@ -108,7 +106,7 @@
 		summary?: Snippet;
 		/** Where the summary's Edit link goes. */
 		editHref?: string;
-		/** Extra content on the status line, such as a Retry or Undo button. */
+		/** Extra content on the status line under the row, such as a Retry or Undo button. The line is the row's last: it never moves the control. */
 		feedback?: Snippet;
 		labels?: Partial<SettingsRowLabels>;
 		/** Words for the row's own lock reason. */
@@ -132,7 +130,6 @@
 		status,
 		error,
 		statusText,
-		statusWords = [],
 		dirty,
 		previous,
 		impact,
@@ -185,6 +182,15 @@
 		effectiveLock ? (effectiveLock === lock ? (reasonId ?? `${uid}-reason`) : scope?.lock?.reasonId) : undefined
 	);
 
+	// What the control sees around it: the lock that applies here and its reason, so a kit control
+	// that shows a covering lock (a ConsequenceDialog) says this row's reason, not a generic one.
+	setSettingsScope({
+		ready: () => ready.current,
+		get lock() {
+			return effectiveLock && lockReasonId ? { lock: effectiveLock, reasonId: lockReasonId } : undefined;
+		}
+	});
+
 	const isDirty = $derived(dirty ?? (draft && name ? draft.isDirty(name) : false));
 	const was = $derived(previous ?? (draft && name ? draft.previous(name) : undefined));
 	const errorText = $derived(
@@ -202,10 +208,14 @@
 			(shownStatus === 'pending' ? words.saving : shownStatus === 'saved' ? words.saved : actionRun.status === 'done' ? (actionRun.notice ?? '') : '')
 	);
 
-	/** A row with a `status` (an instant row, even while `idle`) keeps a status slot on its label line, as wide as its longest word and empty while idle, so a save never changes the label line. */
-	const reservesStatus = $derived(status !== undefined);
+	/**
+	 * Saving, Saved and the `feedback` (Undo, Retry) show on a status line: the row's last flex
+	 * line, after the control. It takes no room on the label line, so labels wrap as they would
+	 * anyway, and coming or going it never moves the control, beside the label or wrapped under
+	 * it. With nothing to show it is hidden.
+	 */
+	const hasStatusLine = $derived(status !== undefined || Boolean(feedback));
 	const savedText = $derived(statusText ?? words.saved);
-	const slotWords = $derived([...new Set([words.saved, ...(statusText ? [statusText] : []), ...statusWords])]);
 
 	const changeId = `${uid}-change`;
 	const impactId = `${uid}-impact`;
@@ -270,10 +280,13 @@
 
 	const layoutClass = $derived(
 		layout === 'inline'
-			? 'flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2 @lg/settings:items-center @lg/settings:gap-x-6'
+			? 'flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2 @lg/settings:items-center @lg/settings:gap-x-6 @lg/settings:gap-y-2'
 			: layout === 'stacked'
 				? '@lg/settings:flex-col @lg/settings:items-stretch @lg/settings:justify-start @lg/settings:gap-2'
-				: ''
+				: // Inline from 32rem, the status line wraps onto a line of its own (the label takes any width, so nothing else wraps).
+					hasStatusLine
+					? '@lg/settings:flex-wrap @lg/settings:gap-y-2'
+					: ''
 	);
 	/** A lock badge ("Always on") replaces what the row shows. A control stays in the page, visually hidden and disabled, so assistive technology meets the same switch either way. */
 	const badgeOnly = $derived(Boolean(effectiveLock?.badge));
@@ -317,25 +330,15 @@
 >
 	<!-- Inline: the label keeps at least 60% of the row (and 14rem, room for a leading icon and a lock reason); a control that needs more wraps under it. -->
 	<div class={cn('flex min-w-0 items-start gap-3', layout === 'inline' ? 'flex-[1_1_max(60%,14rem)]' : 'flex-1')}>
-		{#if leading}<div class="shrink-0 pt-0.5">{@render leading()}</div>{/if}
+		{#if leading}<div class="flex min-w-8 shrink-0 justify-center pt-0.5">{@render leading()}</div>{/if}
 		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
-			<!-- An instant row never wraps this line: the label wraps inside its own box beside a status slot that is always there. -->
-			<div class={cn('flex gap-x-2 gap-y-1', reservesStatus ? 'items-start' : 'flex-wrap items-center')}>
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
 				{#if control && !group && labelFor}
 					<label id={labelId} for={field.controlId} class="min-w-0 text-[13px] leading-5 font-medium break-words text-fg-main">{@render text(label)}{#if required}<span aria-hidden="true" class="text-status-danger"> *</span>{/if}</label>
 				{:else}
 					<span id={labelId} class="min-w-0 text-[13px] leading-5 font-medium break-words text-fg-main">{@render text(label)}</span>
 				{/if}
 				{#if isDirty}<Badge tone="accent" size="sm" aria-hidden="true" class="shrink-0">{words.unsaved}</Badge>{/if}
-				<!-- Saving and Saved sit on the label line, never beside the control, in a slot as wide as its longest word: every word shares one grid cell and only the current one shows. The control, the label's wrap and the rows below stay put whatever the save state. -->
-				{#if reservesStatus}
-					<span aria-hidden="true" data-row-status-slot class="grid shrink-0 items-center justify-items-start *:[grid-area:1/1]">
-						{#each slotWords as word (word)}
-							<span data-row-saved={word} class={cn('inline-flex items-center gap-1 text-xs leading-5 font-medium whitespace-nowrap', STATUS_TEXT_CLASS.success, (shownStatus !== 'saved' || word !== savedText) && 'invisible')}><Check class="size-3.5" />{word}</span>
-						{/each}
-						{#if shownStatus === 'pending'}<Spinner size="sm" decorative class="text-fg-light" />{/if}
-					</span>
-				{/if}
 			</div>
 			{#if description}
 				<p id="{uid}-description" class="m-0 text-xs leading-5 text-fg-light">{@render text(description)}</p>
@@ -352,7 +355,6 @@
 				<LockReason lock={effectiveLock} id={lockReasonId} {onRequest} {requestAction} labels={lockLabels} class="mt-1" />
 			{/if}
 			<div id="{uid}-error" role="alert" class={cn('text-xs leading-5 font-medium', DANGER_TEXT)}>{#if errorText}<p class="m-0">{errorText}</p>{/if}{#if actionError}<p class="m-0">{actionError}</p>{/if}</div>
-			{#if feedback}<div class="flex flex-wrap items-center gap-2 empty:hidden">{@render feedback()}</div>{/if}
 			{#each split.visible as a, index (index)}
 				{#if a.unavailable}<p id="{uid}-action-{index}" class="m-0 text-xs leading-5 text-fg-light">{a.unavailable}</p>{/if}
 			{/each}
@@ -385,6 +387,10 @@
 				</DropdownMenu>
 			{/if}
 		</div>
+	{/if}
+	{#if hasStatusLine}
+		<!-- On one line, so `empty:hidden` meets no whitespace: with nothing to show, the line takes no room. As tall as a small button whatever it holds, so Saving giving way to Saved and Undo moves nothing. -->
+		<div data-row-status-line class={cn('flex min-h-6 min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-1 empty:hidden', leading && 'ps-11')}>{#if shownStatus === 'pending'}<span aria-hidden="true" data-row-saving class="inline-flex items-center gap-1.5 text-xs leading-5 font-medium text-fg-light"><Spinner size="sm" decorative />{words.saving}</span>{:else if shownStatus === 'saved'}<span aria-hidden="true" data-row-saved class={cn('inline-flex items-center gap-1 text-xs leading-5 font-medium', STATUS_TEXT_CLASS.success)}><Check class="size-3.5" />{savedText}</span>{/if}{@render feedback?.()}</div>
 	{/if}
 	<span id={statusId} role="status" class="sr-only">{liveText}</span>
 </li>

@@ -37,6 +37,26 @@ export function readResult(result: unknown): SettingsOutcome {
 }
 
 /**
+ * `readResult` for a component that submits through the Primitives' `FormSubmit`, which reads
+ * only `error` and `errors`: a failure keeps its field errors, and gets a form-level `error` (the
+ * handler's own text, else `generic`) whenever no field error would show, so a `{conflict}`
+ * fails there too. Success is `undefined`.
+ */
+export function toFormResult(result: unknown, generic: string): { error?: string; errors?: Record<string, string> } | undefined {
+	const outcome = readResult(result);
+	if (outcome.ok) return undefined;
+	const { error, errors } = result as SettingsResult;
+	const fields: Record<string, string> = {};
+	for (const [name, message] of Object.entries(errors && typeof errors === 'object' ? errors : {})) {
+		const text = textOf(message);
+		if (text !== undefined) fields[name] = text;
+	}
+	const hasFields = Object.keys(fields).length > 0;
+	const formError = textOf(error) ?? (hasFields ? undefined : (outcome.error ?? generic));
+	return { ...(formError !== undefined ? { error: formError } : {}), ...(hasFields ? { errors: fields } : {}) };
+}
+
+/**
  * One-level undo with an ownership token. `remember` stores a snapshot and returns a token; only
  * the newest token can `take` it back, so a stale notice can never undo a newer change.
  */

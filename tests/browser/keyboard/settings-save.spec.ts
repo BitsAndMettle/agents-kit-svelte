@@ -1118,11 +1118,12 @@ test.describe('Verifier fixes: Enter, row locks, unavailable confirms and shared
 		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 8: Team name → Northwind Design');
 	});
 
-	test('a locked SettingsRow around a ConsequenceDialog turns off its phrase and Confirm and runs nothing', async ({ page }) => {
+	test('a locked SettingsRow around a ConsequenceDialog turns off its phrase and Confirm, says the row’s own reason, and runs nothing', async ({ page }) => {
 		const section = await openOnClock(page, 'consequence-dialog');
 		await section.getByRole('button', { name: 'Transfer…' }).click();
 		const dialog = page.getByRole('dialog', { name: 'Transfer Northwind Studio?' });
-		const reason = 'This is locked here, so it can’t be confirmed.';
+		// The modal hides the row, so the dialog repeats the row's reason rather than a generic one.
+		const reason = 'Only the current owner can transfer the team.';
 		await expect(dialog.getByText(reason)).toBeVisible();
 		const phrase = dialog.getByRole('textbox', { name: 'Type “Transfer” to confirm' });
 		await expect(phrase).toBeDisabled();

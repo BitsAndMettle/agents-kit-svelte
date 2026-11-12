@@ -17,7 +17,7 @@ Everything in `docs/primitives/CONVENTIONS.md` and `docs/auth/CONVENTIONS.md` ap
 |---|---|---|
 | Cross-group types (`SettingLock`, `SettingsAction`, `SettingsResult`, `SettingsHandler`, `SettingsChange`, ...) | import the type | `shared/types.ts` |
 | Instant model | `InstantSetting` (runes); rules in `InstantCore`, `UndoSlot` | `shared/instant.svelte.ts`, `shared/undo.ts` |
-| Reading a callback's result | `readResult` (the only reader: `{error}`, `{errors}` and any `{conflict}` fail); `SettingsHandlerRun` for one button's callback | `shared/undo.ts`, `shared/run.svelte.ts` |
+| Reading a callback's result | `readResult` (the only reader: `{error}`, `{errors}` and any `{conflict}` fail); `SettingsHandlerRun` for one button's callback; `toFormResult` for a callback submitted through `FormSubmit`. `tests/settings-shared.test.ts` fails a component that runs a callback without one of them | `shared/undo.ts`, `shared/run.svelte.ts` |
 | Staged model | `SettingsDraft`; pure `readDefaults`, `diffForm`, `describeChanges`, `adoptCurrentAsDefaults` | `shared/staged.svelte.ts`, `shared/diff.ts` |
 | Locks | `pickLock`, `lockAttrs`, `lockReasonText`, `LOCK_PRECEDENCE`, `LOCK_LABELS`; `LOCK_ICONS` | `shared/lock.ts`, `shared/lock-icons.ts` |
 | Contexts | `set/getSettingsScope`, `set/getSettingsDraft`, `set/getSectionContext` | `shared/context.ts` |
@@ -52,7 +52,7 @@ Each setting uses exactly one, chosen by the app.
   - Always a ConsequenceDialog route (`?dialog=`), opened by a link and closed by `closeHref`. Typed confirmation (`phrasePattern` on the input, `matchesPhrase` in code) only for unrecoverable data loss; the server checks the phrase again.
   - One filled danger button, on the final step only. The footnote says whether the action can be undone.
 - **Locked or managed.**
-  - A lock comes from `lock` on a row, a section or the page scope; the strongest wins: `pickLock(row.lock, scope?.lock?.lock)`, nearest first.
+  - A lock comes from `lock` on a row, a section or the page scope; the strongest wins: `pickLock(row.lock, scope?.lock?.lock)`, nearest first. A row passes the lock that applies to it on to its control as the settings scope, so a control inside reads it the same way.
   - A locked control is natively `disabled` and described (`aria-describedby`) by its reason, which is always visible text (never a tooltip only). Use `lockReasonText(lock, labels)` for the sentence and `LOCK_ICONS[lock.kind]` for the icon.
   - A way forward is `lock.action` or LockReason `onRequest`. "Managed elsewhere" values use SettingsFacts `source`, not a disabled input.
   - Never use `softDisabled` on a form control for a lock. `softDisabled` is for buttons whose action is unavailable (`actionButtonProps` sets it).

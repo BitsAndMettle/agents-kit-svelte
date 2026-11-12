@@ -127,6 +127,51 @@ test('Composed settings: an attention item whose dismissal answers with a confli
 	expect(errors).toEqual([]);
 });
 
+for (const width of [390, 360]) {
+	test(`Composed settings: at ${width}px dismissing the last attention item on the index keeps the list, says all clear and keeps focus`, async ({ page }) => {
+		const errors = watch(page);
+		await page.clock.install();
+		await page.setViewportSize({ width, height: 900 });
+		await page.goto('/fixtures/settings-composed/?section=');
+		const attention = page.getByTestId('composed-attention');
+		// Dismiss buttons need JavaScript: visible means hydrated.
+		await expect(attention.getByRole('button', { name: /^Dismiss/ }).first()).toBeVisible({ timeout: 45000 });
+		await page.clock.pauseAt(new Date(Date.now() + 5000));
+		await attention.getByRole('button', { name: 'Dismiss: Seats almost full' }).click();
+		await page.clock.runFor(700);
+		await expect(attention.locator('[data-attention-item]')).toHaveCount(1);
+		const region = attention.getByRole('button', { name: 'Dismiss: A storage change is waiting' });
+		// The first try answers with a conflict; the second goes through.
+		await region.click();
+		await page.clock.runFor(700);
+		await expect(attention.getByRole('alert')).toHaveText('An administrator answered this a moment ago. Reload to see it.');
+		await region.click();
+		await page.clock.runFor(700);
+		await expect(attention.locator('[data-attention-item]')).toHaveCount(0);
+		await expect(attention.getByText('Nothing needs attention right now.')).toBeVisible();
+		await expect(attention.getByRole('heading', { name: 'Needs attention' })).toBeFocused();
+		expect(errors).toEqual([]);
+	});
+}
+
+test('Composed settings: a scope action answered with a conflict shows its message and can run again', async ({ page }) => {
+	const errors = watch(page);
+	await openOnClock(page);
+	await page.getByTestId('as-viewer').check();
+	const scopePage = page.getByTestId('composed-page');
+	const request = scopePage.getByRole('button', { name: 'Request access' });
+	await request.click();
+	await page.clock.runFor(700);
+	// A conflict is a failure even without an `error`: its message is the alert, and nothing says it was sent.
+	await expect(scopePage.locator('[data-settings-scope-error]')).toHaveText('Your role changed a moment ago. Reload, then ask again.');
+	await expect(scopePage.getByRole('button', { name: 'Access requested' })).toHaveCount(0);
+	await request.click();
+	await page.clock.runFor(700);
+	await expect(scopePage.getByRole('button', { name: 'Access requested' })).toHaveAttribute('aria-disabled', 'true');
+	await expect(scopePage.locator('[data-settings-scope-error]')).toHaveCount(0);
+	expect(errors).toEqual([]);
+});
+
 test('Composed settings: leaving without saving clears the dirty dot and the unsaved attention item', async ({ page }) => {
 	const errors = watch(page);
 	await open(page);

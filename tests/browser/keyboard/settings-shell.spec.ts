@@ -613,7 +613,23 @@ test.describe('Shell: focus rings, forced colours, the index alone and early typ
 			await page.goto('/fixtures/settings-composed/?section=');
 			await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible({ timeout: 45000 });
 			await expect(page.getByRole('heading', { level: 2, name: 'Needs attention' })).toBeVisible();
+			// The nav's group headings follow the title down a level too.
+			await expect(page.getByRole('heading', { level: 2, name: 'You', exact: true })).toBeVisible();
 			await expect(page.locator('h1')).toHaveCount(1);
+			const results = await new AxeBuilder({ page }).withRules(['page-has-heading-one', 'heading-order']).analyze();
+			expect(results.violations.map((v) => v.id)).toEqual([]);
+		}
+	});
+
+	test('a page whose heading level the app sets in the browser gets that level, not the prerender’s', async ({ page }) => {
+		// Prerendered without `?embedded`: the page title is an h1 there. In the browser the app draws
+		// its own h1 and asks for an h2, so once hydrated the page has one h1.
+		for (const width of [1440, 390]) {
+			await page.setViewportSize({ width, height: 900 });
+			await page.goto('/fixtures/settings-composed/?section=workspace&embedded=1');
+			await expect(page.getByRole('switch', { name: 'Play a sound' })).toBeEnabled({ timeout: 45000 });
+			await expect(page.getByRole('heading', { level: 2, name: 'Workspace', exact: true })).toBeVisible();
+			await expect(page.getByRole('heading', { level: 1 })).toHaveText('Admin console');
 			const results = await new AxeBuilder({ page }).withRules(['page-has-heading-one', 'heading-order']).analyze();
 			expect(results.violations.map((v) => v.id)).toEqual([]);
 		}

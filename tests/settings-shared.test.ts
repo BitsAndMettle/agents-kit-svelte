@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix, relative } from 'node:path';
 import test from 'node:test';
 import { adoptCurrentAsDefaults, describeChanges, diffForm, readCurrent, readDefaults, sameValue, undescribedChanges, type ControlLike, type OptionLike } from '../src/lib/settings/shared/diff.ts';
-import { InstantCore, readResult, UndoSlot, type InstantSnapshot } from '../src/lib/settings/shared/undo.ts';
+import { InstantCore, readResult, toFormResult, UndoSlot, type InstantSnapshot } from '../src/lib/settings/shared/undo.ts';
 import { LOCK_LABELS, LOCK_PRECEDENCE, lockAttrs, lockReasonText, pickLock } from '../src/lib/settings/shared/lock.ts';
 import { matchesPhrase, phrasePattern } from '../src/lib/settings/shared/confirm.ts';
 import { filterSettingsLinks, highlightSegments, searchSettings, toPaletteCommands } from '../src/lib/settings/shared/search.ts';
@@ -357,6 +357,17 @@ test('readResult: errors, field errors and any conflict fail and keep only retur
 	assert.deepEqual(readResult({ conflict: { message: 'Scope conflict text' } }), { ok: false, error: 'Scope conflict text', conflict: { message: 'Scope conflict text' } });
 });
 
+test('toFormResult: what FormSubmit shows for a settings result; a conflict fails with its message or the generic text', () => {
+	assert.equal(toFormResult(undefined, 'Failed.'), undefined);
+	assert.equal(toFormResult({ notice: 'Done.' }, 'Failed.'), undefined);
+	assert.equal(toFormResult({ error: ' ' }, 'Failed.'), undefined);
+	assert.deepEqual(toFormResult({ error: 'Offline.' }, 'Failed.'), { error: 'Offline.' });
+	assert.deepEqual(toFormResult({ errors: { name: 'Too long.', other: '' } }, 'Failed.'), { errors: { name: 'Too long.' } });
+	assert.deepEqual(toFormResult({ error: 'Offline.', errors: { name: 'Too long.' } }, 'Failed.'), { error: 'Offline.', errors: { name: 'Too long.' } });
+	assert.deepEqual(toFormResult({ conflict: { message: 'Changed elsewhere.' } }, 'Failed.'), { error: 'Changed elsewhere.' });
+	assert.deepEqual(toFormResult({ conflict: {} }, 'Failed.'), { error: 'Failed.' });
+});
+
 test('UndoSlot hands a snapshot back once, to its own token only', () => {
 	const slot = new UndoSlot<string>();
 	const a = slot.remember('first');
@@ -613,6 +624,49 @@ test('the cross-group import check also rejects barrels and package paths', () =
 	assert.deepEqual(crossGroupImports(rel, `const m = import('../rows/SettingsRow.svelte');`), ['../rows/SettingsRow.svelte']);
 	// A file outside the groups (the shared layer, the root index) is not checked.
 	assert.deepEqual(crossGroupImports('src/lib/settings/index.ts', `export * from './rows';`), []);
+});
+
+/** The shared readers: a component that runs a settings callback reads its result through one of these. */
+const RESULT_READERS = ['readResult', 'toFormResult', 'SettingsHandlerRun', 'InstantSetting', 'InstantCore'];
+
+/**
+ * A group component that runs a callback whose result counts (a `SettingsHandler` prop it does more
+ * with than pass on, or an action's `onSelect`) and imports none of the shared readers: it must be
+ * reading `{error}` by hand, and a `{conflict}` then passes as success.
+ */
+function handRolledReader(rel: string, source: string): string | undefined {
+	if (!GROUPS.some((g) => rel.startsWith(`src/lib/settings/${g}/`)) || !rel.endsWith('.svelte')) return undefined;
+	const handlers = [...source.matchAll(/(\w+)\??:\s*SettingsHandler</g)].map(([, name]) => name);
+	const runsHandler = handlers.some((name) => {
+		const uses = [...source.matchAll(new RegExp(`(?<![\\w.'"])${name}\\b(?!\\??:)`, 'g'))].length;
+		const forwards = [...source.matchAll(new RegExp(`\\{${name}\\}|\\b${name}=\\{${name}\\}`, 'g'))].length;
+		// The destructuring is one use; anything beyond it that is not a plain forward runs it.
+		return uses - 1 - forwards > 0;
+	});
+	// An action's `onSelect` (a `SettingsAction`, an item's action), called here or handed to a runner.
+	const runsAction = /\??\.onSelect\b/.test(source);
+	if (!runsHandler && !runsAction) return undefined;
+	const imports = [...source.matchAll(/import\s*(?:type\s*)?\{([^}]*)\}\s*from\s*['"][^'"]*\/shared(?:\/[^'"]*)?['"]/g)].map(([, names]) => names).join(',');
+	return RESULT_READERS.some((reader) => new RegExp(`(?<!type\\s)\\b${reader}\\b`).test(imports)) ? undefined : rel;
+}
+
+test('the hand-rolled result reader check flags a component that reads a callback by hand, not one that forwards it', () => {
+	const rel = 'src/lib/settings/save/Thing.svelte';
+	const props = `interface Props { onRequest?: SettingsHandler<[]>; }
+let { onRequest }: Props = $props();
+`;
+	assert.equal(handRolledReader(rel, `${props}async function go() { const r = await onRequest?.(); if (r?.error) shown = r.error; }`), rel);
+	assert.equal(handRolledReader(rel, `${props}<LockReason {onRequest} />`), undefined);
+	assert.equal(handRolledReader(rel, `import { readResult } from '../shared/undo';
+${props}const o = readResult(await onRequest?.());`), undefined);
+	assert.equal(handRolledReader(rel, `const r = await action.onSelect?.(); failure = r?.error;`), rel);
+	assert.equal(handRolledReader(rel, `import { SettingsHandlerRun } from '../shared/run.svelte';
+void run.run(action.onSelect);`), undefined);
+	assert.equal(handRolledReader('src/lib/settings/shared/run.svelte.ts', `const r = await onSelect(); r.error;`), undefined);
+});
+
+test('every settings component that runs a callback reads its result through the shared layer (readResult and friends)', () => {
+	assert.deepEqual(sources.map(({ rel, source }) => handRolledReader(rel, source)).filter(Boolean), []);
 });
 
 test('the shared layer has no .svelte files and groups never import another group', () => {

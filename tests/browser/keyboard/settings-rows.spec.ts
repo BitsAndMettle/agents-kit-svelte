@@ -1071,11 +1071,13 @@ test.describe('Row layout', () => {
 		await expect(downloads.getByText('Always on')).toBeVisible();
 	});
 
-	// Ordinary labels, not just a short one: a label that fills its line must not be rewrapped by
-	// Saving or Saved either (the label is renamed in place, as an app's own words would be).
-	for (const width of [393, 400, 412]) {
+	// Ordinary labels, not just a short one (renamed in place, as an app's own words would be). The
+	// status line (Saving, Saved, Undo, Changed back) is the row's last line, so nothing on it moves
+	// the switch: beside the label (1440, 412, 393) or wrapped under it (360, 320), through a save,
+	// its Undo, and both clearing. The rows below move only when the line comes and goes.
+	for (const width of [1440, 412, 393, 360, 320]) {
 		for (const text of ['Compact lists', 'Show line numbers in diffs', 'Email me when a run finishes', 'Compact lists in every project view']) {
-			test(`at ${width}px a save never moves the switch or the rows below, label "${text}"`, async ({ page }) => {
+			test(`at ${width}px a save and its Undo never move the switch or rewrap the label, label "${text}"`, async ({ page }) => {
 				await page.clock.install();
 				await openComposed(page, width);
 				const id = await page.getByRole('switch', { name: 'Compact lists' }).getAttribute('id');
@@ -1086,40 +1088,58 @@ test.describe('Row layout', () => {
 					const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT, { acceptNode: (t) => (t.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP) });
 					walker.nextNode()!.textContent = words;
 				}, text);
-				// The label line: the label and the status slot beside it.
-				const line = label.locator('xpath=..');
 				await expect(compact).toHaveAccessibleName(text);
 				await compact.scrollIntoViewIfNeeded();
+				const shown = row.locator('[data-row-saved]:visible');
+				const undo = row.getByRole('button', { name: /^Undo/ });
 				const next = row.locator('xpath=following-sibling::li[1]');
+				// In page coordinates: clicking Undo may scroll it into view.
 				const where = async () => {
-					const [own, box, below] = [await compact.boundingBox(), await line.boundingBox(), await next.boundingBox()];
-					return { x: own!.x, y: own!.y, label: box!.height, next: below!.y };
+					const [own, box, below] = [await compact.boundingBox(), await label.boundingBox(), await next.boundingBox()];
+					const scroll = await page.evaluate(() => ({ x: window.scrollX, y: window.scrollY }));
+					return { x: own!.x + scroll.x, y: own!.y + scroll.y, label: box!.height, next: below!.y + scroll.y };
 				};
 				const idle = await where();
+				// Nothing waits on the label line: a label of up to 26 characters stays on one line from 393px.
+				if (width >= 393 && text.length <= 26) expect(idle.label, 'idle label height').toBeLessThan(21);
+				await expect(undo).toHaveCount(0);
+
 				await pauseClock(page);
 				await compact.click();
 				await expect(row).toHaveAttribute('data-status', 'pending');
 				const pending = await where();
 				await page.clock.runFor(SETTLE);
 				await expect(row).toHaveAttribute('data-status', 'saved');
-				await expect(row.locator('[data-row-saved]:visible')).toHaveText('Saved');
+				await expect(shown).toHaveText('Saved');
 				const saved = await where();
 				await page.clock.runFor(2500);
 				await expect(row).toHaveAttribute('data-status', 'idle');
-				await expect(row.locator('[data-row-saved]:visible')).toHaveCount(0);
+				await expect(shown).toHaveCount(0);
+				await expect(undo).toBeVisible();
+				const withUndo = await where();
+				await undo.click();
+				await expect(row).toHaveAttribute('data-status', 'pending');
+				const undoing = await where();
+				await page.clock.runFor(SETTLE);
+				await expect(shown).toHaveText('Changed back');
+				const changedBack = await where();
+				await page.clock.runFor(2500);
+				await expect(row).toHaveAttribute('data-status', 'idle');
+				await expect(shown).toHaveCount(0);
+				await expect(undo).toHaveCount(0);
 				const after = await where();
-				for (const [phase, at] of [
-					['pending', pending],
-					['saved', saved],
-					['idle again', after]
-				] as const) {
-					expect(Math.abs(at.x - idle.x), `x while ${phase}`).toBeLessThan(0.5);
-					expect(Math.abs(at.y - idle.y), `y while ${phase}`).toBeLessThan(0.5);
-					expect(Math.abs(at.label - idle.label), `label line height while ${phase}`).toBeLessThan(0.5);
+
+				const phases = { pending, saved, 'Undo shown': withUndo, undoing, 'Changed back': changedBack, 'idle again': after };
+				for (const [phase, at] of Object.entries(phases)) {
+					expect(Math.abs(at.x - idle.x), `switch x while ${phase}`).toBeLessThan(0.5);
+					expect(Math.abs(at.y - idle.y), `switch y while ${phase}`).toBeLessThan(0.5);
+					expect(Math.abs(at.label - idle.label), `label height while ${phase}`).toBeLessThan(0.5);
 				}
-				// The rows below stay put while saving, and when Saved clears (Undo arrives with the save).
-				expect(Math.abs(pending.next - idle.next), 'next row while pending').toBeLessThan(0.5);
-				expect(Math.abs(after.next - saved.next), 'next row when Saved clears').toBeLessThan(0.5);
+				// The rows below move once when the line appears, stay put while it shows, and come back when it goes.
+				for (const [phase, at] of Object.entries({ saved, 'Undo shown': withUndo, undoing, 'Changed back': changedBack })) {
+					expect(Math.abs(at.next - pending.next), `next row while ${phase}`).toBeLessThan(0.5);
+				}
+				expect(Math.abs(after.next - idle.next), 'next row once the line is gone').toBeLessThan(0.5);
 			});
 		}
 	}

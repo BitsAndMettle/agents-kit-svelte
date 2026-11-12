@@ -4,8 +4,10 @@
 	public props: a layout with navigation, search and attention; a page with a scope that locks
 	everything when you view it as a viewer; instant controls; a staged SettingsForm with the same
 	controls inside it, a conflict, and a typed-phrase danger action in route mode (`?dialog=`).
-	The fake server answers after 600 ms; "Play a sound" always fails, and dismissing the storage
-	attention item always answers with a conflict.
+	The fake server answers after 600 ms; "Play a sound" always fails. The first dismissal of the
+	storage attention item, and the first Request access as a viewer, answer with a conflict.
+	`?embedded=1` draws the app's own h1 above the area, so the page title is an h2 in the browser
+	(the prerender has no `?embedded`, so its levels differ from the browser's).
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
@@ -67,6 +69,8 @@
 	let someoneSavesFirst = $state(false);
 	let rejectRole = $state(false);
 	let log = $state('');
+	/** The app draws its own h1 (read in the browser only: the page is prerendered). */
+	const embedded = $derived(browser && page.url.searchParams.get('embedded') === '1');
 
 	// ---- Routing: the app's, not the kit's ----
 	/** The section in the URL (`?section=`). Read only in the browser: the page is prerendered. */
@@ -103,6 +107,7 @@
 	];
 
 	let dismissed = $state<string[]>([]);
+	let regionConflicted = false;
 	const attention = $derived<AttentionItem[]>(
 		[
 			...(unsaved.length
@@ -112,17 +117,26 @@
 			{ id: 'region', tone: 'neutral' as const, label: 'A storage change is waiting', description: 'An administrator has to approve it.', action: { label: 'Open', href: '#region' }, dismissible: true }
 		].filter((item) => !dismissed.includes(item.id))
 	);
-	/** The storage item cannot be dismissed: someone acted on it first (a conflict, not an error). */
+	/** The storage item's first dismissal fails: someone acted on it first (a conflict, not an error). */
 	async function dismiss(id: string): Promise<SettingsResult | void> {
 		await wait();
-		if (id === 'region') return { conflict: { message: 'An administrator answered this a moment ago. Reload to see it.' } };
+		if (id === 'region' && !regionConflicted) {
+			regionConflicted = true;
+			return { conflict: { message: 'An administrator answered this a moment ago. Reload to see it.' } };
+		}
 		dismissed = [...dismissed, id];
 	}
 
 	// ---- The page scope ----
 	let accessRequested = $state(false);
-	async function requestAccess(): Promise<void> {
+	let accessConflicted = false;
+	/** The first request answers with a conflict (a message, no `error`): the page shows it and the request can be sent again. */
+	async function requestAccess(): Promise<SettingsResult | void> {
 		await wait();
+		if (!accessConflicted) {
+			accessConflicted = true;
+			return { conflict: { message: 'Your role changed a moment ago. Reload, then ask again.' } };
+		}
 		accessRequested = true;
 	}
 	const VIEWER_LOCK: SettingLock = { kind: 'permission', reason: 'Only admins can change workspace settings.', source: 'Set by the workspace owner' };
@@ -337,9 +351,9 @@
 	<SettingsSearch {entries} shortcut="/" data-testid="composed-search" />
 {/snippet}
 
-<!-- The same list twice: the layout shows its slot only atop the narrow index, so a wide page renders it again, one heading level up. -->
+<!-- The same list twice: the layout shows its slot only atop the narrow index, so a wide page renders it again, one heading level up. Always passed, even with nothing in it: the list keeps its own all-clear line (and focus) after the last dismissal, and hides itself when it starts empty. -->
 {#snippet attentionInNav()}
-	<AttentionList items={attention} onDismiss={dismiss} headingLevel={current ? 3 : 2} data-testid="composed-attention" />
+	<AttentionList items={attention} onDismiss={dismiss} headingLevel={current || embedded ? 3 : 2} data-testid="composed-attention" />
 {/snippet}
 
 {#snippet help()}
@@ -375,10 +389,11 @@
 			<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={rejectRole} data-testid="reject-role" /> Reject the default role</label>
 		<span class="ml-auto" aria-live="polite" data-testid="composed-log">{log}</span>
 	</div>
+	{#if embedded}<h1 class="m-0 px-4 pt-3 text-base font-semibold">Admin console</h1>{/if}
 
-	<SettingsLayout {groups} {current} filter={{ value: '' }} navHeader={search} navFooter={help} attention={attention.length ? attentionInNav : undefined} headingLevel={current ? 2 : 1} labels={{ title: 'Settings' }}>
+	<SettingsLayout {groups} {current} filter={{ value: '' }} navHeader={search} navFooter={help} attention={attentionInNav} headingLevel={current || embedded ? 2 : 1} labels={{ title: 'Settings' }}>
 		{#if current === 'workspace'}
-			<SettingsPage title="Workspace" lead="How this workspace works for everyone in it." icon={Building2} backHref="?section=" {scope} banner={noticeBanner} width="lg" footnote="Changes on this page apply to every member." data-testid="composed-page">
+			<SettingsPage title="Workspace" headingLevel={embedded ? 2 : 1} lead="How this workspace works for everyone in it." icon={Building2} backHref="?section=" {scope} banner={noticeBanner} width="lg" footnote="Changes on this page apply to every member." data-testid="composed-page">
 				<AttentionList items={attention} onDismiss={dismiss} headingLevel={2} data-testid="composed-attention" />
 
 				<!-- Instant: each change applies on its own. -->
@@ -568,7 +583,7 @@
 				</SettingsForm>
 			</SettingsPage>
 		{:else if current}
-			<SettingsPage title={groups.flatMap((g) => g.items).find((l) => l.id === current)?.label ?? 'Settings'} backHref="?section=" lead="This fixture builds only the Workspace page.">
+			<SettingsPage title={groups.flatMap((g) => g.items).find((l) => l.id === current)?.label ?? 'Settings'} headingLevel={embedded ? 2 : 1} backHref="?section=" lead="This fixture builds only the Workspace page.">
 				<p class="m-0 text-[13px]"><a href="?section=workspace">Back to Workspace</a></p>
 			</SettingsPage>
 		{/if}

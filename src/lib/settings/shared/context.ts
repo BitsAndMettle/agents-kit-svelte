@@ -8,8 +8,8 @@ import type { SettingLock } from './types';
 
 /**
  * What the area around a control says: whether JS-only affordances may run yet, and a lock that
- * covers everything below. Set by SettingsLayout (ready), SettingsPage `scope` and SettingsSection
- * `lock`. A provider that adds a lock keeps its parent's `ready` and passes the stronger lock on
+ * covers everything below. Set by SettingsLayout (ready), SettingsPage `scope`, SettingsSection
+ * `lock` and SettingsRow (for its control). A provider that adds a lock keeps its parent's `ready` and passes the stronger lock on
  * (`pickLock(own, parent?.lock?.lock)`).
  */
 export interface SettingsScope {

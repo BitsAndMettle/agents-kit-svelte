@@ -15,9 +15,9 @@
 	surrounding form, so check `intent` before acting on them. There, form attributes and
 	`enhance` belong on the SettingsForm: other attributes are not applied (development warns once).
 
-	A lock covering it (a SettingsPage scope or SettingsSection lock, or a locked or disabled
-	SettingsRow or Field around it) disables the phrase, the choices and Confirm, shows the lock's
-	reason in the dialog (`labels.locked` for a row's or field's) and describes them with it; it
+	A lock covering it (a SettingsPage scope, SettingsSection or SettingsRow lock, or a disabled
+	Field around it) disables the phrase, the choices and Confirm, shows the lock's reason in the
+	dialog (`labels.locked` for a disabled Field, which has none) and describes them with it; it
 	never calls `onConfirm` or posts then. `confirmUnavailable` does the same for a reason of your
 	own, keeping Confirm focusable: a disabled default button stops Enter in a field from posting,
 	and no `intent` is posted without JavaScript.
@@ -42,7 +42,7 @@
 		whatHappens: string;
 		/** Heading of a flat list's `ok` items, when it has effects too. */
 		whatStays: string;
-		/** Why Confirm is off when the SettingsRow or Field around the dialog is locked or disabled (a section or page lock shows its own reason). */
+		/** Why Confirm is off when the Field around the dialog is disabled (a page, section or row lock shows its own reason). */
 		locked: string;
 	}
 
@@ -65,6 +65,7 @@
 	import { Alert } from '../../primitives/display';
 	import { Button } from '../../primitives/actions';
 	import { getFieldContext, Input, NativeSelect, setFieldContext, type FieldState } from '../../primitives/form';
+	import { isThenable } from '../../core/promise';
 	import { FormSubmit } from '../../primitives/form/submit.svelte';
 	import { Dialog } from '../../primitives/overlays';
 	import { matchesPhrase, phrasePattern, type PhraseOptions } from '../shared/confirm';
@@ -72,6 +73,7 @@
 	import { isDev } from '../shared/env';
 	import { lockAttrs, lockReasonText } from '../shared/lock';
 	import { openerFor } from '../shared/focus';
+	import { toFormResult } from '../shared/undo';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES, SETTINGS_CONTAINER } from '../shared/recipes';
 	import type { ConsequenceGroup, ConsequenceItem, ReassignSpec, SettingsHandler, SettingsIcon, SettingsResult } from '../shared/types';
@@ -248,7 +250,9 @@
 			((values) => {
 				// The browser's pattern check already ran; this is the same rule in code.
 				if (confirmPhrase && !matchesPhrase(values.typed ?? '', confirmPhrase, phraseOptions)) return { error: text.phraseMismatch };
-				return onConfirm(values);
+				// FormSubmit reads only `error` and `errors`: read the result the settings way, so a `{conflict}` fails too.
+				const result = onConfirm(values);
+				return isThenable(result) ? Promise.resolve(result).then((settled) => toFormResult(settled, text.failed)) : toFormResult(result, text.failed);
 			}),
 		read: (data) => ({
 			typed: confirmPhrase ? String(data.get('confirm') ?? '') : undefined,
@@ -287,10 +291,10 @@
 
 	const busy = $derived(submit.pending);
 
-	/** A lock covering the dialog (page scope or section). Nothing inside can change then. */
+	/** A lock covering the dialog (page scope, section or row). Nothing inside can change then. */
 	const scope = getSettingsScope();
 	const lock = $derived(scope?.lock?.lock);
-	/** A locked SettingsRow (or a disabled Field) around the dialog: its lock object is the row's own, so only "disabled" is known. */
+	/** A disabled Field around the dialog: it has no lock, so only "disabled" is known. */
 	const fieldLocked = $derived(Boolean(outerField?.disabled));
 	/** Anything covering the dialog that switches its controls off. */
 	const covered = $derived(Boolean(lock) || fieldLocked);

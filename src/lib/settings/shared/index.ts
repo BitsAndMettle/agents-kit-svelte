@@ -11,7 +11,7 @@ export { readDefaults, readCurrent, diffForm, describeChanges, adoptCurrentAsDef
 export type { ChangeWords, ControlLike, FormLike, OptionLike, FieldReading } from './diff';
 export { InstantSetting } from './instant.svelte';
 export type { InstantOptions } from './instant.svelte';
-export { UndoSlot, InstantCore, readResult } from './undo';
+export { UndoSlot, InstantCore, readResult, toFormResult } from './undo';
 export type { InstantSnapshot, InstantCoreOptions, SettingsOutcome } from './undo';
 export { SettingsHandlerRun } from './run.svelte';
 export type { SettingsRunStatus } from './run.svelte';

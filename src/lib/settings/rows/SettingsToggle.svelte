@@ -224,9 +224,9 @@
 
 {#snippet switchControl()}
 	<span class="group/toggle inline-flex items-center gap-2">
-		<!-- Forced colors paint the thumb like the track, so on and off look alike: the state text then always shows. -->
-		<span aria-hidden="true" data-state-text class={cn('min-w-[2ch] text-right text-xs text-fg-light', !stateText && 'hidden forced-colors:inline')}>
-			<span class="hidden group-has-[input:checked]/toggle:inline">{stateWords.on}</span><span class="group-has-[input:checked]/toggle:hidden">{stateWords.off}</span>
+		<!-- Forced colors paint the thumb like the track, so on and off look alike: the state text then always shows. Both words share one grid cell, so the text is as wide as the longer one and flipping never moves the switch. -->
+		<span aria-hidden="true" data-state-text class={cn('grid justify-items-end text-xs text-fg-light *:[grid-area:1/1]', !stateText && 'hidden forced-colors:grid')}>
+			<span class="invisible group-has-[input:checked]/toggle:visible">{stateWords.on}</span><span class="group-has-[input:checked]/toggle:invisible">{stateWords.off}</span>
 		</span>
 		{#if draft}
 			<Switch {...rest} bind:ref {name} value="true" defaultChecked={start} disabled={disabled || undefined} class={SWITCH_ONLY} />
@@ -279,7 +279,6 @@
 	{status}
 	error={errorText}
 	{statusText}
-	statusWords={[words.undone]}
 	labels={{ saving: words.saving, saved: words.saved }}
 	class={cn('min-w-0', className)}
 />
