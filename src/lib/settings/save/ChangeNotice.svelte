@@ -3,7 +3,9 @@
 	The inline result of an instant change or a finished action: a bold lead, a detail line, Undo,
 	an optional second action and Dismiss. Undo is owned by a token: once the app's current token
 	differs, this notice can no longer undo, says why, and cannot reverse a newer change. It never
-	hides itself. Without JavaScript, Undo posts `intent=undo` and `token` to `undoAction`.
+	hides itself. Without JavaScript, Undo posts `intent=undo` and `token` to `undoAction`. A lock
+	covering it (a SettingsPage scope or SettingsSection lock) disables Undo and the second action,
+	describes them with the lock's reason, and never calls `onUndo` or `onSelect` then.
 -->
 <script lang="ts" module>
 	/** Every word ChangeNotice shows or announces. */
@@ -23,7 +25,7 @@
 	}
 </script>
 
-<script lang="ts">
+<script lang="ts" generics="Token extends string | number = string | number">
 	import { tick, type Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { Undo2 } from '@lucide/svelte';
@@ -32,13 +34,14 @@
 	import { isThenable } from '../../core/promise';
 	import { Alert } from '../../primitives/display';
 	import { Button } from '../../primitives/actions';
-	import { getSettingsDraft } from '../shared/context';
+	import { getSettingsDraft, getSettingsScope } from '../shared/context';
 	import { nextFocusAfterRemoval, restoreFocus } from '../shared/focus';
+	import { lockAttrs } from '../shared/lock';
 	import { actionButtonProps } from '../shared/recipes';
-	import type { SettingsAction, SettingsHandler, SettingsResult } from '../shared/types';
-	import { isSuperseded } from './helpers';
+	import type { SettingsAction, SettingsHandler } from '../shared/types';
+	import { isSuperseded, resultFailure } from './helpers';
 
-	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'hidden'> {
+	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'hidden'> {
 		/** What happened, in bold ("Reduce motion turned on"). */
 		lead: string | Snippet;
 		/** A line of detail under the lead. */
@@ -46,16 +49,16 @@
 		/** Colour of the notice. Default `success`. */
 		tone?: UiTone;
 		/** The token of the change this notice can undo (an `InstantSetting.undoToken`, or your own). */
-		undoToken?: string | number;
+		undoToken?: Token;
 		/** The token that owns the undo point now. When it differs (or is `null`: nothing to undo), Undo is unavailable. */
-		currentToken?: string | number | null;
-		/** Undoes the change, given `undoToken`. A promise makes Undo load; `{ error }` or a rejection shows a failure. */
-		onUndo?: SettingsHandler<[string | number | undefined]>;
+		currentToken?: Token | null;
+		/** Undoes the change, given `undoToken`. A promise makes Undo load; `{ error }`, `{ errors }`, `{ conflict }` or a rejection shows a failure. */
+		onUndo?: SettingsHandler<[Token | undefined]>;
 		/** Where Undo posts without JavaScript: `intent=undo`, `token` and `hidden`. Inside a SettingsForm (no nested forms) only `onUndo` works. */
 		undoAction?: string;
 		/** Extra values for that post, rendered as hidden inputs. */
 		hidden?: Record<string, string>;
-		/** A second action (a link, a callback or a form intent), e.g. "Reset to default". */
+		/** A second action (a link, a callback or a form intent), e.g. "Reset to default". An `onSelect` that returns (or resolves to) `{ error }` shows that failure. */
 		secondary?: SettingsAction;
 		/** Shows a dismiss button that calls this. The notice does not remove itself: stop rendering it. */
 		onDismiss?: () => void;
@@ -108,6 +111,10 @@
 
 	/** Inside a SettingsForm the notice must not render a form of its own. */
 	const insideForm = getSettingsDraft() !== undefined;
+	/** A lock covering the notice: Undo and the second action are off, described by its reason. */
+	const scope = getSettingsScope();
+	const lock = $derived(scope?.lock);
+	const locked = $derived(lockAttrs(lock?.lock, lock?.reasonId));
 
 	let root = $state<HTMLDivElement | null>(null);
 	let undoing = $state(false);
@@ -115,7 +122,8 @@
 	let failure = $state<string | null>(null);
 	let secondaryBusy = $state(false);
 
-	const superseded = $derived(isSuperseded(undoToken, currentToken));
+	// An undo in flight or done may itself move the app's undo point: that is not a newer change.
+	const superseded = $derived(!undoing && !didUndo && !undone && isSuperseded(undoToken, currentToken));
 	const finished = $derived(undone || didUndo);
 	const canPost = $derived(undoAction !== undefined && !insideForm);
 	const offersUndo = $derived(!finished && (onUndo !== undefined || canPost));
@@ -125,23 +133,22 @@
 	async function undo(event: Event): Promise<void> {
 		if (!onUndo) return;
 		event.preventDefault();
-		if (undoing || superseded || finished) return;
+		if (lock || undoing || superseded || finished) return;
 		const startedInside = root?.contains(document.activeElement) ?? false;
 		failure = null;
 		undoing = true;
 		// Let a cleared failure reach the page first, so the same failure is announced again.
 		await tick();
-		let result: void | SettingsResult;
+		let message: string | undefined;
 		try {
 			const outcome = onUndo(undoToken);
-			result = isThenable(outcome) ? await outcome : outcome;
+			message = resultFailure(isThenable(outcome) ? await outcome : outcome, text.undoFailed);
 		} catch {
-			result = { error: text.undoFailed };
+			message = text.undoFailed;
 		}
 		undoing = false;
-		const message = result && (result.error || Object.values(result.errors ?? {}).find(Boolean) || result.conflict?.message);
-		if (message || (result && result.conflict)) {
-			failure = message || text.undoFailed;
+		if (message) {
+			failure = message;
 			return;
 		}
 		didUndo = true;
@@ -178,17 +185,23 @@
 
 	async function runSecondary(): Promise<void> {
 		const select = secondary?.onSelect;
-		if (!select || secondaryBusy) return;
-		const outcome = select();
-		if (!isThenable(outcome)) return;
-		secondaryBusy = true;
+		if (!select || secondaryBusy || lock) return;
+		failure = null;
+		let message: string | undefined;
 		try {
-			await outcome;
+			const outcome = select();
+			if (isThenable(outcome)) {
+				secondaryBusy = true;
+				// Let a cleared failure reach the page first, so the same failure is announced again.
+				await tick();
+				message = resultFailure(await outcome, text.actionFailed);
+			} else message = resultFailure(outcome, text.actionFailed);
 		} catch {
-			failure = text.actionFailed;
+			message = text.actionFailed;
 		} finally {
 			secondaryBusy = false;
 		}
+		if (message) failure = message;
 	}
 </script>
 
@@ -200,6 +213,7 @@
 		softDisabled={superseded}
 		aria-describedby={superseded ? reasonId : undefined}
 		onclick={onUndo && !canPost ? undo : undefined}
+		{...locked}
 	>
 		{#snippet leading()}<Undo2 aria-hidden="true" />{/snippet}
 		{text.undo}
@@ -222,7 +236,7 @@
 		{/if}
 	{/if}
 	{#if secondary && secondaryProps}
-		<Button {...secondaryProps} size="sm" variant={secondary.tone ? secondaryProps.variant : 'ghost'} loading={secondaryBusy} onclick={secondary.onSelect ? runSecondary : undefined}>{secondary.label}</Button>
+		<Button {...secondaryProps} size="sm" variant={secondary.tone ? secondaryProps.variant : 'ghost'} loading={secondaryBusy} onclick={secondary.onSelect ? runSecondary : undefined} {...locked}>{secondary.label}</Button>
 	{/if}
 {/snippet}
 

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ArrowRight } from '@lucide/svelte';
-	import { ConsequenceDialog, SaveBar, SettingsForm } from '$lib/settings/save';
+	import { ConflictResolver, ConsequenceDialog, SaveBar, SettingsForm, type ConsequenceConfirmContext } from '$lib/settings/save';
+	import { SettingsRow } from '$lib/settings/rows';
 	import { RECIPES, SETTINGS_CONTAINER, type SettingsDraft, type SettingsResult, type SettingsSubmitContext, type SettingsValues } from '$lib/settings/shared';
 	import { Input, NativeSelect, Switch } from '$lib/primitives/form';
 	import { Button } from '$lib/primitives/actions';
@@ -23,8 +24,12 @@
 	let teammateSaves = $state(false);
 	let here = $state('General');
 	let log = $state('');
+	let formRef = $state<HTMLFormElement | null>(null);
 
 	const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+	/** A fixed clock, so the server render and the browser agree on "2 min ago". */
+	const NOW = Date.UTC(2026, 10, 12, 9, 30);
+	const CHANGED_AT = Date.UTC(2026, 10, 12, 9, 28);
 
 	/** Pretends to save on a server: answers after 600 ms, checks the name, and can report a stale revision. */
 	async function save(values: SettingsValues, context: SettingsSubmitContext): Promise<SettingsResult | void> {
@@ -32,19 +37,34 @@
 		const name = String(values.teamName ?? '').trim();
 		if (!name) return { errors: { teamName: 'Enter a team name.' } };
 		if (name.length > 40) return { error: 'The server refused the name. Nothing was saved.' };
+		if (values.intent === 'reset-invite') {
+			log = 'Invite link reset';
+			return;
+		}
 		if (teammateSaves) {
 			teammateSaves = false;
 			revision += 1;
-			return { conflict: { message: 'Ben Ortiz saved these settings a moment ago. Your changes are kept: save again to replace his.' } };
+			return {
+				conflict: {
+					message: 'Ben Ortiz saved these settings a moment ago. Your changes are kept: choose what to keep, then save again.',
+					fields: [{ name: 'teamName', label: 'Team name', mine: name, theirs: 'Northwind Studio Ltd' }]
+				}
+			};
+		}
+		const kept = values['keep.teamName'];
+		if (kept === 'theirs') {
+			const control = formRef?.elements.namedItem('teamName') as HTMLInputElement | null;
+			if (control) control.value = control.defaultValue = 'Northwind Studio Ltd';
 		}
 		revision += 1;
 		log = `Saved revision ${revision}: ${context.changes.map((c) => `${c.label} → ${c.to}`).join(', ')}`;
 	}
 
 	/** A danger action inside the staged form: it runs on its own, never with Save. */
-	async function clearActivity(): Promise<SettingsResult | void> {
+	async function clearActivity({ data }: ConsequenceConfirmContext): Promise<SettingsResult | void> {
 		await wait(600);
-		log = 'Activity cleared';
+		// The intent rides on Confirm: a server tells this post from a save by it.
+		log = data.get('intent') === 'clear-activity' ? 'Activity cleared' : 'Activity cleared, but the post had no intent';
 	}
 
 	function goTo(place: string): void {
@@ -70,7 +90,7 @@
 		</label>
 	</nav>
 
-	<SettingsForm action="/settings-demo/general" {fields} {revision} onSubmit={save} bind:controller aria-label="General settings">
+	<SettingsForm action="/settings-demo/general" {fields} {revision} onSubmit={save} bind:controller bind:ref={formRef} aria-label="General settings">
 		{#snippet children(draft)}
 			<section aria-labelledby="sfd-heading" class={RECIPES.section}>
 				<header class={RECIPES.sectionHeader}>
@@ -116,7 +136,13 @@
 						</div>
 						<Switch id="sfd-digest" name="digest" defaultChecked aria-describedby="sfd-digest-help" />
 					</li>
+					<SettingsRow label="Invite link" description="Anyone with it can ask to join." value="northwind.example/join/8f3k" mono action={{ label: 'Reset link', intent: 'reset-invite' }} />
 				</ul>
+				{#if draft.status === 'conflict' && draft.conflict?.fields?.length}
+					<div class="border-t border-canvas-border px-4 py-3">
+						<ConflictResolver fields={draft.conflict.fields} changedBy={{ name: 'Ben Ortiz', at: CHANGED_AT }} now={NOW} />
+					</div>
+				{/if}
 			</section>
 			<section aria-labelledby="sfd-danger" class={cn(RECIPES.section, RECIPES.danger)}>
 				<header class={cn(RECIPES.sectionHeader, 'border-status-danger/20')}>

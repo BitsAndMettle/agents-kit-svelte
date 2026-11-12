@@ -23,14 +23,16 @@
 	import type { ConsequenceGroup, ConsequenceItem } from '../shared/types';
 	import { headingBelow } from './helpers';
 
-	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
+	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'title'> {
 		/** One flat list of effects. */
 		items?: ConsequenceItem[];
 		/** Titled groups of effects; wins over `items`. */
 		groups?: ConsequenceGroup[];
-		/** A heading above the list. */
+		/** A heading above the list, which also names it. */
+		title?: string;
+		/** @deprecated Use `title`. */
 		heading?: string;
-		/** Level of `heading`; group titles take the next level (or this one without a heading). Default 3. */
+		/** Level of `title`; group titles take the next level (or this one without a heading). Default 3. */
 		headingLevel?: 3 | 4 | 5;
 		/** `auto`: groups sit side by side once the settings container is wide enough. Default `auto`. */
 		columns?: 'auto' | 1 | 2;
@@ -42,7 +44,8 @@
 	let {
 		items = [],
 		groups,
-		heading,
+		title,
+		heading: headingAlias,
 		headingLevel = 3,
 		columns = 'auto',
 		size = 'md',
@@ -51,6 +54,7 @@
 		...rest
 	}: Props = $props();
 
+	const heading = $derived(title ?? headingAlias);
 	const text = $derived<ConsequenceListLabels>({ ok: 'Yes:', no: 'No:', warn: 'Caution:', info: 'Note:', ...labels });
 
 	const id = $props.id();

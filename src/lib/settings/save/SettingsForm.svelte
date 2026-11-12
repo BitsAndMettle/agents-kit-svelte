@@ -4,7 +4,8 @@
 	publishes it, so rows and controls inside switch to staged mode and drop their own forms.
 	Dirty state is the DOM diff against the server-rendered defaults (or a controlled `changes`
 	list). It posts the revision, runs `onSubmit` (or posts natively), keeps the draft on a
-	conflict, and holds a navigation while dirty with a small leave dialog.
+	conflict, and holds a navigation while dirty with a small leave dialog. It owns implicit
+	submission: Enter in a field always saves, even when an intent or danger button comes first.
 -->
 <script lang="ts" module>
 	/** Every word SettingsForm shows or announces. */
@@ -164,6 +165,8 @@
 <svelte:window onbeforeunload={draft.guard.beforeunload} />
 
 <form {...rest} bind:this={ref} method="post" {action} {@attach draft.attach} onsubmit={draft.onsubmit} aria-busy={draft.pending || undefined} class={cn('min-w-0', className)}>
+	<!-- The form's default button (the first submit in it): Enter in a field saves, with or without JavaScript, never an intent or danger button further down. -->
+	<button type="submit" tabindex="-1" aria-hidden="true" data-settings-default class="sr-only"></button>
 	{#if revision !== undefined}
 		<input type="hidden" name={revisionName} value={String(revision)} />
 	{/if}

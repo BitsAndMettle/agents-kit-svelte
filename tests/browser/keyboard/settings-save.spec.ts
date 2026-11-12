@@ -599,7 +599,10 @@ test.describe('ConsequenceList', () => {
 		await expect(can.getByRole('listitem')).toHaveCount(3);
 		await expect(can.getByRole('listitem').first()).toHaveText('Yes: Open documents shared with the team');
 		await expect(cannot.getByRole('listitem').first()).toHaveText('No: Edit, move or delete documents');
-		await expect(section.getByRole('group', { name: 'What happens' }).getByRole('listitem').first()).toContainText('Caution: The project becomes read-only');
+		const happens = section.getByRole('group', { name: 'What happens' });
+		await expect(happens.getByRole('listitem').first()).toContainText('Caution: The project becomes read-only');
+		// `title` is the heading, never a tooltip on the root.
+		await expect(happens).not.toHaveAttribute('title');
 		await expect(section.getByText('Note: Download files')).toHaveCount(1);
 		await expect(section.locator('.sr-only').filter({ hasText: /^(Yes|No|Caution|Note):/ })).toHaveCount(14);
 	});
@@ -894,5 +897,201 @@ test.describe('Sheet route props', () => {
 		await expect(sheet.getByRole('link', { name: 'Close' })).toHaveAttribute('href', './');
 		expect(page.url()).not.toContain('sheet=');
 		await close();
+	});
+});
+
+test.describe('Red-team fixes: SettingsForm owns Enter, and Save never carries an intent', () => {
+	test('Enter in a field saves, even with an intent button earlier in the form', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await team.fill('Northwind Design');
+		await pauseClock(page);
+		await team.press('Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 8: Team name → Northwind Design');
+	});
+
+	test('without JavaScript Enter in a field posts the save, with no intent or phrase', async ({ browser }) => {
+		const { page, section, close } = await openWithoutJs(browser, 'settings-form');
+		const form = section.locator('form[aria-label="General settings"]');
+		// The danger dialog's intent rides on its own (switched off) confirm button, never a hidden field of the page form.
+		await expect(form.locator('input[name="intent"]')).toHaveCount(0);
+		await expect(form.locator('button[name="intent"][value="clear-activity"]')).toBeDisabled();
+		await section.getByRole('textbox', { name: 'Team name' }).fill('Northwind Design');
+		const posted = await catchPost(page, '/settings-demo/general');
+		await section.getByRole('textbox', { name: 'Team name' }).press('Enter');
+		const body = decode(await posted());
+		expect(body.get('teamName')).toBe('Northwind Design');
+		expect(body.has('intent')).toBe(false);
+		expect(body.has('confirm')).toBe(false);
+		await close();
+	});
+
+	test('a conflict review inside the form adds no change, and once it is resolved focus returns to a field', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		await section.getByRole('checkbox', { name: 'A teammate saves first' }).check();
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await team.fill('Mine');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(SETTLE);
+		const choice = section.getByRole('radiogroup', { name: 'Team name' });
+		await choice.getByText('Yours').click();
+		await expect(choice.getByRole('radio', { name: 'Yours' })).toBeChecked();
+		// Its radios' saved state follows the choice, so the form never counts them as edits.
+		const synced = await section
+			.locator('input[name^="keep."]')
+			.evaluateAll((radios) => radios.length > 0 && radios.every((r) => (r as HTMLInputElement).defaultChecked === (r as HTMLInputElement).checked));
+		expect(synced).toBe(true);
+		const bar = section.locator('[data-layout="sticky"]');
+		await expect(bar).toContainText('1 unsaved change');
+		await expect(bar).not.toContainText('Keep');
+
+		await section.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 9: Team name → Mine');
+		await expect(choice).toHaveCount(0);
+		await expect(team).toBeFocused();
+	});
+
+	test('Discard during a conflict review returns focus to a field, not the page', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		await section.getByRole('checkbox', { name: 'A teammate saves first' }).check();
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await team.fill('Mine');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(SETTLE);
+		const choice = section.getByRole('radiogroup', { name: 'Team name' });
+		await choice.getByText('Yours').click();
+		await section.getByRole('button', { name: 'Discard' }).focus();
+		await press(page, 'Enter');
+		// The form re-reads its values on the task after a reset.
+		await page.clock.runFor(100);
+		await expect(team).toHaveValue('Northwind Studio');
+		await expect(choice).toHaveCount(0);
+		await expect(team).toBeFocused();
+	});
+
+	for (const layout of ['Sticky', 'Floating'] as const) {
+		test(`a ${layout.toLowerCase()} bar keeps room below a field focused with Tab, so the field is never hidden under it`, async ({ page }) => {
+			const section = await openSection(page, 'save-bar');
+			await section.getByRole('group', { name: 'Bar layout' }).getByRole('button', { name: layout }).click();
+			await section.getByRole('switch', { name: 'Mentions' }).click();
+			const bar = section.locator(`[data-layout="${layout.toLowerCase()}"]`);
+			await expect(bar).toContainText('1 unsaved change');
+			const target = section.getByRole('switch', { name: 'Weekly digest' });
+			const previous = section.getByRole('switch', { name: 'Invites accepted' });
+			// Park the switch right where the bar sits in its scrolling frame, then Tab to it from the one before.
+			const barTop = (await bar.boundingBox())!.y;
+			await target.evaluate((el, top) => {
+				const scroller = el.closest('.overflow-y-auto') as HTMLElement;
+				scroller.scrollTop += el.getBoundingClientRect().bottom - (top + 20);
+			}, barTop);
+			const covered = (await target.boundingBox())!;
+			expect(covered.y + covered.height).toBeGreaterThan((await bar.boundingBox())!.y);
+			await previous.evaluate((el) => (el as HTMLElement).focus({ preventScroll: true }));
+			await press(page, 'Tab');
+			await expect(target).toBeFocused();
+			const field = (await target.boundingBox())!;
+			expect(field.y + field.height).toBeLessThanOrEqual((await bar.boundingBox())!.y);
+		});
+	}
+});
+
+test.describe('Red-team fixes: locks, outcomes and announcements', () => {
+	test('a covering lock turns off the phrase and Confirm, describes them with the reason it shows, and runs nothing', async ({ page }) => {
+		const section = await openOnClock(page, 'consequence-dialog');
+		await section.getByRole('checkbox', { name: 'View as a viewer' }).check();
+		await section.getByRole('button', { name: 'Archive…' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Archive Northwind Studio?' });
+		const reason = 'Only the team owner can archive the team or hand over billing.';
+		await expect(dialog.getByText(reason)).toBeVisible();
+		const phrase = dialog.getByRole('textbox', { name: 'Type “Archive” to confirm' });
+		await expect(phrase).toBeDisabled();
+		await expect(phrase).toHaveAccessibleDescription(reason);
+		const confirm = dialog.getByRole('button', { name: 'Archive team' });
+		await expect(confirm).toBeDisabled();
+		await expect(confirm).toHaveAccessibleDescription(reason);
+		await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+		await pauseClock(page);
+		await dialog.locator('form').evaluate((form) => (form as HTMLFormElement).requestSubmit());
+		await page.clock.runFor(SETTLE);
+		await expect(dialog).toBeVisible();
+		await expect(section.getByTestId('cdd-status')).toHaveText('');
+		await dialog.getByRole('button', { name: 'Cancel' }).click();
+
+		// Unlocked, the same dialog confirms.
+		await section.getByRole('checkbox', { name: 'View as a viewer' }).uncheck();
+		await section.getByRole('button', { name: 'Archive…' }).click();
+		await dialog.getByRole('textbox', { name: 'Type “Archive” to confirm' }).fill('Archive');
+		await dialog.getByRole('button', { name: 'Archive team' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('cdd-status')).toHaveText('Team archived');
+	});
+
+	test('confirmUnavailable keeps Confirm focusable but blocked, with its reason shown and linked', async ({ page }) => {
+		const section = await openOnClock(page, 'consequence-dialog');
+		await section.getByRole('button', { name: 'Hand over…' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Hand over billing?' });
+		const reason = 'Handing over billing is not available in this preview.';
+		await expect(dialog.getByText(reason)).toBeVisible();
+		const confirm = dialog.getByRole('button', { name: 'Hand over' });
+		await expect(confirm).toHaveAttribute('aria-disabled', 'true');
+		await expect(confirm).toHaveAccessibleDescription(reason);
+		await pauseClock(page);
+		await confirm.focus();
+		await press(page, 'Enter');
+		// Playwright refuses to click an aria-disabled button; a person can.
+		await confirm.click({ force: true });
+		await page.clock.runFor(SETTLE);
+		await expect(dialog).toBeVisible();
+		await expect(confirm).toBeFocused();
+		await expect(section.getByTestId('cdd-status')).toHaveText('');
+	});
+
+	test('under a covering lock a ChangeNotice turns off Undo and its second action, described by the lock reason', async ({ page }) => {
+		const section = await openSection(page, 'change-notice');
+		const locked = section.getByTestId('cnd-locked');
+		const reason = /Only admins can change the team’s theme\./;
+		const undo = locked.getByRole('button', { name: 'Undo' });
+		await expect(undo).toBeDisabled();
+		await expect(undo).toHaveAccessibleDescription(reason);
+		const reset = locked.getByRole('button', { name: 'Reset to default' });
+		await expect(reset).toBeDisabled();
+		await expect(reset).toHaveAccessibleDescription(reason);
+	});
+
+	test('an Undo that succeeds is never announced as replaced, even when it clears the undo point', async ({ page }) => {
+		const section = await openOnClock(page, 'change-notice');
+		const density = section.getByRole('radiogroup', { name: 'Density' });
+		await pauseClock(page);
+		await density.getByText('Compact').click();
+		await page.clock.runFor(SETTLE);
+		const notice = section.getByTestId('cnd-notices').getByRole('status').first();
+		await expect(notice).toContainText('Density set to compact');
+		await notice.evaluate((node) => {
+			const seen: string[] = [];
+			(window as unknown as { seen: string[] }).seen = seen;
+			new MutationObserver(() => seen.push(node.textContent ?? '')).observe(node, { subtree: true, childList: true, characterData: true });
+		});
+		await notice.getByRole('button', { name: 'Undo' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(notice).toContainText('Undone. The change was reversed.');
+		const seen = await page.evaluate(() => (window as unknown as { seen: string[] }).seen);
+		expect(seen.some((text) => text.includes('Undoing…'))).toBe(true);
+		expect(seen.some((text) => text.includes('A newer change replaced this one'))).toBe(false);
+	});
+
+	test('a second action that returns { error } shows that failure as an alert', async ({ page }) => {
+		const section = await openOnClock(page, 'change-notice');
+		const density = section.getByRole('radiogroup', { name: 'Density' });
+		await pauseClock(page);
+		await density.getByText('Compact').click();
+		await page.clock.runFor(SETTLE);
+		const notice = section.getByTestId('cnd-notices').getByRole('status').first();
+		await notice.getByRole('button', { name: 'Use for the whole team' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(notice.getByRole('alert')).toHaveText('Only admins can set the team’s density.');
 	});
 });
