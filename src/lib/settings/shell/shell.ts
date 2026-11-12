@@ -18,6 +18,14 @@ export function layoutView(mode: 'auto' | 'section' | 'index', current: string |
 	return mode;
 }
 
+/**
+ * Whether a SettingsLayout shows the index on its own at every width: nothing is current and the
+ * mode does not insist on the page. A wide rail beside an empty page would hide the attention slot.
+ */
+export function layoutOverview(mode: 'auto' | 'section' | 'index', current: string | null | undefined): boolean {
+	return mode !== 'section' && !current;
+}
+
 /** How many links the navigation shows (disabled ones included). */
 export function countLinks(groups: readonly SettingsNavGroup[]): number {
 	return groups.reduce((total, group) => total + group.items.length, 0);

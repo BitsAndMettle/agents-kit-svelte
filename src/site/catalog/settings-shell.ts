@@ -11,7 +11,7 @@ export const SETTINGS_SHELL: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/shell/SettingsLayout.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'The whole settings area in one DOM tree. In a wide container it shows a navigation rail beside the page; in a narrow one it shows either the grouped index (with an optional attention slot on top) or the current page alone, chosen by `current` and `mode`. It sets the settings container and the not-yet-hydrated gate for everything below, and draws the navigation once. It reports nothing: your app owns routing, loads the section and passes it in as children, and sets the document title.',
+			'The whole settings area in one DOM tree. In a wide container it shows a navigation rail beside the page; in a narrow one it shows either the grouped index (with an optional attention slot on top) or the current page alone, chosen by `current` and `mode`. With nothing current, every width shows the index on its own, attention on top (set `headingLevel={1}` when it is the whole page). It sets the settings container and the not-yet-hydrated gate for everything below, and draws the navigation once. It reports nothing: your app owns routing, loads the section and passes it in as children, and sets the document title.',
 		usageSnippet: `<script lang="ts">
   import { SettingsLayout, SettingsPage, type SettingsNavGroup } from 'agents-kit-svelte/settings';
 
@@ -101,7 +101,7 @@ export const SETTINGS_SHELL: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/shell/SettingsSearch.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Search across individual settings, not just sections. It is a GET form (`?q=`): render it on the server with `value` set and the results arrive as plain links. With JavaScript it ranks as you type (label start, then label word, then keyword, then anywhere; case and accents ignored), marks the matched text, names the section each result lives in, moves through results with the arrow keys and reports the chosen one through onSelect before the link navigates. `inline` sits at the top of a rail; `page` is a results page. The same entries feed a CommandPalette through toPaletteCommands.',
+			'Search across individual settings, not just sections. It is a GET form (`?q=`): render it on the server with `value` set and the results arrive as plain links. With JavaScript it ranks as you type (label start, then label word, then keyword, then anywhere; case and accents ignored), marks the matched text, names the section each result lives in, offers a clear button, moves through results with the arrow keys and reports the chosen one through onSelect before the link navigates. `inline` sits at the top of a rail; `page` is a results page. The same entries feed a CommandPalette through toPaletteCommands.',
 		usageSnippet: `<script lang="ts">
   import { SettingsSearch, type SettingsSearchEntry } from 'agents-kit-svelte/settings';
 
@@ -126,7 +126,7 @@ export const SETTINGS_SHELL: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/shell/AttentionList.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A data-driven "needs attention" list. The count is always the number of items; each item shows a tone tile (with the tone spoken), a label, one line and one action, and the whole item follows that action without nesting controls. Wide containers show boxed cards, narrow ones rows. A dismissible item reports onDismiss(id) (a promise shows loading; a returned `{ error }` or a rejection keeps the item and says why). Dismissing needs JavaScript, so the dismiss button appears once the page is ready; your app removes it and focus moves to the next item, the previous one or the heading. With no items the list is hidden. Your app decides what needs attention.',
+			'A data-driven "needs attention" list. The count is always the number of items; each item shows a tone tile (with the tone spoken), a label, one line and one action, and the whole item follows that action without nesting controls. An action is a link (`href`) or a callback (`onSelect`): a returned promise marks the item busy, and a returned `{ error }` or a rejection is shown in the item. Wide containers show boxed cards, narrow ones rows. A dismissible item reports onDismiss(id) (a promise shows loading; a returned `{ error }` or a rejection keeps the item and says why). Dismissing needs JavaScript, so the dismiss button appears once the page is ready; your app removes it and focus moves to the next item, the previous one or the heading. With no items the list is hidden. Your app decides what needs attention.',
 		usageSnippet: `<script lang="ts">
   import { AttentionList, type AttentionItem } from 'agents-kit-svelte/settings';
 

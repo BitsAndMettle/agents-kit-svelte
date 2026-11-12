@@ -11,6 +11,8 @@
 		dismiss: (label: string) => string;
 		/** Shown (as an alert) when a dismissal rejected; the item stays. A returned `{ error }` is shown instead. */
 		dismissFailed: (label: string) => string;
+		/** Shown (as an alert) when an item's `action.onSelect` threw or rejected. A returned `{ error }` is shown instead. */
+		actionFailed: (label: string) => string;
 		/** Shown after the last item was dismissed, where focus lands. */
 		allClear: string;
 		/** Spoken before each item's label, so the tone never rests on colour or icon alone. Empty for none. */
@@ -22,7 +24,7 @@
 	import { tick } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
-	import { ChevronRight, CircleAlert, Info, OctagonAlert, TriangleAlert, X } from '@lucide/svelte';
+	import { ChevronRight, CircleAlert, Info, LoaderCircle, OctagonAlert, TriangleAlert, X } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
 	import { isThenable } from '../../core/promise';
 	import { IconButton } from '../../primitives/actions';
@@ -52,6 +54,10 @@
 		 * returned `{ error }` keeps the item and shows that error; a rejection shows
 		 * `labels.dismissFailed`. Dismissing needs JavaScript, so the button appears once the page
 		 * is ready (the settings scope's `ready()`, or after mount).
+		 *
+		 * An item's `action.onSelect` runs the same way: a returned promise marks the item busy
+		 * (and an action button loading), and a returned `{ error }` or a rejection shows as an
+		 * alert in the item. A link action still navigates; its result only shows if the page stays.
 		 */
 		onDismiss?: (id: string) => unknown;
 		/** Words, merged over the English defaults. */
@@ -66,6 +72,7 @@
 		count: (count) => (count === 1 ? '1 item' : `${count} items`),
 		dismiss: (label) => `Dismiss: ${label}`,
 		dismissFailed: (label) => `Couldn’t dismiss “${label}”. It’s still here.`,
+		actionFailed: (label) => `“${label}” didn’t go through. Try again.`,
 		allClear: 'Nothing needs attention right now.',
 		...labels,
 		tone: { warning: 'Warning:', danger: 'Problem:', accent: '', neutral: '', ...labels?.tone }
@@ -74,6 +81,8 @@
 	const id = $props.id();
 	const headingTag = $derived(`h${headingLevel}`);
 	const pending = new SvelteSet<string>();
+	/** Items whose action's promise is still running. */
+	const acting = new SvelteSet<string>();
 	/** Item id to the message its last failed dismissal shows. */
 	const failed = new SvelteMap<string, string>();
 	const scope = getSettingsScope();
@@ -119,6 +128,26 @@
 		(target ?? heading)?.focus();
 	}
 
+	async function select(item: AttentionItem): Promise<void> {
+		if (!item.action.onSelect || acting.has(item.id)) return;
+		failed.delete(item.id);
+		let result: unknown;
+		try {
+			result = item.action.onSelect();
+			if (isThenable(result)) {
+				acting.add(item.id);
+				result = await result;
+			}
+		} catch {
+			failed.set(item.id, text.actionFailed(item.action.label));
+			return;
+		} finally {
+			acting.delete(item.id);
+		}
+		const outcome = readResult(result);
+		if (!outcome.ok) failed.set(item.id, outcome.error ?? text.actionFailed(item.action.label));
+	}
+
 	const TONE_TILE: Record<AttentionItem['tone'], string> = {
 		warning: 'bg-status-warning-subtle text-status-warning',
 		danger: 'bg-status-danger-subtle text-status-danger',
@@ -156,7 +185,10 @@
 
 <section {...rest} hidden={items.length === 0 && !clearedHere ? true : undefined} aria-labelledby="{id}-title" class={cn('@container/settings flex min-w-0 flex-col gap-2.5', className)}>
 	<div class="flex items-center gap-2 px-1">
-		<svelte:element this={headingTag} bind:this={heading} id="{id}-title" tabindex="-1" class="m-0 text-sm font-semibold text-fg-main outline-none focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary">{title ?? text.title}</svelte:element>
+		<!-- Hydration keeps the server's tag, and the app's state (so the level) can differ in the browser: re-create it once mounted. -->
+		{#key gate.current}
+		<svelte:element this={headingTag} bind:this={heading} id="{id}-title" tabindex="-1" class="m-0 text-sm font-semibold text-fg-main outline-none focus-visible:rounded-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary">{title ?? text.title}</svelte:element>
+		{/key}
 		{#if items.length}
 			<Badge tone="neutral" size="sm" aria-hidden="true" data-attention-count>{items.length}</Badge>
 			<span class="sr-only">({text.count(items.length)})</span>
@@ -167,8 +199,9 @@
 			{#each items as item, index (item.id)}
 				{@const Icon = item.icon ?? TONE_ICON[item.tone]}
 				{@const busy = pending.has(item.id)}
+				{@const running = acting.has(item.id)}
 				{@const described = item.description ? `${id}-${item.id}-label ${id}-${item.id}-description` : `${id}-${item.id}-label`}
-				<li data-attention-item={item.id} aria-busy={busy || undefined} class={cn('relative flex min-w-0 transition-colors has-[[data-attention-action]:hover]:bg-canvas-secondary', ITEM[layout])}>
+				<li data-attention-item={item.id} aria-busy={busy || running || undefined} class={cn('relative flex min-w-0 transition-colors has-[[data-attention-action]:hover]:bg-canvas-secondary', ITEM[layout])}>
 					<div class="flex min-w-[min(100%,12rem)] flex-1 items-start gap-3">
 						<span aria-hidden="true" class={cn(RECIPES.iconTile, TONE_TILE[item.tone])}><Icon /></span>
 						<div class="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -181,12 +214,12 @@
 					</div>
 					<div class={cn('flex items-center', CONTROLS[layout])}>
 						{#if item.action.href !== undefined}
-							<a href={item.action.href} data-attention-action aria-describedby={described} onclick={() => item.action.onSelect?.()} class={cn(ACTION_BASE, ACTION[layout])}>
+							<a href={item.action.href} data-attention-action aria-describedby={described} onclick={() => select(item)} class={cn(ACTION_BASE, ACTION[layout])}>
 								{item.action.label}<ChevronRight aria-hidden="true" class={cn('size-3.5 rtl:-scale-x-100', CHEVRON[layout])} />
 							</a>
 						{:else}
-							<button type="button" data-attention-action aria-describedby={described} onclick={() => item.action.onSelect?.()} class={cn(ACTION_BASE, ACTION[layout])}>
-								{item.action.label}<ChevronRight aria-hidden="true" class={cn('size-3.5 rtl:-scale-x-100', CHEVRON[layout])} />
+							<button type="button" data-attention-action aria-describedby={described} aria-disabled={running || undefined} aria-busy={running || undefined} onclick={() => select(item)} class={cn(ACTION_BASE, ACTION[layout], running && 'cursor-progress')}>
+								{item.action.label}{#if running}<LoaderCircle aria-hidden="true" class="size-3.5 animate-spin motion-reduce:animate-none" />{:else}<ChevronRight aria-hidden="true" class={cn('size-3.5 rtl:-scale-x-100', CHEVRON[layout])} />{/if}
 							</button>
 						{/if}
 						{#if item.dismissible && onDismiss && ready}

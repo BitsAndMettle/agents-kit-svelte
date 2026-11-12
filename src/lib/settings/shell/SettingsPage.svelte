@@ -167,6 +167,8 @@
 
 	const WIDTH = { md: 'max-w-3xl', lg: 'max-w-5xl', full: '' } as const;
 	const headingTag = $derived(`h${headingLevel}`);
+	/** Hydration keeps the server's tag, and the app's state (so the level) can differ in the browser: re-create it once mounted. */
+	const mounted = new ReadyGate();
 	const ScopeIcon = $derived(scope?.lock ? LOCK_ICONS[scope.lock.kind] : undefined);
 	const crumbs = $derived(breadcrumb?.length ? [...breadcrumb, { label: title }] : []);
 </script>
@@ -211,7 +213,7 @@
 			{#if Icon}<span aria-hidden="true" class={cn(RECIPES.iconTile, 'size-10 [&_svg]:size-5')}><Icon /></span>{/if}
 			<div class="flex min-w-0 flex-1 basis-40 flex-col gap-1">
 				<div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-					<svelte:element this={headingTag} class="m-0 text-xl font-semibold tracking-[-0.015em] break-words text-fg-main">{title}</svelte:element>
+					{#key mounted.current}<svelte:element this={headingTag} class="m-0 text-xl font-semibold tracking-[-0.015em] break-words text-fg-main">{title}</svelte:element>{/key}
 					{@render badges?.()}
 				</div>
 				{#if typeof lead === 'string'}<p class="m-0 text-[13px] leading-5 text-fg-light">{lead}</p>{:else if lead}<div class="text-[13px] leading-5 text-fg-light">{@render lead()}</div>{/if}

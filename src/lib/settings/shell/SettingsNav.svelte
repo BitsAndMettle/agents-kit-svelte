@@ -32,7 +32,7 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { ChevronRight, Search } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
@@ -40,6 +40,7 @@
 	import { Input } from '../../primitives/form';
 	import { filterSettingsLinks } from '../shared/search';
 	import { LOCK_ICONS } from '../shared/lock-icons';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import type { SettingsLink, SettingsNavGroup } from '../shared/types';
 	import { insideSettingsLayout } from './layout-context';
 	import { asSentence, badgeLabel, countLinks, sentenceStop } from './shell';
@@ -70,8 +71,8 @@
 		top?: Snippet;
 		/** Content under the links (a help link, a version line). */
 		footer?: Snippet;
-		/** Level of the title; group headings sit one below it. Default 2. */
-		headingLevel?: 2 | 3;
+		/** Level of the title; group headings sit one below it. Default 2; use 1 when the index is the whole page. */
+		headingLevel?: 1 | 2 | 3;
 		/** Words, merged over the English defaults. */
 		labels?: Partial<SettingsNavLabels>;
 		class?: string;
@@ -121,7 +122,16 @@
 
 	const groupLevel = $derived(Math.min(title ? headingLevel + 1 : headingLevel, 6));
 	const titleTag = $derived(`h${headingLevel}`);
+	/** Hydration keeps the server's tag, and the app's state (so the level) can differ in the browser: re-create it once mounted. */
+	const mounted = new ReadyGate();
 	const groupTag = $derived(`h${groupLevel}`);
+
+	// Text typed into the server-rendered box before the page was interactive is the query.
+	onMount(() => {
+		if (!filter || !input || input.value === query) return;
+		query = input.value;
+		onFilterChange?.(query);
+	});
 
 	function clearFilter(event: MouseEvent): void {
 		event.preventDefault();
@@ -156,7 +166,7 @@
 	/** Parts only the index look shows. */
 	const INDEX_ONLY = { rail: 'hidden', index: '', auto: '@3xl/settings:hidden' } as const;
 	const LINK =
-		'group relative flex w-full items-center text-fg-main no-underline outline-none transition-colors hover:bg-canvas-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary aria-[current=page]:bg-accent-subtle aria-[current=page]:font-medium aria-[current=page]:shadow-[inset_3px_0_0_var(--color-accent-primary)]';
+		'group relative flex w-full items-center text-fg-main no-underline outline-none transition-colors hover:bg-canvas-secondary focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary aria-[current=page]:bg-accent-subtle aria-[current=page]:font-medium aria-[current=page]:shadow-[inset_3px_0_0_var(--color-accent-primary)] forced-colors:aria-[current=page]:border-s-4 forced-colors:aria-[current=page]:border-solid';
 </script>
 
 <!-- The link's name is its label alone. Marks, badge, description and meta describe it
@@ -166,7 +176,7 @@
 {#snippet marks(link: SettingsLink, base: string)}
 	{#if link.dirty}
 		<span class="inline-flex shrink-0 items-center">
-			<span aria-hidden="true" class="size-1.5 rounded-full bg-accent-primary"></span>
+			<span aria-hidden="true" data-nav-dirty class="size-1.5 rounded-full bg-accent-primary forced-colors:border-[3px] forced-colors:border-solid"></span>
 			<span id="{base}-dirty" aria-hidden="true" class="sr-only">{asSentence(text.unsaved)}</span>
 		</span>
 	{/if}
@@ -220,7 +230,7 @@
 <nav {...rest} aria-label={ariaLabel ?? title ?? text.nav} data-variant={variant} class={cn('flex min-w-0 flex-col gap-4', ownContainer && '@container/settings', className)}>
 	{#if title || description}
 		<div class="flex flex-col gap-0.5 px-1">
-			{#if title}<svelte:element this={titleTag} class="m-0 text-base font-semibold tracking-[-0.01em] text-fg-main">{title}</svelte:element>{/if}
+			{#if title}{#key mounted.current}<svelte:element this={titleTag} class="m-0 text-base font-semibold tracking-[-0.01em] text-fg-main">{title}</svelte:element>{/key}{/if}
 			{#if description}<p class="m-0 text-xs leading-5 text-fg-light">{description}</p>{/if}
 		</div>
 	{/if}
@@ -257,7 +267,7 @@
 	{#each shown as group (group.id)}
 		<div class="flex min-w-0 flex-col gap-1.5">
 			{#if group.label}
-				<svelte:element this={groupTag} id="{id}-{group.id}" class="m-0 px-1 text-xs font-medium text-fg-light">{group.label}</svelte:element>
+				{#key mounted.current}<svelte:element this={groupTag} id="{id}-{group.id}" class="m-0 px-1 text-xs font-medium text-fg-light">{group.label}</svelte:element>{/key}
 			{/if}
 			{#if group.description}<p class={cn('m-0 px-1 text-xs leading-5 text-fg-light', INDEX_ONLY[variant])}>{group.description}</p>{/if}
 			<ul role="list" aria-labelledby={group.label ? `${id}-${group.id}` : undefined} class={cn('m-0 list-none p-0', columns === 2 ? TILES[variant] : LIST[variant])}>

@@ -339,7 +339,7 @@
 
 <!-- The same list twice: the layout shows its slot only atop the narrow index, so a wide page renders it again, one heading level up. -->
 {#snippet attentionInNav()}
-	<AttentionList items={attention} onDismiss={dismiss} headingLevel={3} data-testid="composed-attention" />
+	<AttentionList items={attention} onDismiss={dismiss} headingLevel={current ? 3 : 2} data-testid="composed-attention" />
 {/snippet}
 
 {#snippet help()}
@@ -376,7 +376,7 @@
 		<span class="ml-auto" aria-live="polite" data-testid="composed-log">{log}</span>
 	</div>
 
-	<SettingsLayout {groups} {current} filter={{ value: '' }} navHeader={search} navFooter={help} attention={attention.length ? attentionInNav : undefined} labels={{ title: 'Settings' }}>
+	<SettingsLayout {groups} {current} filter={{ value: '' }} navHeader={search} navFooter={help} attention={attention.length ? attentionInNav : undefined} headingLevel={current ? 2 : 1} labels={{ title: 'Settings' }}>
 		{#if current === 'workspace'}
 			<SettingsPage title="Workspace" lead="How this workspace works for everyone in it." icon={Building2} backHref="?section=" {scope} banner={noticeBanner} width="lg" footnote="Changes on this page apply to every member." data-testid="composed-page">
 				<AttentionList items={attention} onDismiss={dismiss} headingLevel={2} data-testid="composed-attention" />

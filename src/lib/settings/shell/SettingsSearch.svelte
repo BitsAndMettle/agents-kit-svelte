@@ -12,7 +12,7 @@
 		noneHint: string;
 		/** Where a result lives ("in Data"). */
 		inSection: (section: string) => string;
-		/** The clear button in the box. */
+		/** The clear button in the box (it needs JavaScript, so it appears once the page is ready). */
 		clear: string;
 	}
 </script>
@@ -24,6 +24,8 @@
 	import { ListNav } from '../../headless/runtime/list-nav.svelte';
 	import { Kbd } from '../../primitives/display';
 	import { Input } from '../../primitives/form';
+	import { getSettingsScope } from '../shared/context';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import { highlightSegments, searchSettings, type TextRange } from '../shared/search';
 	import type { SettingsSearchEntry } from '../shared/types';
 	import { insideSettingsLayout } from './layout-context';
@@ -92,6 +94,10 @@
 	const query = $derived((value ?? '').trim());
 	const results = $derived(query ? searchSettings(entries, query, limit ?? (variant === 'page' ? 20 : 6)) : []);
 	const keys = $derived(parseShortcut(shortcut));
+	// The clear button needs JavaScript, so it appears once the page is ready.
+	const scope = getSettingsScope();
+	const gate = new ReadyGate();
+	const ready = $derived(scope ? scope.ready() : gate.current);
 
 	const nav = new ListNav({
 		id,
@@ -166,7 +172,7 @@
 		autocomplete="off"
 		spellcheck={false}
 		enterkeyhint="search"
-		clearable
+		clearable={ready}
 		clearLabel={text.clear}
 		onkeydown={onInputKeydown}
 		onValueChange={(next) => onValueChange?.(next)}
@@ -192,7 +198,7 @@
 							data-search-result={hit.entry.id}
 							onkeydown={(event) => onResultKeydown(event, index)}
 							class={cn(
-								'flex min-w-0 items-start gap-3 text-fg-main no-underline outline-none transition-colors hover:bg-canvas-secondary focus-visible:bg-canvas-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary',
+								'flex min-w-0 items-start gap-3 text-fg-main no-underline outline-none transition-colors hover:bg-canvas-secondary focus-visible:bg-canvas-secondary focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary',
 								page ? 'px-4 py-3' : 'rounded-control px-2.5 py-2'
 							)}
 						>

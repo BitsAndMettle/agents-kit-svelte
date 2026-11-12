@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { badgeLabel, countLinks, coveringLock, layoutView, matchesShortcut, parseShortcut, asSentence, sentenceStop, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
+import { badgeLabel, countLinks, coveringLock, layoutOverview, layoutView, matchesShortcut, parseShortcut, asSentence, sentenceStop, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
 import { pickLock } from '../src/lib/settings/shared/lock.ts';
 import { SAMPLE_SETTINGS_NAV } from '../src/lib/fixtures/settings.ts';
 import { filterSettingsLinks } from '../src/lib/settings/shared/search.ts';
@@ -14,6 +14,15 @@ test('layoutView: auto shows the index until a section is current; section and i
 	assert.equal(layoutView('auto', 'billing'), 'section');
 	assert.equal(layoutView('section', null), 'section');
 	assert.equal(layoutView('index', 'billing'), 'index');
+});
+
+test('layoutOverview: with nothing current the index stands alone, unless the mode insists on the page', () => {
+	assert.equal(layoutOverview('auto', null), true);
+	assert.equal(layoutOverview('auto', ''), true);
+	assert.equal(layoutOverview('index', undefined), true);
+	assert.equal(layoutOverview('section', null), false);
+	assert.equal(layoutOverview('auto', 'billing'), false);
+	assert.equal(layoutOverview('index', 'billing'), false);
 });
 
 test('countLinks counts every link, disabled ones included, and follows a filter', () => {

@@ -147,21 +147,18 @@
 				<button type="button" aria-pressed={width.id === option.id} class={segmentClass(width.id === option.id)} onclick={() => (width = option)}>{option.px} px</button>
 			{/each}
 		</div>
-		<p class="m-0 text-xs text-fg-light">Showing <span data-testid="layout-current">{current ?? 'the index'}</span>. Pick a section, then use the back link at phone width.</p>
+		<p class="m-0 text-xs text-fg-light">Showing <span data-testid="layout-current">{current ?? 'the index'}</span>. Pick a section, then use the back link at phone width. With nothing picked, every width shows the index.</p>
 	</div>
 	<!-- The frame is a stand-in for the app's window; the router below is the app's, not the layout's. -->
 	<div class="min-w-0 overflow-hidden rounded-window border border-card-border bg-canvas-primary">
 		<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 		<div data-testid="layout-frame" class="mx-auto max-w-full transition-[width] duration-300" style="width: {width.px}px" onclick={route}>
 			<SettingsLayout {groups} {current} filter={{ value: query }} onFilterChange={(q) => (query = q)} attention={attention.length ? attentionSlot : undefined} navFooter={help}>
+				<!-- With nothing current the layout shows the index on its own, attention on top, at every width. -->
 				{#if link}
 					<SettingsPage headingLevel={2} title={link.label} lead={link.description} icon={link.icon} backHref={INDEX_HREF} footnote="Changes here apply to everyone on the team.">
 						{#snippet badges()}{#if link.dirty}<Badge tone="accent" size="sm">Unsaved</Badge>{/if}{/snippet}
 						{@render body(link.id)}
-					</SettingsPage>
-				{:else}
-					<SettingsPage headingLevel={2} title="Settings" lead="Pick a section from the list." width="md">
-						{@render attentionSlot()}
 					</SettingsPage>
 				{/if}
 			</SettingsLayout>
@@ -172,9 +169,7 @@
 			<figure class="flex w-[360px] max-w-full flex-col gap-2">
 				<figcaption class="text-xs text-fg-light">Phone, nothing selected: the index, attention on top</figcaption>
 				<div data-testid="layout-index-frame" class="overflow-hidden rounded-window border border-card-border bg-canvas-primary">
-					<SettingsLayout {groups} current={null} attention={attentionSlot} labels={{ title: 'Settings' }}>
-						<SettingsPage headingLevel={2} title="Profile" backHref={INDEX_HREF}><p class="m-0 text-[13px]">Not shown at this width until a section is picked.</p></SettingsPage>
-					</SettingsLayout>
+					<SettingsLayout {groups} current={null} attention={attentionSlot} labels={{ title: 'Settings' }} />
 				</div>
 			</figure>
 			<figure class="flex w-[360px] max-w-full flex-col gap-2">
