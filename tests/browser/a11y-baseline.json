@@ -94,7 +94,7 @@
 			"color-contrast"
 		]
 	},
-	"chat-workbench": {
+	"chat-workbench-demo": {
 		"light": [
 			"aria-required-parent",
 			"color-contrast",

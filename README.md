@@ -6,8 +6,8 @@ A **Svelte 5 Runes** component collection for AI agent interfaces—inspired by 
 
 ## Highlights
 
-- **158 Svelte 5 Runes Components** (`$props()`, `$state()`, `$derived()`, `$effect()`, `Spring`, `Tween`, `crossfade`, `flip`, `SvelteSet`, `SvelteMap`) across 11 collections:
-  1. **beUI Agents (27)**: `ChatWorkbench`, `AgentActivity`, `TodoList`, `ToolApproval`, `ToolResult`, `FileDiff`, `CodeBlock`, `ApprovalCard`, `PromptInput`, `Message`, `MessageBubble`, `MessageScroller`, `StreamingResponse`, `Citations`, `ImageGeneration`, `AISidebar`, `ThinkingShimmer`, `AgentProgress`, `ReasoningText`, `AgentDisclosure`, `AgentWorkTrace`, `PresenceBanner` (whether the operator, or your phone's own link, is reachable, since when, with one action), `ActionReceipt` (one thing an agent did or refused on your behalf, with why and the run that proposed it), `LevelDial` (how much an agent may do on its own, with a confirm that names what changes when you raise it), `RiskToggle` (a setting that stays off until you tick that you understand the risk), `DeviceApprovalCard` (approve a new device once its code matches on both screens) and `CitedAnswer` (an answer given on your behalf with the quoted sources it rests on, each marked checked or not).
+- **160 Svelte 5 Runes Components** (`$props()`, `$state()`, `$derived()`, `$effect()`, `Spring`, `Tween`, `crossfade`, `flip`, `SvelteSet`, `SvelteMap`) across 11 collections:
+  1. **beUI Agents (29)**: `ChatWorkbench` (your conversation, or the scripted `demo`), `Markdown` (model text rendered safely), `AgentActivity`, `TodoList`, `ToolApproval`, `ToolResult`, `FileDiff`, `CodeBlock`, `ApprovalCard`, `PromptInput`, `Message`, `MessageBubble`, `MessageScroller`, `StreamingResponse`, `Citations`, `ImageGeneration`, `AISidebar`, `ThinkingShimmer`, `AgentProgress`, `ReasoningText`, `AgentDisclosure`, `AgentWorkTrace`, `PresenceBanner` (whether the operator, or your phone's own link, is reachable, since when, with one action), `ActionReceipt` (one thing an agent did or refused on your behalf, with why and the run that proposed it), `LevelDial` (how much an agent may do on its own, with a confirm that names what changes when you raise it), `RiskToggle` (a setting that stays off until you tick that you understand the risk), `DeviceApprovalCard` (approve a new device once its code matches on both screens) and `CitedAnswer` (an answer given on your behalf with the quoted sources it rests on, each marked checked or not).
   2. **Beautiful UI (11)**: `ToolChips`, `RecommendationCard`, `InsightCards`, `ContextCards`, `Flowchart`, `FineTuneCard`, `SearchList`, `FilterTable`, `SelectionActions`, `RecordsTable`, `DiffTable`.
   3. **GitHub Cards & Layouts (18)**: `GitHubIssueCard`, `GitHubPullRequestCard`, `GitHubCommitCard`, `GitHubChecksPanel`, `GitHubReviewThreadCard`, `GitHubBentoLayout`, `GitHubKanbanBoard`, plus the dev lifecycle set: `GitHubLifecycleTimeline`, `GitHubIssueTriage`, `GitHubBranchCard`, `GitHubPullRequestReview`, `GitHubMergeQueue`, `GitHubDeploymentPipeline`, `GitHubReleaseCard`, `GitHubIncidentCard`, plus the in-chat PR flow: `GitHubPrActionBar` (Create PR with a diff stat), `GitHubPullRequestGraph` (a PR card with its commit graph) and `GitHubChecksWaterfall` (live CI bars with Fix and Merge). Watch an agent take a PR from diff to merged on the `/pr-flow` page.
   4. **Intelligent UI & Generative (3)**: `IntelligentUIRenderer`, `AgentGenerativeSurface`, `ResultActions`.
@@ -171,6 +171,56 @@ The chat components take plain data, so you can feed them from any agent runtime
 ```
 
 Approvals come from the Agent SDK's `canUseTool` callback rather than its message stream. When the SDK runs in the same process as the UI, `await session.requestApproval(toolUseID, { params })` inside that callback resolves once the user clicks. When it runs on a server, send an `approval.request` event to the browser alongside the messages, and post the user's answer back from `onApprove` / `onDeny`. For another runtime, write an adapter that yields `AgentEvent`s; see `src/lib/core/agent/adapters.ts` for the pattern.
+
+### A whole chat: `ChatWorkbench`
+
+`ChatWorkbench` draws a conversation you own: a header, the messages, past conversations and the composer. It fills its parent's height, so give the parent one. You keep the state; the workbench raises events and never replies on its own (`demo` plays the scripted session from the docs site instead).
+
+```svelte
+<script lang="ts">
+  import { ChatWorkbench, type ChatWorkbenchMessage, type PromptAttachment } from 'agents-kit-svelte/chat';
+
+  let messages = $state<ChatWorkbenchMessage[]>([]);
+  let model = $state('sonnet');
+  let effort = $state('medium');
+  let card = $state<PromptAttachment[]>([{ id: 'card-212', label: '#212 · owner/repo' }]);
+
+  async function send(text: string, attachments: PromptAttachment[]) {
+    messages.push({ id: crypto.randomUUID(), role: 'user', text });
+    // ...call your agent, then push { role: 'assistant', text, parts: [{ type: 'tool', tool: 'list_cards', status: 'success' }] }
+  }
+</script>
+
+<div class="h-[100dvh]">
+  <ChatWorkbench
+    title="Referee"
+    subtitle="devbox"
+    status={{ text: 'Online', tone: 'success' }}
+    assistantName="Referee"
+    {messages}
+    conversations={[{ id: 'c1', title: 'What is blocked?', date: 'Nov 12', active: true }]}
+    onSelectConversation={(id) => load(id)}
+    onNewConversation={() => (messages = [])}
+    models={[{ id: 'sonnet', label: 'Sonnet' }, { id: 'opus', label: 'Opus' }]}
+    efforts={[{ id: 'medium', label: 'Medium' }, { id: 'high', label: 'High' }]}
+    bind:model
+    bind:effort
+    bind:attachments={card}
+    placeholder="Message the Referee"
+    onSend={send}
+  >
+    {#snippet headerActions({ button })}<button class={button}>Pause</button>{/snippet}
+  </ChatWorkbench>
+</div>
+```
+
+- **Messages**: `role`, Markdown `text`, and `parts` drawn in order (`text`, `tool` as `ToolResult`, `activity` as `AgentActivity`, `note`). `status: 'streaming'` shows a thinking line until text arrives; `'error'` shows `statusText` in red. `busy` adds a thinking line after the last message.
+- **Layout**: with `conversations`, a sidebar from 1024px and Chat / Conversations tabs below it; `layout="panel"` keeps the tabs at any width, for a side panel. `view` is bindable. Without `conversations` there is no list.
+- **Header**: `title` (an `h2`, or `headingLevel`), `subtitle`, `status` (`text` and a `tone`), `headerActions` (given the kit's pill classes), and a `presence` banner above the messages.
+- **Snippets**: `empty` when there are no messages, `messageFooter(message)` after each one.
+- **Composer**: `value` (bindable), `placeholder`, `disabled`, `busy` with `onStop`, `attachments` (bindable) with `onRemoveAttachment`, `models` and `efforts` with `onModelChange({ model, effort })`, and `onSend(text, attachments)`.
+
+`Markdown` (also used by `Message` and `StreamingResponse` when you pass `text`) renders model text as elements and never as HTML: raw HTML stays text, links need an `http(s):` or `mailto:` address and open with `rel="noopener noreferrer nofollow"`, fenced code goes through `CodeBlock`, and parsing is linear in the input. The [`/workbench`](https://bitsandmettle.github.io/agents-kit-svelte/workbench/) page shows the workbench with app data.
 
 ---
 

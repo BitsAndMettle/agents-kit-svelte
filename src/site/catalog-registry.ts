@@ -42,7 +42,32 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/workbench/ChatWorkbench.svelte',
 		upstreamSource: 'AK-S Dynamic Agentic Workbench · components/beui/components/agents/*',
 		description:
-			'Full multi-turn AK-S Chat workbench combining AgentActivity, TodoList, FileDiff, ToolApproval, ApprovalCard, StreamingResponse, AgentContextMeter, and PromptInput.',
+			'A whole chat from your data: messages with safe Markdown and tool results, a header with status and actions, past conversations (sidebar or tabs) and a composer with a model and effort picker. `demo` plays the scripted session shown here.',
+		usageSnippet: `<script lang="ts">
+  import { ChatWorkbench, type ChatWorkbenchMessage } from 'agents-kit-svelte';
+
+  let messages = $state<ChatWorkbenchMessage[]>([
+    { id: '1', role: 'assistant', text: 'Two cards are **blocked**.' }
+  ]);
+</script>
+
+<div class="h-[720px] overflow-hidden rounded-[14px] border border-card-border">
+  <ChatWorkbench
+    title="Referee"
+    status={{ text: 'Online', tone: 'success' }}
+    {messages}
+    onSend={(text) => messages.push({ id: crypto.randomUUID(), role: 'user', text })}
+  />
+</div>`
+	},
+	{
+		slug: 'chat-workbench-demo',
+		name: 'ChatWorkbench demo',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/workbench/ChatWorkbenchDemo.svelte',
+		upstreamSource: 'AK-S Dynamic Agentic Workbench · components/beui/components/agents/*',
+		description:
+			'The scripted session behind `<ChatWorkbench demo />`: AgentActivity, TodoList, FileDiff, ToolApproval, ApprovalCard, StreamingResponse, AgentContextMeter and PromptInput playing one coding run.',
 		usageSnippet: `<script lang="ts">
   import { ChatWorkbench } from 'agents-kit-svelte';
 
@@ -50,8 +75,26 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 </script>
 
 <div class="h-[720px] overflow-hidden rounded-[14px] border border-card-border">
-  <ChatWorkbench initialDark={darkTheme} />
+  <ChatWorkbench demo initialDark={darkTheme} />
 </div>`
+	},
+	{
+		slug: 'markdown',
+		name: 'Markdown',
+		category: 'beUI Agents',
+		sveltePath: 'src/lib/agents/Markdown.svelte',
+		upstreamSource: 'agents-kit-svelte · safe Markdown for model replies',
+		description:
+			'Model text as elements, never HTML: paragraphs, headings, lists, quotes, inline code, bold, italic, http(s) and mailto links, and fenced code through CodeBlock. Linear-time parsing.',
+		usageSnippet: `<script lang="ts">
+  import { Markdown, Message } from 'agents-kit-svelte';
+
+  const reply = 'Two cards are **blocked**:\\n\\n- one\\n- two\\n\\nSee [the Board](https://example.com).';
+</script>
+
+<Message role="assistant" author="Referee">
+  <Markdown text={reply} />
+</Message>`
 	},
 	{
 		slug: 'agent-activity',
