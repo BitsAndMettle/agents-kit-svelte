@@ -107,7 +107,7 @@ mount(App, { target: document.getElementById('app')! });
 	import { BorderBeam } from 'agents-kit-svelte/effects';
 	import { buttonClass } from 'agents-kit-svelte/primitives';
 	import { SignInCard } from 'agents-kit-svelte/auth';
-	import { pickLock, searchSettings, type SettingsSearchEntry } from 'agents-kit-svelte/settings';
+	import { CopyValue, SettingsSection, SettingsToggle, pickLock, searchSettings, type SettingsSearchEntry } from 'agents-kit-svelte/settings';
 	import { AgentSession, parseUnifiedDiff } from 'agents-kit-svelte/core';
 	import { SAMPLE_ISSUE, SAMPLE_SKILLS, SAMPLE_SUB_AGENTS } from 'agents-kit-svelte/fixtures';
 
@@ -136,6 +136,10 @@ mount(App, { target: document.getElementById('app')! });
 	<InsightCards />
 	<SignInCard onSubmit={() => undefined} />
 	<p>{searchSettings(entries, 'ret').length} {lock?.kind}</p>
+	<SettingsSection title="Preferences">
+		<SettingsToggle label="Compact lists" defaultChecked={false} onCommit={() => undefined} />
+		<CopyValue label="Workspace ID" value="ws_123" />
+	</SettingsSection>
 	<BorderBeam><button class={buttonClass('primary')}>{session.state.status} {diff.additions}</button></BorderBeam>
 </main>
 `
