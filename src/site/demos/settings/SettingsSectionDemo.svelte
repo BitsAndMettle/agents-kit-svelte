@@ -46,7 +46,7 @@
 			actions={[
 				{ label: 'Change role', ariaLabel: 'Change role for Chloé Martin', href: '?dialog=role&member=chloe' },
 				{ label: 'Reset two-step sign-in', onSelect: () => (resets += 1) },
-				{ label: 'Sign out everywhere', onSelect: () => (signOuts += 1) },
+				{ label: 'Sign out everywhere', ariaLabel: 'Sign out Chloé Martin everywhere', onSelect: () => (signOuts += 1) },
 				{ label: 'Remove', ariaLabel: 'Remove Chloé Martin', href: '?dialog=remove&member=chloe', tone: 'danger' }
 			]}
 		/>

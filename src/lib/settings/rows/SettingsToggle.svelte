@@ -56,14 +56,16 @@
 		action?: string;
 		/** Extra hidden fields for that form (an id, a revision). */
 		hidden?: Record<string, string>;
-		/** Shows "On"/"Off" beside the switch (or your words). */
+		/** Shows "On"/"Off" beside the switch (or your words). In forced-colors mode the state text always shows, since the switch's thumb can't be seen there. */
 		stateText?: boolean | { on: string; off: string };
 		/** Locks the toggle. A `badge` ("Always on") replaces the switch on screen; a disabled switch stays for assistive technology. */
 		lock?: SettingLock;
-		/** Id of a reason shown elsewhere that describes this toggle. */
+		/** Id of a reason shown elsewhere that describes this toggle's own `lock`. A stronger section or page lock is described by its own reason. */
 		reasonId?: string;
 		/** Request flow for the toggle's own lock reason. */
 		onRequest?: SettingsHandler<[]>;
+		/** No-JavaScript path for that request: LockReason's `requestAction`. */
+		requestAction?: string;
 		/** An icon before the label. */
 		leading?: Snippet;
 		/** Overrides readiness (default: true once mounted). Before it, an instant toggle with no `action` and no form is disabled, since nothing could happen. */
@@ -91,6 +93,7 @@
 		lock,
 		reasonId,
 		onRequest,
+		requestAction,
 		leading,
 		ready,
 		ref = $bindable(null),
@@ -118,6 +121,8 @@
 		undone: 'Changed back',
 		...labels
 	});
+	/** The row draws the label, so the Switch gets none: drop its label column and gap, or the switch ends short of every other control's right edge. */
+	const SWITCH_ONLY = 'grid-cols-[auto] gap-x-0';
 	const stateWords = $derived(typeof stateText === 'object' ? stateText : { on: words.on, off: words.off });
 
 	/** The value the toggle starts from: the saved value. */
@@ -218,15 +223,14 @@
 
 {#snippet switchControl()}
 	<span class="group/toggle inline-flex items-center gap-2">
-		{#if stateText}
-			<span aria-hidden="true" class="min-w-[2ch] text-right text-xs text-fg-light">
-				<span class="hidden group-has-[input:checked]/toggle:inline">{stateWords.on}</span><span class="group-has-[input:checked]/toggle:hidden">{stateWords.off}</span>
-			</span>
-		{/if}
+		<!-- Forced colors paint the thumb like the track, so on and off look alike: the state text then always shows. -->
+		<span aria-hidden="true" data-state-text class={cn('min-w-[2ch] text-right text-xs text-fg-light', !stateText && 'hidden forced-colors:inline')}>
+			<span class="hidden group-has-[input:checked]/toggle:inline">{stateWords.on}</span><span class="group-has-[input:checked]/toggle:hidden">{stateWords.off}</span>
+		</span>
 		{#if draft}
-			<Switch {...rest} bind:ref {name} value="true" defaultChecked={start} disabled={disabled || undefined} />
+			<Switch {...rest} bind:ref {name} value="true" defaultChecked={start} disabled={disabled || undefined} class={SWITCH_ONLY} />
 		{:else}
-			<Switch autocomplete="off" {...rest} bind:ref {name} value="true" checked={current} disabled={disabled || notReady || undefined} onCheckedChange={change} />
+			<Switch autocomplete="off" {...rest} bind:ref {name} value="true" checked={current} disabled={disabled || notReady || undefined} onCheckedChange={change} class={SWITCH_ONLY} />
 		{/if}
 	</span>
 {/snippet}
@@ -269,6 +273,7 @@
 	{lock}
 	{reasonId}
 	{onRequest}
+	{requestAction}
 	{lockLabels}
 	{status}
 	error={errorText}

@@ -91,6 +91,7 @@ Each setting uses exactly one, chosen by the app.
 - Semantics: sections are `<section aria-labelledby>`; rows are `<li>` in `<ul role="list">`; facts are `<dl>`; meters are `role="meter"`; results are `role="status"` and errors `role="alert"`; consequence tones carry sr-only prefixes, so meaning never rests on colour or icon alone.
 - A kit control inside a row keeps one label and is described by the row's description, status and lock reason: provide Field context with `createFieldState({ id, describedBy: () => [statusId, reasonId] })`.
 - Touch targets come from the primitives. Do not add your own hit-area padding.
+- Insets: a row (`RECIPES.row`) brings its own `px-4`. Everything placed in a `list={false}` SettingsSection (SettingsFacts, UsageMeter, CopyValue, NotificationMatrix, ConsequenceList, LockReason) brings none: the caller wraps the block in one padded box (`px-4 py-3`), so labels line up with the header and with each other.
 - Focus: after a removal, `nextFocusAfterRemoval` (next, previous, then the heading). A route dialog marks its opener with `rememberOpener(key)` and returns focus with `restoreFocus(openerFor(key), fallback)`.
 
 ## Structure

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { factCopyText, flippedByPerson, formatRequestedAgo, readOutcome, splitActions, withQuery } from '../src/lib/settings/rows/helpers.ts';
+import { actionSoftDisabled, callbackOnly, factCopyText, flippedByPerson, formatRequestedAgo, readOutcome, splitActions, withQuery } from '../src/lib/settings/rows/helpers.ts';
 import type { SettingsAction } from '../src/lib/settings/shared/types.ts';
 
 const link = (label: string): SettingsAction => ({ label, href: `/${label}` });
@@ -83,4 +83,21 @@ test("flippedByPerson trusts the browser's record of user interaction and counts
 		),
 		true
 	);
+});
+
+test('callbackOnly: only an action with nothing but onSelect needs JavaScript', () => {
+	assert.equal(callbackOnly(button('a')), true);
+	assert.equal(callbackOnly(link('a')), false);
+	assert.equal(callbackOnly({ label: 'a', intent: 'go', onSelect: () => undefined }), false);
+	assert.equal(callbackOnly({ label: 'a', href: '/a', onSelect: () => undefined }), false);
+	assert.equal(callbackOnly({ label: 'a', onSelect: () => undefined, unavailable: 'Owners only.' }), false);
+	assert.equal(callbackOnly({ label: 'a' }), false);
+});
+
+test('actionSoftDisabled waits for the page only where the button needs JavaScript, and always when unavailable', () => {
+	assert.equal(actionSoftDisabled(button('a'), false), true);
+	assert.equal(actionSoftDisabled(button('a'), true), undefined);
+	assert.equal(actionSoftDisabled(link('a'), false), undefined);
+	assert.equal(actionSoftDisabled({ label: 'a', intent: 'go' }, false), undefined);
+	assert.equal(actionSoftDisabled({ label: 'a', href: '/a', unavailable: 'Owners only.' }, true), true);
 });

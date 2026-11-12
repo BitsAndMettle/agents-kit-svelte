@@ -59,7 +59,8 @@
 
 	<SettingsSection data-testid="lock-request" title="Billing" description="You can see the plan but not change it." list={false}>
 		<div class="flex flex-col gap-3 px-4 py-3">
-			<LockReason data-testid="lock-request-ok" lock={{ kind: 'permission', reason: 'Only billing owners can change the plan.' }} onRequest={request} />
+			<!-- With requestAction the button also works without JavaScript; the next one has only a handler, so it waits for the page. -->
+			<LockReason data-testid="lock-request-ok" lock={{ kind: 'permission', reason: 'Only billing owners can change the plan.' }} onRequest={request} requestAction="/settings-demo/access?setting=plan" />
 			<LockReason data-testid="lock-request-fail" lock={{ kind: 'plan', reason: 'Seat limits are fixed on the Starter plan.' }} onRequest={refuse} labels={{ request: 'Ask for an upgrade' }} />
 			<LockReason
 				lock={{ kind: 'managed', reason: 'Payment details are managed in the billing portal.', action: { label: 'Open billing portal', href: '?page=billing-portal' } }}

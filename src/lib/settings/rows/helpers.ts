@@ -101,3 +101,39 @@ export function flippedByPerson(input: HTMLInputElement): boolean {
 		return true;
 	}
 }
+
+/**
+ * True when an action's button needs JavaScript to do anything: it only calls back (`onSelect`),
+ * with no link and no form intent to fall back on. Such a button waits, soft-disabled, until the
+ * page is interactive, so nobody clicks a dead button.
+ */
+export function callbackOnly(action: SettingsAction): boolean {
+	return !action.unavailable && action.href === undefined && action.intent === undefined && action.onSelect !== undefined;
+}
+
+/**
+ * `softDisabled` for an action's button: true while it is unavailable, or while the page is not
+ * interactive yet and the button only calls back (`callbackOnly`). Undefined otherwise.
+ */
+export function actionSoftDisabled(action: SettingsAction, ready: boolean): true | undefined {
+	return action.unavailable || (!ready && callbackOnly(action)) ? true : undefined;
+}
+
+/**
+ * Posts `intent` to `url` from a hidden form of its own, as a native post would. Used inside
+ * someone else's form, whose own submit handler would otherwise take the post (as if Save). Call
+ * it in the browser only.
+ */
+export function postIntent(url: string, intent: string): void {
+	const form = document.createElement('form');
+	form.method = 'post';
+	form.action = url;
+	form.hidden = true;
+	const input = document.createElement('input');
+	input.type = 'hidden';
+	input.name = 'intent';
+	input.value = intent;
+	form.append(input);
+	document.body.append(form);
+	form.submit();
+}

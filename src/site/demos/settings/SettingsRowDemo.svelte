@@ -8,7 +8,7 @@
 	import { Button } from '$lib/primitives/actions';
 	import { Input, NativeSelect, Switch } from '$lib/primitives/form';
 	import { RequestedChange, SettingsRow, SettingsSection } from '$lib/settings/rows';
-	import { SettingsDraft, setSettingsDraft, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
+	import { SettingsDraft, setSettingsDraft, type SettingStatus, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
 
 	const RETENTION = [
 		{ value: '30', label: '30 days' },
@@ -21,6 +21,11 @@
 		{ value: 'America/New_York', label: 'New York (UTC−5)' }
 	];
 	const retentionText = (raw: string | string[]) => RETENTION.find((o) => o.value === raw)?.label ?? String(raw);
+	const VIEWS = [
+		{ value: 'list', label: 'List' },
+		{ value: 'board', label: 'Board' },
+		{ value: 'calendar', label: 'Calendar' }
+	];
 
 	let saves = $state(0);
 	let requests = $state(0);
@@ -40,6 +45,22 @@
 		await wait();
 		regenerated += 1;
 		if (regenerated === 1) return { error: "Couldn't make new codes. Your old ones still work." };
+	}
+
+	/** An instant row: the app owns the value and the status; the fake server refuses Calendar, so the value goes back. */
+	let view = $state('list');
+	let viewStatus = $state<SettingStatus>('idle');
+	async function changeView(next: string): Promise<void> {
+		const before = view;
+		view = next;
+		viewStatus = 'pending';
+		await wait();
+		if (next === 'calendar') {
+			view = before;
+			viewStatus = 'error';
+			return;
+		}
+		viewStatus = 'saved';
 	}
 
 	async function emailCodes(): Promise<void> {
@@ -111,6 +132,7 @@
 			description="Require members to sign in through your identity provider."
 			lock={{ kind: 'plan', reason: 'Single sign-on is on the Business plan.' }}
 			onRequest={requestAccess}
+			requestAction="/settings-demo/access?setting=sso"
 			lockLabels={{ request: 'Ask an owner to upgrade' }}
 		>
 			{#snippet control()}
@@ -154,3 +176,13 @@
 </form>
 
 {#snippet zoneSummary()}Berlin (UTC+1){/snippet}
+
+<div class="mt-6 max-w-3xl">
+	<SettingsSection data-testid="row-instant" title="Your view" description="Instant: applies as soon as you pick it. Calendar fails, to show the error.">
+		<SettingsRow label="Default view" description="What opens first when you visit the team." status={viewStatus}>
+			{#snippet control()}
+				<NativeSelect value={view} options={VIEWS} onValueChange={changeView} class="w-full @lg/settings:w-36" />
+			{/snippet}
+		</SettingsRow>
+	</SettingsSection>
+</div>
