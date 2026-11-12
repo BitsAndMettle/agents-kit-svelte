@@ -185,7 +185,10 @@
 
 <section {...rest} hidden={items.length === 0 && !clearedHere ? true : undefined} aria-labelledby="{id}-title" class={cn('@container/settings flex min-w-0 flex-col gap-2.5', className)}>
 	<div class="flex items-center gap-2 px-1">
+		<!-- Hydration keeps the server's tag, and the app's state (so the level) can differ in the browser: re-create it once mounted. -->
+		{#key gate.current}
 		<svelte:element this={headingTag} bind:this={heading} id="{id}-title" tabindex="-1" class="m-0 text-sm font-semibold text-fg-main outline-none focus-visible:rounded-sm focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-primary">{title ?? text.title}</svelte:element>
+		{/key}
 		{#if items.length}
 			<Badge tone="neutral" size="sm" aria-hidden="true" data-attention-count>{items.length}</Badge>
 			<span class="sr-only">({text.count(items.length)})</span>

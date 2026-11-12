@@ -40,6 +40,7 @@
 	import { Input } from '../../primitives/form';
 	import { filterSettingsLinks } from '../shared/search';
 	import { LOCK_ICONS } from '../shared/lock-icons';
+	import { ReadyGate } from '../shared/ready.svelte';
 	import type { SettingsLink, SettingsNavGroup } from '../shared/types';
 	import { insideSettingsLayout } from './layout-context';
 	import { asSentence, badgeLabel, countLinks, sentenceStop } from './shell';
@@ -121,6 +122,8 @@
 
 	const groupLevel = $derived(Math.min(title ? headingLevel + 1 : headingLevel, 6));
 	const titleTag = $derived(`h${headingLevel}`);
+	/** Hydration keeps the server's tag, and the app's state (so the level) can differ in the browser: re-create it once mounted. */
+	const mounted = new ReadyGate();
 	const groupTag = $derived(`h${groupLevel}`);
 
 	// Text typed into the server-rendered box before the page was interactive is the query.
@@ -227,7 +230,7 @@
 <nav {...rest} aria-label={ariaLabel ?? title ?? text.nav} data-variant={variant} class={cn('flex min-w-0 flex-col gap-4', ownContainer && '@container/settings', className)}>
 	{#if title || description}
 		<div class="flex flex-col gap-0.5 px-1">
-			{#if title}<svelte:element this={titleTag} class="m-0 text-base font-semibold tracking-[-0.01em] text-fg-main">{title}</svelte:element>{/if}
+			{#if title}{#key mounted.current}<svelte:element this={titleTag} class="m-0 text-base font-semibold tracking-[-0.01em] text-fg-main">{title}</svelte:element>{/key}{/if}
 			{#if description}<p class="m-0 text-xs leading-5 text-fg-light">{description}</p>{/if}
 		</div>
 	{/if}
@@ -264,7 +267,7 @@
 	{#each shown as group (group.id)}
 		<div class="flex min-w-0 flex-col gap-1.5">
 			{#if group.label}
-				<svelte:element this={groupTag} id="{id}-{group.id}" class="m-0 px-1 text-xs font-medium text-fg-light">{group.label}</svelte:element>
+				{#key mounted.current}<svelte:element this={groupTag} id="{id}-{group.id}" class="m-0 px-1 text-xs font-medium text-fg-light">{group.label}</svelte:element>{/key}
 			{/if}
 			{#if group.description}<p class={cn('m-0 px-1 text-xs leading-5 text-fg-light', INDEX_ONLY[variant])}>{group.description}</p>{/if}
 			<ul role="list" aria-labelledby={group.label ? `${id}-${group.id}` : undefined} class={cn('m-0 list-none p-0', columns === 2 ? TILES[variant] : LIST[variant])}>

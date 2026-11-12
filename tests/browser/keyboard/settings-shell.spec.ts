@@ -605,6 +605,20 @@ test.describe('Shell: focus rings, forced colours, the index alone and early typ
 		}
 	});
 
+	test('loading the composed index directly gives one h1: heading levels follow the browser, not the prerender', async ({ page }) => {
+		// The fixture is prerendered with Workspace current (nav title h2, attention h3). Loaded with
+		// `?section=`, nothing is current in the browser, so once hydrated the levels are h1 and h2.
+		for (const width of [1440, 390, 360]) {
+			await page.setViewportSize({ width, height: 900 });
+			await page.goto('/fixtures/settings-composed/?section=');
+			await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible({ timeout: 45000 });
+			await expect(page.getByRole('heading', { level: 2, name: 'Needs attention' })).toBeVisible();
+			await expect(page.locator('h1')).toHaveCount(1);
+			const results = await new AxeBuilder({ page }).withRules(['page-has-heading-one', 'heading-order']).analyze();
+			expect(results.violations.map((v) => v.id)).toEqual([]);
+		}
+	});
+
 	test('text typed into the nav filter before the page is interactive filters once it is', async ({ page }) => {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		let release: () => void = () => undefined;
@@ -635,7 +649,7 @@ test.describe('Shell: focus rings, forced colours, the index alone and early typ
 		await expect(results.getByRole('searchbox')).toHaveValue('');
 	});
 
-	test('an attention callback action loads while it runs and shows a refusal; a retry works', async ({ page }) => {
+	test('an attention callback action loads while it runs, shows a rejection and a refusal; a retry works', async ({ page }) => {
 		const section = await openOnClock(page, 'attention-list');
 		const list = section.getByTestId('attention-callback');
 		const item = list.locator('[data-attention-item="export"]');
@@ -646,6 +660,15 @@ test.describe('Shell: focus rings, forced colours, the index alone and early typ
 		await expect(item).toHaveAttribute('aria-busy', 'true');
 		await expect(send).toHaveAttribute('aria-busy', 'true');
 		await page.clock.runFor(SETTLE);
+		// The first send rejects: the generic message shows, and the item is no longer busy.
+		await expect(list.getByRole('alert')).toHaveText('“Email it to me” didn’t go through. Try again.');
+		await expect(item).not.toHaveAttribute('aria-busy');
+		await expect(send).not.toHaveAttribute('aria-busy');
+		await expect(send).toBeFocused();
+		await press(page, 'Enter');
+		await expect(list.getByRole('alert')).toHaveCount(0);
+		await page.clock.runFor(SETTLE);
+		// The second returns the server's own reason, which wins over the generic message.
 		await expect(list.getByRole('alert')).toHaveText('The mail server didn’t answer. Try again.');
 		await expect(item).not.toHaveAttribute('aria-busy');
 		await expect(send).toBeFocused();
