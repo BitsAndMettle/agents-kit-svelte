@@ -58,6 +58,23 @@ test.describe('ChoiceCards', () => {
 		await expect(theme.getByRole('button', { name: 'Undo' })).toHaveCount(0);
 	});
 
+	test('Undo from the keyboard returns focus to the radio the choice goes back to', async ({ page }) => {
+		const section = await openOnClock(page, 'choice-cards');
+		const theme = section.getByTestId('cc-theme');
+		const system = theme.getByRole('radio', { name: 'System' });
+		await system.focus();
+		await press(page, 'ArrowRight');
+		await page.clock.runFor(SETTLE);
+		const undo = theme.getByRole('button', { name: 'Undo' });
+		await undo.focus();
+		await press(page, 'Enter');
+		await expect(system).toBeFocused();
+		await page.clock.runFor(SETTLE);
+		await expect(system).toBeChecked();
+		await expect(system).toBeFocused();
+		await expect(section.getByTestId('cc-theme-saved')).toHaveText('Saved theme: system');
+	});
+
 	test('a failed instant change goes back and says so in an alert', async ({ page }) => {
 		const section = await openOnClock(page, 'choice-cards');
 		const density = section.getByTestId('cc-density');
@@ -214,6 +231,62 @@ test.describe('NotificationMatrix', () => {
 		expect(await column.evaluate((el: HTMLInputElement) => el.indeterminate)).toBe(false);
 	});
 
+	test('Undo of a cell returns focus to that cell', async ({ page }) => {
+		const section = await openOnClock(page, 'notification-matrix');
+		const matrix = section.getByTestId('nm-instant');
+		const cell = matrix.getByRole('checkbox', { name: 'Replies by Email', exact: true });
+		await cell.focus();
+		await press(page, 'Space');
+		await page.clock.runFor(SETTLE);
+		await matrix.getByRole('button', { name: 'Undo' }).focus();
+		await press(page, 'Enter');
+		await expect(cell).toBeFocused();
+		await page.clock.runFor(SETTLE);
+		await expect(cell).not.toBeChecked();
+		await expect(cell).toBeFocused();
+		await expect(section.getByTestId('nm-saved')).toHaveText('Saved: 7 cells');
+	});
+
+	test('a column toggle is one change: Undo puts back every cell it changed and focus returns to the toggle', async ({ page }) => {
+		const section = await openOnClock(page, 'notification-matrix');
+		const matrix = section.getByTestId('nm-instant');
+		const column = matrix.getByRole('checkbox', { name: 'All events by In app' });
+		expect(await column.evaluate((el: HTMLInputElement) => el.indeterminate)).toBe(true);
+		await column.click();
+		await page.clock.runFor(SETTLE);
+		await expect(column).toBeChecked();
+		await expect(section.getByTestId('nm-saved')).toHaveText('Saved: 9 cells');
+		await expect(matrix.getByRole('status')).toHaveText('Saved');
+		await matrix.getByRole('button', { name: 'Undo' }).focus();
+		await press(page, 'Enter');
+		await expect(column).toBeFocused();
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('nm-saved')).toHaveText('Saved: 7 cells');
+		for (const event of ['Security alerts', 'Weekly summary']) {
+			await expect(matrix.getByRole('checkbox', { name: `${event} by In app`, exact: true })).not.toBeChecked();
+		}
+		for (const event of ['Mentions', 'Replies', 'Assigned to you']) {
+			await expect(matrix.getByRole('checkbox', { name: `${event} by In app`, exact: true })).toBeChecked();
+		}
+		expect(await column.evaluate((el: HTMLInputElement) => el.indeterminate)).toBe(true);
+		await expect(column).toBeFocused();
+		await expect(matrix.getByRole('button', { name: 'Undo' })).toHaveCount(0);
+	});
+
+	test('every id a cell is described by exists, also after the browser grants a channel', async ({ page }) => {
+		const section = await openOnClock(page, 'notification-matrix');
+		const matrix = section.getByTestId('nm-instant');
+		const missing = () =>
+			matrix.locator('input[data-cell]').evaluateAll((boxes) =>
+				boxes.flatMap((box) => (box.getAttribute('aria-describedby') ?? '').split(/\s+/).filter((id) => id && !document.getElementById(id)))
+			);
+		expect(await missing()).toEqual([]);
+		await matrix.getByRole('button', { name: 'Allow Push' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(matrix.getByText('Your browser asks before it shows Push notifications.')).toHaveCount(0);
+		expect(await missing()).toEqual([]);
+	});
+
 	test('a channel the browser asks about first offers Allow, which reports the request', async ({ page }) => {
 		const section = await openOnClock(page, 'notification-matrix');
 		const matrix = section.getByTestId('nm-instant');
@@ -349,6 +422,29 @@ test.describe('SettingsItemList', () => {
 		const row = members.locator('li[data-item-id="m4"]');
 		await expect(row.getByRole('status')).toHaveText("Couldn't finish that for Dev Rao. Try again.");
 		await expect(row.getByRole('status')).toBeVisible();
+	});
+
+	test('a failure on a row the filter hides is announced by the list', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-item-list');
+		const members = section.getByTestId('il-members');
+		const listStatus = members.locator('[data-list-status]');
+		await expect(listStatus).toHaveAttribute('role', 'status');
+		await expect(listStatus).toHaveText('');
+		await members.getByRole('button', { name: 'More actions for Dev Rao' }).click();
+		await page.getByRole('menuitem', { name: 'Remove' }).click();
+		await page.getByRole('alertdialog').getByRole('button', { name: 'Remove' }).click();
+		await expect(page.getByRole('alertdialog')).toBeHidden();
+		const filterBox = members.getByRole('searchbox', { name: 'Filter' });
+		await filterBox.fill('Ben');
+		await expect(filterBox).toHaveValue('Ben');
+		await expect(members.locator('li[data-item-id="m4"]')).toHaveCount(0);
+		await page.clock.runFor(SETTLE);
+		await expect(listStatus).toHaveText("Couldn't finish that for Dev Rao. Try again.");
+		await expect(listStatus).toBeVisible();
+		// Shown again, the row carries its own failure and the list stops repeating it.
+		await members.getByRole('searchbox', { name: 'Filter' }).fill('');
+		await expect(members.locator('li[data-item-id="m4"]').getByRole('status')).toHaveText("Couldn't finish that for Dev Rao. Try again.");
+		await expect(listStatus).toHaveText('');
 	});
 
 	test('a locked row cannot be acted on or selected, and says why', async ({ page }) => {

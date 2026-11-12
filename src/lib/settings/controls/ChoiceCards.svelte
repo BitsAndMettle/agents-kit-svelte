@@ -201,10 +201,25 @@
 			return;
 		}
 		if (instant) {
+			// The value Undo goes back to: only a change that saved offers Undo, and it started from this.
+			undoTo = instant.committed;
 			void instant.set(next);
 			return;
 		}
 		value = next;
+	}
+
+	let undoTo: string | null = null;
+	/**
+	 * Undo hides its own button (a pending change offers none), so focus goes first to the radio the
+	 * choice returns to, which is the checked one once Undo lands.
+	 */
+	function undo(): void {
+		if (!instant || !root) return;
+		const radios = Array.from(root.querySelectorAll<HTMLInputElement>('input[type="radio"]'));
+		const target = radios.find((r) => r.value === undoTo && !r.disabled) ?? radios.find((r) => r.checked);
+		target?.focus();
+		void instant.undo();
 	}
 
 	const ids = (index: number) => ({
@@ -393,7 +408,7 @@
 				{#if status === 'pending'}<Spinner size="xs" decorative />{text.saving}{:else if status === 'saved'}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
 			</p>
 			{#if instant.canUndo}
-				<Button size="xs" variant="ghost" onclick={() => void instant.undo()}>{text.undo}</Button>
+				<Button size="xs" variant="ghost" onclick={undo}>{text.undo}</Button>
 			{/if}
 		</div>
 		{#if status === 'error'}

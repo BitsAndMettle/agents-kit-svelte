@@ -190,6 +190,13 @@
 	const selected = $derived(new Set(value));
 	const hiddenSelected = $derived(value.filter((id) => !shown.some((item) => item.id === id) && items.some((item) => item.id === id)));
 	const actionable = $derived(selectableIds(items, value));
+	/** Failures of rows the filter hides: their own status is not on the page, so the list announces them. */
+	const hiddenFailures = $derived(
+		Object.keys(failed)
+			.filter((id) => failed[id] && !shown.some((item) => item.id === id) && items.some((item) => item.id === id))
+			.map((id) => failed[id])
+			.join(' ')
+	);
 
 	// A removed row takes its focused button with it: move focus to the next row, the previous, then the heading.
 	$effect(() => {
@@ -518,6 +525,8 @@
 			{/if}
 		{/each}
 	{/if}
+
+	<p role="status" data-list-status="" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, hiddenFailures ? 'border-t border-canvas-border px-4 py-2' : 'sr-only')}>{hiddenFailures}</p>
 
 	<!-- Selected rows the filter hides still post. -->
 	{#each hiddenSelected as id (id)}<input type="hidden" {name} value={id} />{/each}

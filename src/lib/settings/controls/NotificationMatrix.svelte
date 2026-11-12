@@ -179,7 +179,12 @@
 	const instant = !draft && Boolean(untrack(() => onCellCommit));
 	const cores = new Map<string, InstantCore<boolean>>();
 	let snapshots = $state<Record<string, InstantSnapshot<boolean>>>({});
-	let lastKey = $state<string | null>(null);
+	/**
+	 * The change Undo reverses: one cell, or every cell one column toggle changed. Each cell keeps its
+	 * own undo point in its InstantCore; the group treats the batch as one change, and `focus` is the
+	 * control that made it (the cell or the column toggle), where focus returns after Undo.
+	 */
+	let lastChange = $state<{ keys: string[]; focus: string } | null>(null);
 	const valueSet = $derived(new Set(value));
 
 	function coreFor(key: string): InstantCore<boolean> {
@@ -284,15 +289,7 @@
 			return;
 		}
 		if (instant) {
-			lastKey = key;
-			void coreFor(key).set(on);
-			// What every cell shows now: saved cells, with each cell changed since then (still pending or not) on top.
-			const next = new Set(valueSet);
-			for (const [k, core] of cores) {
-				if (core.snapshot.current) next.add(k);
-				else next.delete(k);
-			}
-			onValueChange?.([...next]);
+			commitCells([key], on, cellId(key));
 			return;
 		}
 		const next = on ? [...value.filter((k) => k !== key), key] : value.filter((k) => k !== key);
@@ -300,7 +297,29 @@
 		onValueChange?.(next);
 	}
 
-	function toggleColumn(channel: NotificationChannel, on: boolean): void {
+	/** Instant mode: commits each cell on its own, as one change for Undo, and reports once. */
+	function commitCells(keys: string[], on: boolean, focus: string): void {
+		if (keys.length === 0) return;
+		lastChange = { keys, focus };
+		for (const key of keys) void coreFor(key).set(on);
+		// What every cell shows now: saved cells, with each cell changed since then (still pending or not) on top.
+		const next = new Set(valueSet);
+		for (const [k, core] of cores) {
+			if (core.snapshot.current) next.add(k);
+			else next.delete(k);
+		}
+		onValueChange?.([...next]);
+	}
+
+	/** Undo hides its own button, so focus goes back to the control that made the change first. */
+	function undoLast(): void {
+		const change = lastChange;
+		if (!change) return;
+		document.getElementById(change.focus)?.focus();
+		for (const key of change.keys) if (snapshots[key]?.canUndo) void cores.get(key)?.undo();
+	}
+
+	function toggleColumn(channel: NotificationChannel, on: boolean, focus: string): void {
 		const keys = changeable(channel);
 		if (draft && root) {
 			// Uncontrolled cells: change them in place and let the form (and the draft) hear it.
@@ -316,7 +335,7 @@
 			return;
 		}
 		if (instant) {
-			for (const key of keys) if (isOn(key) !== on) setCell(key, on);
+			commitCells(keys.filter((key) => isOn(key) !== on), on, focus);
 			return;
 		}
 		const next = toggleMatrixColumn(value, keys, on);
@@ -349,14 +368,21 @@
 		const channel = channels.find((c) => c.id === cell?.channel);
 		return event && channel ? text.cell(event.label, channel.label) : key;
 	};
-	const last = $derived(lastKey ? snapshots[lastKey] : undefined);
+	const lastSnapshots = $derived((lastChange?.keys ?? []).map((key) => snapshots[key]).filter(Boolean));
+	/** Saved once the whole change has settled and some of it saved. */
+	const lastSaved = $derived(lastSnapshots.some((snapshot) => snapshot.status === 'saved'));
+	/** Undo while every cell of the change has settled and one that saved still owns its undo point. */
+	const canUndo = $derived(lastSnapshots.every((snapshot) => snapshot.status !== 'pending') && lastSnapshots.some((snapshot) => snapshot.canUndo));
 	/** Saving while any cell is in flight, not only the last one touched. */
 	const anyPending = $derived(Object.values(snapshots).some((snapshot) => snapshot.status === 'pending'));
 	/** Every cell whose change failed and went back, until it is changed again: none fails silently. */
 	const failedKeys = $derived(Object.keys(snapshots).filter((key) => snapshots[key].status === 'error'));
 	const cellId = (key: string) => `${uid}-cell-${idPart(key)}`;
+	const columnId = (index: number) => `${uid}-column-${index}`;
 	const errorId = (key: string) => `${uid}-error-${idPart(key)}`;
-	const channelNotes = $derived(channels.some((c) => c.unavailable || c.permission === 'prompt' || c.permission === 'denied'));
+	/** A channel that is unavailable, or that the browser asks about or blocks, has a note in the list below. */
+	const hasChannelNote = (channel: NotificationChannel) => Boolean(channel.unavailable) || channel.permission === 'prompt' || channel.permission === 'denied';
+	const channelNotes = $derived(channels.some(hasChannelNote));
 
 	/**
 	 * Classes per part. `grid` is a table; `list` stacks one block per event with each cell labelled;
@@ -452,10 +478,11 @@
 								<Badge size="sm" tone="danger">{text.unavailable}</Badge>
 							{:else if columnToggle && ready.current && keys.length > 0}
 								<Checkbox
+									id={columnId(ci)}
 									aria-label={text.column(channel.label)}
 									checked={state === 'all'}
 									indeterminate={state === 'some'}
-									onCheckedChange={(on) => toggleColumn(channel, on)}
+									onCheckedChange={(on) => toggleColumn(channel, on, columnId(ci))}
 									data-column={channel.id}
 								/>
 							{/if}
@@ -485,7 +512,7 @@
 							{@const snap = instant ? snapshots[key] : undefined}
 							{@const dirty = draft ? stagedOn.has(key) !== stagedSaved.has(key) : false}
 							{@const id = cellId(key)}
-							{@const describedBy = [fixed ? lockedNoteId(key) : '', channel.unavailable || channel.permission ? channelNoteId(ci) : '', groupReasonId ?? '', snap?.status === 'error' ? errorId(key) : '', instant ? statusId : ''].filter(Boolean).join(' ') || undefined}
+							{@const describedBy = [fixed ? lockedNoteId(key) : '', hasChannelNote(channel) ? channelNoteId(ci) : '', groupReasonId ?? '', snap?.status === 'error' ? errorId(key) : '', instant ? statusId : ''].filter(Boolean).join(' ') || undefined}
 							<td class={cn(look('cell'), dirty && 'bg-accent-subtle/60', snap?.status === 'error' && 'bg-status-danger-subtle/60')} data-cell-key={key} data-dirty={dirty ? '' : undefined} data-failed={snap?.status === 'error' ? '' : undefined}>
 								<span class={look('cellInner')}>
 									<span class="relative inline-flex">
@@ -557,11 +584,10 @@
 	{#if instant}
 		<div class="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
 			<p id={statusId} role="status" class="m-0 inline-flex items-center gap-1.5 text-xs leading-5 text-fg-light [&_svg]:size-3.5">
-				{#if anyPending}<Spinner size="xs" decorative />{text.saving}{:else if last?.status === 'saved'}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
+				{#if anyPending}<Spinner size="xs" decorative />{text.saving}{:else if lastSaved}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
 			</p>
-			{#if lastKey && last?.canUndo}
-				{@const key = lastKey}
-				<Button size="xs" variant="ghost" onclick={() => void cores.get(key)?.undo()}>{text.undo}</Button>
+			{#if canUndo}
+				<Button size="xs" variant="ghost" onclick={undoLast}>{text.undo}</Button>
 			{/if}
 		</div>
 		{#each failedKeys as key (key)}
