@@ -3,6 +3,7 @@ import test from 'node:test';
 import { timeUntil, usageLevel, usagePercent, usageScale, usageTone } from '../src/lib/settings/controls/meter.ts';
 import { groupMatrixEvents, matrixCellKey, matrixColumnState, parseMatrixCellKey, toggleMatrixColumn } from '../src/lib/settings/controls/matrix.ts';
 import { filterSettingsItems, groupSettingsItems, selectableIds } from '../src/lib/settings/controls/item-list.ts';
+import { idPart } from '../src/lib/settings/controls/ids.ts';
 import { SAMPLE_SETTINGS_MEMBERS } from '../src/lib/fixtures/settings.ts';
 
 // ---- UsageMeter ----
@@ -126,4 +127,24 @@ test('groupSettingsItems keeps unknown groups in the main list', () => {
 
 test('selectableIds drops locked and missing items from a bulk action', () => {
 	assert.deepEqual(selectableIds(SAMPLE_SETTINGS_MEMBERS, ['m1', 'm2', 'gone', 'i1']), ['m2', 'i1']);
+});
+
+// ---- Element ids ----
+
+test('idPart keeps letters and digits and gives every other character its own escape, with no hyphen', () => {
+	assert.equal(idPart('m1'), 'm1');
+	assert.equal(idPart('a-b'), 'a_19_b');
+	assert.equal(idPart('mention:email'), 'mention_1m_email');
+	assert.equal(idPart('a b'), 'a_w_b');
+	assert.ok(!idPart('x-y:z é/😀').includes('-'));
+	assert.match(idPart('x-y:z é/😀'), /^[A-Za-z0-9_]+$/);
+});
+
+test('idPart is one-to-one, so joined ids from different parts never collide', () => {
+	const join = (...parts: string[]) => parts.map(idPart).join('-');
+	assert.notEqual(join('a-b', 'c'), join('a', 'b-c'));
+	assert.notEqual(join('a_b'), join('a b'));
+	assert.notEqual(join('a__b'), join('a_b'));
+	const samples = ['a', 'a-', '-a', 'a_', '_a', 'a:b', 'a::b', 'a_1m_b', 'é', 'é', '😀', ''];
+	assert.equal(new Set(samples.map(idPart)).size, samples.length);
 });

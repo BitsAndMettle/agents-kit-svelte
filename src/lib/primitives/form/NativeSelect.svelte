@@ -93,6 +93,13 @@
 		lg: 'h-8 pl-3.5 pr-8 text-[13px]'
 	};
 
+	/**
+	 * A pill is shorter than a finger: on a coarse pointer the transparent select grows to 44px high,
+	 * centred on the face, so the tap reaches it while the face stays the same. (A select draws no
+	 * pseudo-elements, so the shared extender cannot be used here.)
+	 */
+	const PILL_HIT_AREA = 'pointer-coarse:top-1/2 pointer-coarse:bottom-auto pointer-coarse:h-[max(100%,44px)] pointer-coarse:-translate-y-1/2';
+
 	function findLabel(entries: (NativeSelectOption | NativeSelectOptionGroup)[], wanted: string): string | undefined {
 		for (const entry of entries) {
 			if ('options' in entry) {
@@ -158,7 +165,7 @@
 				onValueChange?.(event.currentTarget.value);
 				rest.onchange?.(event);
 			}}
-			class={cn('absolute inset-0 m-0 w-full min-w-0 cursor-pointer appearance-none truncate rounded-full border-0 bg-transparent font-medium text-fg-main focus:outline-none [&_option]:bg-card-bg [&_option]:text-fg-main disabled:cursor-not-allowed', PILL_SIZES[size], 'h-full')}
+			class={cn('absolute inset-0 m-0 w-full min-w-0 cursor-pointer appearance-none truncate rounded-full border-0 bg-transparent font-medium text-fg-main focus:outline-none [&_option]:bg-card-bg [&_option]:text-fg-main disabled:cursor-not-allowed', PILL_SIZES[size], 'h-full', PILL_HIT_AREA, !value && placeholder && 'text-fg-light')}
 		>
 			{@render entries()}
 		</select>

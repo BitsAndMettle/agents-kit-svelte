@@ -82,6 +82,7 @@
 		type SettingsHandler
 	} from '../shared';
 	import { groupMatrixEvents, matrixCellKey, matrixColumnState, parseMatrixCellKey, toggleMatrixColumn } from './matrix';
+	import { idPart } from './ids';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'defaultValue'> {
 		events: NotificationEvent[];
@@ -284,11 +285,13 @@
 		}
 		if (instant) {
 			lastKey = key;
-			const core = coreFor(key);
-			void core.set(on);
+			void coreFor(key).set(on);
+			// What every cell shows now: saved cells, with each cell changed since then (still pending or not) on top.
 			const next = new Set(valueSet);
-			if (on) next.add(key);
-			else next.delete(key);
+			for (const [k, core] of cores) {
+				if (core.snapshot.current) next.add(k);
+				else next.delete(k);
+			}
 			onValueChange?.([...next]);
 			return;
 		}
@@ -339,7 +342,7 @@
 	const groups = $derived(groupMatrixEvents(events));
 	const lockedKeys = $derived(Object.keys(locked).filter((key) => parseMatrixCellKey(key)));
 	const channelNoteId = (index: number) => `${uid}-channel-${index}`;
-	const lockedNoteId = (key: string) => `${uid}-locked-${events.findIndex((e) => key.startsWith(`${e.id}:`))}-${channels.findIndex((c) => key.endsWith(`:${c.id}`))}`;
+	const lockedNoteId = (key: string) => `${uid}-locked-${idPart(key)}`;
 	const labelOf = (key: string) => {
 		const cell = parseMatrixCellKey(key);
 		const event = events.find((e) => e.id === cell?.event);
@@ -347,6 +350,12 @@
 		return event && channel ? text.cell(event.label, channel.label) : key;
 	};
 	const last = $derived(lastKey ? snapshots[lastKey] : undefined);
+	/** Saving while any cell is in flight, not only the last one touched. */
+	const anyPending = $derived(Object.values(snapshots).some((snapshot) => snapshot.status === 'pending'));
+	/** Every cell whose change failed and went back, until it is changed again: none fails silently. */
+	const failedKeys = $derived(Object.keys(snapshots).filter((key) => snapshots[key].status === 'error'));
+	const cellId = (key: string) => `${uid}-cell-${idPart(key)}`;
+	const errorId = (key: string) => `${uid}-error-${idPart(key)}`;
 	const channelNotes = $derived(channels.some((c) => c.unavailable || c.permission === 'prompt' || c.permission === 'denied'));
 
 	/**
@@ -356,7 +365,7 @@
 	const GRID = {
 		table: 'w-full border-collapse text-left',
 		thead: '',
-		headCell: 'px-2 pt-1 pb-2 text-center align-bottom text-xs font-medium text-fg-light',
+		headCell: 'px-2 pt-1 pb-2 text-center align-top text-xs font-medium text-fg-light',
 		tbody: '',
 		groupRow: '',
 		groupCell: 'pt-5 pb-1.5 text-left text-[11px] font-semibold tracking-wide text-fg-light uppercase',
@@ -392,6 +401,26 @@
 		cellInner: '@max-lg/settings:flex-row @max-lg/settings:flex-wrap @max-lg/settings:gap-x-2 @max-lg/settings:gap-y-0.5',
 		cellLabel: '@max-lg/settings:not-sr-only @max-lg/settings:text-[13px] @max-lg/settings:text-fg-main'
 	};
+	/**
+	 * Column toggles live in the header. In the list (or the narrow auto) layout the header becomes a
+	 * strip of "All events by …" checkboxes above the events, so the toggles stay reachable.
+	 */
+	const toggles = $derived(columnToggle && ready.current);
+	const STRIP = {
+		thead: 'block pb-3',
+		headRow: 'flex flex-wrap gap-x-5 gap-y-2',
+		eventHead: 'hidden',
+		headCell: 'block w-auto p-0 text-left',
+		headInner: 'flex-row gap-2'
+	};
+	const STRIP_NARROW: typeof STRIP = {
+		thead: '@max-lg/settings:block @max-lg/settings:pb-3',
+		headRow: '@max-lg/settings:flex @max-lg/settings:flex-wrap @max-lg/settings:gap-x-5 @max-lg/settings:gap-y-2',
+		eventHead: '@max-lg/settings:hidden',
+		headCell: '@max-lg/settings:block @max-lg/settings:w-auto @max-lg/settings:p-0 @max-lg/settings:text-left',
+		headInner: '@max-lg/settings:flex-row @max-lg/settings:gap-2'
+	};
+	const narrowStrip = (part: keyof typeof STRIP): string => (layout === 'list' ? STRIP[part] : layout === 'grid' ? '' : STRIP_NARROW[part]);
 	type Part = keyof typeof GRID;
 	const look = (part: Part): string => (layout === 'list' ? LIST[part] : layout === 'grid' ? GRID[part] : cn(GRID[part], AUTO_NARROW[part]));
 </script>
@@ -405,15 +434,15 @@
 >
 	<table class={look('table')} aria-describedby={[groupReasonId, channelNotes ? `${uid}-notes` : ''].filter(Boolean).join(' ') || undefined}>
 		<caption class={cn(showCaption ? 'pb-2 text-left text-sm font-semibold text-fg-main' : 'sr-only')}>{text.caption}</caption>
-		<thead class={look('thead')}>
-			<tr>
-				<th scope="col" class="pt-1 pb-2 text-left align-bottom text-xs font-medium text-fg-light">{text.event}</th>
+		<thead class={toggles ? narrowStrip('thead') : look('thead')}>
+			<tr class={toggles ? narrowStrip('headRow') : undefined}>
+				<th scope="col" class={cn('pt-1 pb-2 text-left align-top text-xs font-medium text-fg-light', toggles && narrowStrip('eventHead'))}>{text.event}</th>
 				{#each channels as channel, ci (channel.id)}
 					{@const Icon = channel.icon}
 					{@const keys = changeable(channel)}
 					{@const state = matrixColumnState(keys, shownOn)}
-					<th scope="col" class={cn(look('headCell'), 'w-24')} data-channel={channel.id}>
-						<span class="inline-flex flex-col items-center gap-1.5">
+					<th scope="col" class={cn(look('headCell'), 'w-24', toggles && narrowStrip('headCell'))} data-channel={channel.id}>
+						<span class={cn('inline-flex flex-col items-center gap-1.5', toggles && narrowStrip('headInner'))}>
 							<span class="inline-flex items-center gap-1 text-fg-main [&_svg]:size-3.5 [&_svg]:text-fg-light">
 								{#if Icon}<span aria-hidden="true" class="contents"><Icon /></span>{/if}{channel.label}
 							</span>
@@ -455,16 +484,16 @@
 							{@const off = cellDisabled(key, channel)}
 							{@const snap = instant ? snapshots[key] : undefined}
 							{@const dirty = draft ? stagedOn.has(key) !== stagedSaved.has(key) : false}
-							{@const cellId = `${uid}-${event.id}-${channel.id}`.replace(/[^\w-]/g, '_')}
-							{@const describedBy = [fixed ? lockedNoteId(key) : '', channel.unavailable || channel.permission ? channelNoteId(ci) : '', groupReasonId ?? ''].filter(Boolean).join(' ') || undefined}
-							<td class={cn(look('cell'), dirty && 'bg-accent-subtle/60', snap?.status === 'error' && 'bg-status-danger-subtle/60')} data-cell-key={key} data-dirty={dirty ? '' : undefined}>
+							{@const id = cellId(key)}
+							{@const describedBy = [fixed ? lockedNoteId(key) : '', channel.unavailable || channel.permission ? channelNoteId(ci) : '', groupReasonId ?? '', snap?.status === 'error' ? errorId(key) : '', instant ? statusId : ''].filter(Boolean).join(' ') || undefined}
+							<td class={cn(look('cell'), dirty && 'bg-accent-subtle/60', snap?.status === 'error' && 'bg-status-danger-subtle/60')} data-cell-key={key} data-dirty={dirty ? '' : undefined} data-failed={snap?.status === 'error' ? '' : undefined}>
 								<span class={look('cellInner')}>
 									<span class="relative inline-flex">
 										{#if draft && !fixed}
-											<Checkbox id={cellId} {name} value={key} defaultChecked={stagedStart.has(key)} disabled={off} aria-label={text.cell(event.label, channel.label)} aria-describedby={describedBy} data-cell="" onCheckedChange={(checked) => setCell(key, checked)} />
+											<Checkbox {id} {name} value={key} defaultChecked={stagedStart.has(key)} disabled={off} aria-label={text.cell(event.label, channel.label)} aria-describedby={describedBy} data-cell="" onCheckedChange={(checked) => setCell(key, checked)} />
 										{:else}
 											<Checkbox
-												id={cellId}
+												{id}
 												name={off ? undefined : name}
 												value={key}
 												checked={on}
@@ -473,13 +502,14 @@
 												aria-label={text.cell(event.label, channel.label)}
 												aria-describedby={describedBy}
 												aria-busy={snap?.status === 'pending' ? 'true' : undefined}
+												aria-invalid={snap?.status === 'error' ? 'true' : undefined}
 												data-cell=""
 												onCheckedChange={(checked) => setCell(key, checked)}
 											/>
 										{/if}
 										{#if snap?.status === 'pending'}<span class="absolute -right-4 top-0.5"><Spinner size="xs" decorative /></span>{/if}
 									</span>
-									<label for={cellId} class={look('cellLabel')}>{channel.label}</label>
+									<label for={id} class={look('cellLabel')}>{channel.label}</label>
 									{#if fixed}
 										<span class="inline-flex items-center gap-0.5 text-[11px] leading-4 text-fg-light [&_svg]:size-3"><Lock aria-hidden="true" />{fixed.checked ? text.alwaysOn : text.alwaysOff}</span>
 									{/if}
@@ -527,16 +557,16 @@
 	{#if instant}
 		<div class="flex min-h-6 flex-wrap items-center gap-x-2 gap-y-1">
 			<p id={statusId} role="status" class="m-0 inline-flex items-center gap-1.5 text-xs leading-5 text-fg-light [&_svg]:size-3.5">
-				{#if last?.status === 'pending'}<Spinner size="xs" decorative />{text.saving}{:else if last?.status === 'saved'}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
+				{#if anyPending}<Spinner size="xs" decorative />{text.saving}{:else if last?.status === 'saved'}<Check aria-hidden="true" class="text-status-success" />{text.saved}{/if}
 			</p>
 			{#if lastKey && last?.canUndo}
 				{@const key = lastKey}
 				<Button size="xs" variant="ghost" onclick={() => void cores.get(key)?.undo()}>{text.undo}</Button>
 			{/if}
 		</div>
-		{#if last?.status === 'error' && lastKey}
-			<p role="alert" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT)}>{last.error ?? text.failed(labelOf(lastKey))}</p>
-		{/if}
+		{#each failedKeys as key (key)}
+			<p id={errorId(key)} role="alert" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT)} data-failed-cell={key}>{snapshots[key].error ?? text.failed(labelOf(key))}</p>
+		{/each}
 	{/if}
 
 	{#if action && !draft && !(instant && ready.current)}

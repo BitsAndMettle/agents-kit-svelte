@@ -7,6 +7,8 @@
 		copied: string;
 		/** Shown and announced when the clipboard refused; the text is selected instead. */
 		copyFailed: string;
+		/** Shown and announced when the clipboard refused a hidden value: nothing is selected, since the page does not hold it. */
+		copyFailedHidden: string;
 		/** Accessible name of the copy button: "Copy API token". */
 		copyFor: (label: string) => string;
 		reveal: string;
@@ -103,6 +105,7 @@
 		copy: 'Copy',
 		copied: 'Copied',
 		copyFailed: "Couldn't copy. The text is selected: press Ctrl+C or ⌘C.",
+		copyFailedHidden: "Couldn't copy. Choose Reveal, then select the text and copy it yourself.",
 		copyFor: (l) => `Copy ${l}`,
 		reveal: 'Reveal',
 		hide: 'Hide',
@@ -140,10 +143,15 @@
 	const doneBlocked = $derived(requireAcknowledge && !acknowledged);
 	const fileName = $derived(filename ?? `${label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'value'}.txt`);
 
+	/** Whether the failed copy was of a hidden value (no text to select), so the right words show. */
+	let failedHidden = $state(false);
+
 	async function copy(): Promise<void> {
 		if (!ready.current || expired) return;
+		const wasConcealed = concealed;
 		const ok = await copier.copy(value);
-		if (!ok && !concealed && input) {
+		failedHidden = !ok && wasConcealed;
+		if (!ok && !wasConcealed && input) {
 			// The fallback: select the text so a keyboard copy works.
 			input.focus();
 			input.select();
@@ -164,12 +172,13 @@
 		link.href = url;
 		link.download = fileName;
 		link.click();
-		setTimeout(() => URL.revokeObjectURL(url), 0);
+		// Some browsers read the file after the click returns: give the download time before letting go.
+		setTimeout(() => URL.revokeObjectURL(url), 30_000);
 		onDownload?.();
 	}
 
 	async function done(): Promise<void> {
-		if (doneBlocked || finishing) return;
+		if (!ready.current || doneBlocked || finishing) return;
 		const result = onDone?.();
 		if (!isThenable(result)) return;
 		finishing = true;
@@ -182,7 +191,7 @@
 		}
 	}
 
-	const announcement = $derived(copier.status === 'copied' ? text.copied : copier.status === 'failed' ? text.copyFailed : '');
+	const announcement = $derived(copier.status === 'copied' ? text.copied : copier.status === 'failed' ? (failedHidden ? text.copyFailedHidden : text.copyFailed) : '');
 </script>
 
 <div {...rest} data-masked={masked ? (concealed ? 'hidden' : 'shown') : undefined} data-expired={expired ? '' : undefined} class={cn('flex min-w-0 flex-col gap-2 text-fg-main', className)}>
@@ -252,7 +261,7 @@
 						{text.download}
 					</Button>
 				{/if}
-				<Button variant="primary" size="sm" class="ml-auto" softDisabled={doneBlocked && !expired} loading={finishing} aria-describedby={doneBlocked && !expired ? ackReasonId : undefined} onclick={done}>{text.done}</Button>
+				<Button variant="primary" size="sm" class="ml-auto" softDisabled={!ready.current || (doneBlocked && !expired)} loading={finishing} aria-describedby={doneBlocked && !expired ? ackReasonId : undefined} onclick={done}>{text.done}</Button>
 			</div>
 			{#if doneBlocked && !expired}<p id={ackReasonId} class="m-0 -mt-1 text-right text-xs leading-5 text-fg-light">{text.acknowledgeFirst}</p>{/if}
 		</div>

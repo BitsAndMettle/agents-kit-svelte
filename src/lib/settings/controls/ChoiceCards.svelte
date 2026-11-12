@@ -349,7 +349,8 @@
 				</span>
 				{#if isSaved || isChanged}
 					<span id={id.caption} class={look('caption')}>
-						{#if isChanged}<span class="inline-flex items-center gap-1 text-accent-primary"><span aria-hidden="true" class="size-1.5 rounded-full bg-accent-primary"></span>{text.changed}</span>{/if}
+						<!-- Body text colour: accent text on the checked option's accent tint is too faint to read. -->
+						{#if isChanged}<span class="inline-flex items-center gap-1 text-fg-main"><span aria-hidden="true" class="size-1.5 rounded-full bg-accent-primary"></span>{text.changed}</span>{/if}
 						{#if isSaved}<span class="text-fg-light">{text.current}</span>{/if}
 					</span>
 				{/if}

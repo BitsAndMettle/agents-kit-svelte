@@ -50,12 +50,14 @@
 		nextFocusAfterRemoval,
 		ReadyGate,
 		RECIPES,
+		restoreFocus,
 		type SettingsAction,
 		type SettingsItem,
 		type SettingsItemAction,
 		type SettingsResult
 	} from '../shared';
 	import { filterSettingsItems, groupSettingsItems, selectableIds } from './item-list';
+	import { idPart } from './ids';
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title' | 'defaultValue'> {
 		items: T[];
@@ -70,7 +72,11 @@
 		groups?: { id: string; label: string; description?: string }[];
 		/** A control at the end of each row: a Switch, a NativeSelect pill for a role, a Button. */
 		trailing?: Snippet<[T]>;
-		/** Row actions. More than two (links aside) collapse into a menu once the page is ready. */
+		/**
+		 * Row actions. More than two (links aside) collapse into a menu once the page is ready. A `confirm`
+		 * action never posts without its confirmation: give it an `href` (a ConsequenceDialog route) to
+		 * work without JavaScript; without one it waits for the page to be ready.
+		 */
 		actions?: (item: T) => SettingsItemAction[];
 		/** A row action was chosen (after its confirm). A promise shows loading on the row; return `{ error }` or reject to show a failure. Your app removes items. */
 		onAction?: (actionId: string, item: T) => unknown;
@@ -97,7 +103,7 @@
 		onValueChange?: (ids: string[]) => void;
 		/** The selection line: "3 selected · frees 2.9 GB". Default `labels.selected(n)`. */
 		selectionSummary?: (ids: string[]) => string;
-		/** Actions on the whole selection, in the selection footer. */
+		/** Actions on the whole selection, in the selection footer. A `confirm` action waits for the page to be ready. */
 		bulkActions?: SettingsItemAction[];
 		/** A bulk action was chosen (after its confirm), with the selected ids that are not locked. A promise shows loading. */
 		onBulkAction?: (actionId: string, ids: string[]) => unknown;
@@ -175,6 +181,7 @@
 	let bulkFailed = $state('');
 	let asking = $state<{ action: SettingsItemAction; item?: T; ids?: string[] } | null>(null);
 	let dialogOpen = $state(false);
+	let postForm = $state<HTMLFormElement | null>(null);
 	/** Where focus goes if an acted-on row disappears: its list and position. */
 	const removals = new Map<string, { list: string; index: number }>();
 
@@ -277,11 +284,45 @@
 		void performBulk(action, ids);
 	}
 
+	/** A confirmed action with no handler posts the way its button would have: `actionId=itemId` or `intent=actionId`. */
+	function postNatively(fieldName: string, fieldValue: string): void {
+		if (!postForm) return;
+		const field = document.createElement('input');
+		field.type = 'hidden';
+		field.name = fieldName;
+		field.value = fieldValue;
+		postForm.append(field);
+		postForm.requestSubmit();
+		field.remove();
+	}
+
 	function confirmed(): void {
 		const target = asking;
 		if (!target) return;
-		if (target.item) void perform(target.action, target.item);
-		else if (target.ids) void performBulk(target.action, target.ids);
+		if (target.item) {
+			if (onAction) void perform(target.action, target.item);
+			else if (nativeForm) postNatively(target.action.id, target.item.id);
+		} else if (target.ids) {
+			if (onBulkAction) void performBulk(target.action, target.ids);
+			else if (nativeForm) postNatively('intent', target.action.id);
+		}
+	}
+
+	/**
+	 * The confirm dialog closed (cancelled, escaped or confirmed). When its opener was a menu item it
+	 * is gone, and focus would fall to the page: give it to the row's menu button (or the action
+	 * button) instead. A removed row hands focus on through the removal effect.
+	 */
+	function returnFocus(): void {
+		const target = asking;
+		const active = document.activeElement;
+		if (!target || !root || (active && active !== document.body && !active.closest('dialog'))) return;
+		if (target.item) {
+			const row = root.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(target.item.id)}"]`);
+			restoreFocus(row?.querySelector<HTMLElement>('[data-row-menu]'), row?.querySelector<HTMLElement>(`[data-action="${CSS.escape(target.action.id)}"]`), heading);
+		} else {
+			restoreFocus(root.querySelector<HTMLElement>(`[data-bulk="${CSS.escape(target.action.id)}"]`), heading);
+		}
 	}
 
 	let addLoading = $state(false);
@@ -304,13 +345,19 @@
 		onFilterChange?.(next);
 	}
 
-	const reasonId = (item: T, suffix: string) => `${uid}-${item.id}-${suffix}`.replace(/[^\w-]/g, '_');
+	const reasonId = (item: T, suffix: string) => `${uid}-${idPart(item.id)}-${suffix}`;
+	const actionReasonId = (item: T, action: SettingsItemAction) => reasonId(item, `a${idPart(action.id)}`);
+	/** A link stays a link unless it must ask first and can (ready, with a handler): then it opens the confirm. */
+	const asLink = (action: SettingsItemAction, item: T) =>
+		Boolean(action.href) && !action.unavailable && !item.lock && !(action.confirm && ready.current && onAction);
+	/** Only a plain, available action on an unlocked row posts on its own. */
+	const posts = (action: SettingsItemAction, item?: T) => nativeForm && !action.unavailable && !item?.lock && !action.confirm;
 </script>
 
 {#snippet actionButtons(item: T)}
 	{@const all = actions?.(item) ?? []}
-	{@const links = all.filter((a) => a.href && !a.unavailable)}
-	{@const buttons = all.filter((a) => !(a.href && !a.unavailable))}
+	{@const links = all.filter((a) => asLink(a, item))}
+	{@const buttons = all.filter((a) => !asLink(a, item))}
 	{@const collapse = all.length > 2 && buttons.length > 0 && ready.current}
 	{#each links as action (action.id)}
 		<Button size="sm" variant={action.tone === 'danger' ? 'danger' : 'secondary'} href={action.href} aria-label={action.ariaLabel}>{action.label}</Button>
@@ -328,7 +375,7 @@
 			}))}
 		>
 			{#snippet trigger(part)}
-				<button {...part} type="button" aria-busy={pending[item.id] ? 'true' : undefined} class={buttonClass('ghost', 'icon-sm', cn('relative', TOUCH_TARGET_CLASS))}><Ellipsis aria-hidden="true" /></button>
+				<button {...part} type="button" data-row-menu="" aria-busy={pending[item.id] ? 'true' : undefined} class={buttonClass('ghost', 'icon-sm', cn('relative', TOUCH_TARGET_CLASS))}><Ellipsis aria-hidden="true" /></button>
 			{/snippet}
 		</DropdownMenu>
 	{:else}
@@ -336,16 +383,16 @@
 			<Button
 				size="sm"
 				variant={action.tone === 'danger' ? 'danger' : 'secondary'}
-				type={nativeForm ? 'submit' : 'button'}
-				name={nativeForm ? action.id : undefined}
-				value={nativeForm ? item.id : undefined}
-				softDisabled={Boolean(action.unavailable) || Boolean(item.lock)}
+				type={posts(action, item) ? 'submit' : 'button'}
+				name={posts(action, item) ? action.id : undefined}
+				value={posts(action, item) ? item.id : undefined}
+				softDisabled={Boolean(action.unavailable) || Boolean(item.lock) || (Boolean(action.confirm) && !ready.current)}
 				aria-label={action.ariaLabel}
-				aria-describedby={action.unavailable ? reasonId(item, `${action.id}-reason`) : item.lock ? reasonId(item, 'lock') : undefined}
+				aria-describedby={action.unavailable ? actionReasonId(item, action) : item.lock ? reasonId(item, 'lock') : undefined}
 				loading={pending[item.id] === action.id}
 				data-action={action.id}
 				onclick={(event: MouseEvent) => {
-					if (!onAction) return;
+					if (!onAction && !action.confirm) return;
 					event.preventDefault();
 					choose(action, item);
 				}}
@@ -372,54 +419,57 @@
 			isSelected && 'bg-canvas-secondary/60'
 		)}
 	>
-		{#if selectable}
-			<Checkbox
-				{name}
-				value={item.id}
-				checked={isSelected}
-				disabled={Boolean(item.lock)}
-				aria-label={text.select(item.label)}
-				aria-describedby={item.lock ? reasonId(item, 'lock') : undefined}
-				onCheckedChange={(on) => setSelected(item.id, on)}
-			/>
-		{/if}
-		{#if item.avatar}
-			<Avatar name={item.avatar.name} src={item.avatar.src} size="sm" decorative />
-		{:else if ItemIcon}
-			<span aria-hidden="true" class={RECIPES.iconTile}><ItemIcon /></span>
-		{/if}
-		<div class="min-w-0 flex-1 basis-40">
-			<p class="m-0 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5">
-				{#if item.href}
-					<a href={item.href} class={cn('min-w-0 font-medium break-words text-fg-main underline-offset-2 hover:underline', item.mono && 'font-mono text-xs')}>{item.label}</a>
-				{:else}
-					<span class={cn('min-w-0 font-medium break-words text-fg-main', item.mono && 'font-mono text-xs')}>{item.label}</span>
-				{/if}
-				{#if item.current}<Badge size="sm" tone="accent">{text.current}</Badge>{/if}
-				{#if item.isNew}<Badge size="sm" tone="accent" variant="outline">{text.isNew}</Badge>{/if}
-				{#each item.badges ?? [] as badge (badge.label)}<Badge size="sm" tone={badge.tone ?? 'neutral'}>{badge.label}</Badge>{/each}
-			</p>
-			{#if item.description || item.meta?.length || item.status}
-				<p class="m-0 mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs leading-5 text-fg-light">
-					{#if item.description}<span class="min-w-0 break-words">{item.description}</span>{/if}
-					{#each item.meta ?? [] as meta, mi (mi)}
-						{#if item.description || mi > 0}<span aria-hidden="true">·</span>{/if}<span>{meta}</span>
-					{/each}
-					{#if item.status}
-						{#if item.description || item.meta?.length}<span aria-hidden="true">·</span>{/if}
-						<span class="inline-flex items-center gap-1 font-medium text-fg-main" data-tone={item.status.tone ?? 'neutral'}>
-							<span aria-hidden="true" class={cn('size-1.5 rounded-full', TONE_FILL_CLASS[item.status.tone ?? 'neutral'])}></span>{item.status.label}
-						</span>
+		<!-- The checkbox, icon and text stay on one line; only the trailing controls wrap below them. -->
+		<div class="flex min-w-0 flex-1 basis-56 items-center gap-3">
+			{#if selectable}
+				<Checkbox
+					{name}
+					value={item.id}
+					checked={isSelected}
+					disabled={Boolean(item.lock)}
+					aria-label={text.select(item.label)}
+					aria-describedby={item.lock ? reasonId(item, 'lock') : undefined}
+					onCheckedChange={(on) => setSelected(item.id, on)}
+				/>
+			{/if}
+			{#if item.avatar}
+				<Avatar name={item.avatar.name} src={item.avatar.src} size="sm" decorative />
+			{:else if ItemIcon}
+				<span aria-hidden="true" class={RECIPES.iconTile}><ItemIcon /></span>
+			{/if}
+			<div class="min-w-0 flex-1">
+				<p class="m-0 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5">
+					{#if item.href}
+						<a href={item.href} class={cn('min-w-0 font-medium break-words text-fg-main underline-offset-2 hover:underline', item.mono && 'font-mono text-xs')}>{item.label}</a>
+					{:else}
+						<span class={cn('min-w-0 font-medium break-words text-fg-main', item.mono && 'font-mono text-xs')}>{item.label}</span>
 					{/if}
+					{#if item.current}<Badge size="sm" tone="accent">{text.current}</Badge>{/if}
+					{#if item.isNew}<Badge size="sm" tone="accent" variant="outline">{text.isNew}</Badge>{/if}
+					{#each item.badges ?? [] as badge (badge.label)}<Badge size="sm" tone={badge.tone ?? 'neutral'}>{badge.label}</Badge>{/each}
 				</p>
-			{/if}
-			{#if item.lock && LockIcon}
-				<p id={reasonId(item, 'lock')} class={cn(RECIPES.note, 'm-0 mt-1')}><span aria-hidden="true" class="contents"><LockIcon /></span><span>{lockReasonText(item.lock)}</span></p>
-			{/if}
-			{#each unavailable as action (action.id)}
-				<p id={reasonId(item, `${action.id}-reason`)} class="m-0 mt-1 text-xs leading-5 text-fg-light">{action.label}: {action.unavailable}</p>
-			{/each}
-			<p role="status" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, !failed[item.id] && 'sr-only')}>{failed[item.id] ?? ''}</p>
+				{#if item.description || item.meta?.length || item.status}
+					<p class="m-0 mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs leading-5 text-fg-light">
+						{#if item.description}<span class="min-w-0 break-words">{item.description}</span>{/if}
+						{#each item.meta ?? [] as meta, mi (mi)}
+							{#if item.description || mi > 0}<span aria-hidden="true">·</span>{/if}<span>{meta}</span>
+						{/each}
+						{#if item.status}
+							{#if item.description || item.meta?.length}<span aria-hidden="true">·</span>{/if}
+							<span class="inline-flex items-center gap-1 font-medium text-fg-main" data-tone={item.status.tone ?? 'neutral'}>
+								<span aria-hidden="true" class={cn('size-1.5 rounded-full', TONE_FILL_CLASS[item.status.tone ?? 'neutral'])}></span>{item.status.label}
+							</span>
+						{/if}
+					</p>
+				{/if}
+				{#if item.lock && LockIcon}
+					<p id={reasonId(item, 'lock')} class={cn(RECIPES.note, 'm-0 mt-1')}><span aria-hidden="true" class="contents"><LockIcon /></span><span>{lockReasonText(item.lock)}</span></p>
+				{/if}
+				{#each unavailable as action (action.id)}
+					<p id={actionReasonId(item, action)} class="m-0 mt-1 text-xs leading-5 text-fg-light">{action.label}: {action.unavailable}</p>
+				{/each}
+				<p role="status" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, !failed[item.id] && 'sr-only')}>{failed[item.id] ?? ''}</p>
+			</div>
 		</div>
 		{#if trailing || actions}
 			<div class="flex shrink-0 flex-wrap items-center justify-end gap-2 @max-lg/settings:w-full @max-lg/settings:pl-11">
@@ -481,15 +531,15 @@
 						<Button
 							size="sm"
 							variant={action.tone === 'danger' ? 'danger' : 'secondary'}
-							type={nativeForm ? 'submit' : 'button'}
-							name={nativeForm ? 'intent' : undefined}
-							value={nativeForm ? action.id : undefined}
-							softDisabled={Boolean(action.unavailable) || (ready.current && actionable.length === 0)}
+							type={posts(action) ? 'submit' : 'button'}
+							name={posts(action) ? 'intent' : undefined}
+							value={posts(action) ? action.id : undefined}
+							softDisabled={Boolean(action.unavailable) || (Boolean(action.confirm) && !ready.current) || (ready.current && actionable.length === 0)}
 							aria-label={action.ariaLabel}
 							loading={bulkPending === action.id}
 							data-bulk={action.id}
 							onclick={(event: MouseEvent) => {
-								if (!onBulkAction) return;
+								if (!onBulkAction && !action.confirm) return;
 								event.preventDefault();
 								chooseBulk(action);
 							}}
@@ -499,7 +549,7 @@
 					{/each}
 				</div>
 			{/if}
-			<p role="status" class={cn('m-0 w-full text-xs font-medium', DANGER_TEXT, !bulkFailed && 'sr-only')}>{bulkFailed}</p>
+			<p role="status" class={cn('m-0 text-xs font-medium', DANGER_TEXT, bulkFailed ? 'w-full' : 'sr-only')}>{bulkFailed}</p>
 		</div>
 	{/if}
 
@@ -562,7 +612,7 @@
 	{/if}
 
 	{#if nativeForm}
-		<form method="post" action={formAction} class="m-0">{@render body()}</form>
+		<form bind:this={postForm} method="post" action={formAction} class="m-0">{@render body()}</form>
 	{:else}
 		{@render body()}
 	{/if}
@@ -576,4 +626,5 @@
 	cancelLabel={text.cancel}
 	tone={asking?.action.tone === 'danger' ? 'danger' : 'neutral'}
 	onConfirm={confirmed}
+	onclose={returnFocus}
 />

@@ -11,8 +11,11 @@
 		resets: (when: string) => string;
 		/** Relative reset time, when `now` is given: "in 3 days", "in 5 hours", "within the hour". */
 		inTime: (days: number, hours: number) => string;
-		/** Absolute reset date, when `now` is not given: "on 1 Dec". */
-		onDate: (date: string) => string;
+		/**
+		 * Absolute reset date, when `now` is not given: "on 1 Dec". `date` is the English default
+		 * (day and short month, UTC); format `at` yourself for another language or time zone.
+		 */
+		onDate: (date: string, at: Date) => string;
 		/** Near the warning threshold. */
 		near: string;
 		/** At or over the limit. */
@@ -164,7 +167,8 @@
 			const left = timeUntil(at, toMillis(now));
 			return text.resets(left ? text.inTime(left.days, left.hours) : text.inTime(0, 0));
 		}
-		return text.resets(text.onDate(DATE.format(new Date(at))));
+		const when = new Date(at);
+		return text.resets(text.onDate(DATE.format(when), when));
 	});
 	const ariaValueText = $derived([total === undefined ? text.none : display, levelWords].filter(Boolean).join(', '));
 

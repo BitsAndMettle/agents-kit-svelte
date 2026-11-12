@@ -39,6 +39,8 @@
 				id: 'remove',
 				label: 'Remove',
 				tone: 'danger',
+				// Without JavaScript, Remove opens the confirmation route instead of posting at once.
+				href: `?dialog=remove-member&member=${encodeURIComponent(item.id)}`,
 				confirm: { title: `Remove ${item.label}?`, description: 'They lose access to every document at once. You can invite them again later.', confirmLabel: 'Remove' }
 			}
 		];

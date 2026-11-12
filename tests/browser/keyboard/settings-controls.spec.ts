@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Browser, type Locator, type Page } from '@playwright/test';
 import { openSection, press } from './helpers';
 
@@ -82,6 +83,21 @@ test.describe('ChoiceCards', () => {
 		await expect(form.getByTestId('cc-defaults-status')).toHaveText('No unsaved changes');
 	});
 
+	test('a changed option still passes colour contrast in both themes', async ({ page }) => {
+		// As the a11y ratchet does: no colour transitions, so a scan never sees a theme half-way.
+		await page.emulateMedia({ reducedMotion: 'reduce' });
+		const section = await openSection(page, 'choice-cards');
+		await section.getByTestId('cc-role').getByRole('radio', { name: 'Viewer' }).check();
+		await expect(section.getByTestId('cc-role').getByRole('radio', { name: 'Viewer' })).toHaveAccessibleDescription(/Changed/);
+		const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+		for (const want of ['light', 'dark']) {
+			if ((await theme()) !== want) await page.getByRole('button', { name: 'Toggle global color theme' }).click();
+			await expect.poll(theme).toBe(want);
+			const results = await new AxeBuilder({ page }).include('#choice-cards').withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']).analyze();
+			expect(results.violations.map((v) => `${want}: ${v.id}`)).toEqual([]);
+		}
+	});
+
 	test('a locked option and a locked group are disabled and described by their visible reason', async ({ page }) => {
 		const section = await openSection(page, 'choice-cards');
 		const admin = section.getByTestId('cc-role').getByRole('radio', { name: 'Admin' });
@@ -147,6 +163,43 @@ test.describe('NotificationMatrix', () => {
 		await expect(matrix.getByRole('alert')).toHaveText("Weekly summary can't be sent by push. Changed back.");
 	});
 
+	test('a failing cell overtaken by a later change still reverts with its own alert, and saving covers every cell in flight', async ({ page }) => {
+		const section = await openOnClock(page, 'notification-matrix');
+		const matrix = section.getByTestId('nm-instant');
+		const refused = matrix.getByRole('checkbox', { name: 'Weekly summary by Push', exact: true });
+		const mentions = matrix.getByRole('checkbox', { name: 'Mentions by Push', exact: true });
+		const message = "Weekly summary can't be sent by push. Changed back.";
+		await refused.check();
+		await page.clock.runFor(300);
+		await mentions.check();
+		await page.clock.runFor(350);
+		// The refused cell has settled and gone back; the later one is still saving.
+		await expect(refused).not.toBeChecked();
+		await expect(matrix.getByRole('alert')).toHaveText(message);
+		await expect(refused).toHaveAttribute('aria-invalid', 'true');
+		await expect(refused).toHaveAccessibleDescription(new RegExp(message.replace(/[.']/g, '\\$&')));
+		await expect(matrix.getByRole('status')).toHaveText('Saving…');
+		await page.clock.runFor(SETTLE);
+		await expect(mentions).toBeChecked();
+		await expect(matrix.getByRole('status')).toHaveText('Saved');
+		await expect(matrix.getByRole('alert')).toHaveText(message);
+		// Changing the failed cell again clears its alert.
+		await refused.check();
+		await expect(matrix.getByRole('alert')).toHaveCount(0);
+	});
+
+	test('instant cells are described by the shared status line', async ({ page }) => {
+		const section = await openOnClock(page, 'notification-matrix');
+		const matrix = section.getByTestId('nm-instant');
+		const statusId = await matrix.getByRole('status').getAttribute('id');
+		const mentions = matrix.getByRole('checkbox', { name: 'Mentions by Push', exact: true });
+		expect((await mentions.getAttribute('aria-describedby'))?.split(' ')).toContain(statusId);
+		await mentions.check();
+		await expect(mentions).toHaveAccessibleDescription(/Saving…/);
+		await page.clock.runFor(SETTLE);
+		await expect(mentions).toHaveAccessibleDescription(/Saved/);
+	});
+
 	test('a column toggle shows mixed and turns every changeable cell on', async ({ page }) => {
 		const section = await openOnClock(page, 'notification-matrix');
 		const matrix = section.getByTestId('nm-instant');
@@ -177,7 +230,10 @@ test.describe('NotificationMatrix', () => {
 		await page.setViewportSize({ width: 375, height: 800 });
 		const section = page.locator('#notification-matrix');
 		const matrix = section.getByTestId('nm-instant');
-		await expect(matrix.locator('thead')).toBeHidden();
+		// The header turns into a strip of column toggles; the event column header is gone.
+		await expect(matrix.getByRole('columnheader', { name: 'Event', exact: true })).toBeHidden();
+		await expect(matrix.getByRole('checkbox', { name: 'All events by In app' })).toBeVisible();
+		await expect(matrix.getByRole('checkbox', { name: 'All events by Email' })).toBeVisible();
 		const mentions = matrix.locator('tr[data-event="mention"]');
 		await expect(mentions.locator('label', { hasText: 'Email' })).toBeVisible();
 		await mentions.locator('label', { hasText: 'Push' }).click();
@@ -227,6 +283,51 @@ test.describe('SettingsItemList', () => {
 		await page.clock.runFor(SETTLE);
 		await expect(members.getByText('Ben Ortiz')).toHaveCount(0);
 		await expect(members.getByRole('combobox', { name: 'Role for Chloé Martin' })).toBeFocused();
+	});
+
+	test('a confirm opened from the row menu gives focus back to that menu button on Cancel, Escape and failure', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-item-list');
+		const members = section.getByTestId('il-members');
+		const more = members.getByRole('button', { name: 'More actions for Dev Rao' });
+		const dialog = page.getByRole('alertdialog', { name: 'Remove Dev Rao?' });
+
+		await more.click();
+		await page.getByRole('menuitem', { name: 'Remove' }).click();
+		await expect(dialog).toBeVisible();
+		await dialog.getByRole('button', { name: 'Cancel' }).click();
+		await expect(dialog).toBeHidden();
+		await expect(more).toBeFocused();
+
+		await more.click();
+		await page.getByRole('menuitem', { name: 'Remove' }).click();
+		await expect(dialog).toBeVisible();
+		await press(page, 'Escape');
+		await expect(dialog).toBeHidden();
+		await expect(more).toBeFocused();
+
+		await more.click();
+		await page.getByRole('menuitem', { name: 'Remove' }).click();
+		await dialog.getByRole('button', { name: 'Remove' }).click();
+		await expect(dialog).toBeHidden();
+		await expect(more).toBeFocused();
+		await page.clock.runFor(SETTLE);
+		await expect(members.locator('li[data-item-id="m4"]').getByRole('status')).toHaveText("Couldn't finish that for Dev Rao. Try again.");
+		await expect(more).toBeFocused();
+	});
+
+	test('in a narrow container a selectable row keeps its checkbox, icon and name on one line', async ({ page }) => {
+		await openSection(page, 'settings-item-list');
+		await page.setViewportSize({ width: 360, height: 800 });
+		const row = page.locator('#settings-item-list').getByTestId('il-exports').locator('li[data-item-id="e1"]');
+		await row.scrollIntoViewIfNeeded();
+		const box = async (locator: Locator) => (await locator.boundingBox())!;
+		const check = await box(row.getByRole('checkbox'));
+		const name = await box(row.getByText('export-2026-10-01.zip'));
+		expect(name.x).toBeGreaterThan(check.x + check.width);
+		// Same line: the name's box overlaps the checkbox's vertical span.
+		expect(name.y).toBeLessThan(check.y + check.height);
+		expect(name.y + name.height).toBeGreaterThan(check.y);
+		expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 	});
 
 	test('removing the last row of a sub-group moves focus to the heading', async ({ page }) => {
@@ -293,6 +394,35 @@ test.describe('SettingsItemList', () => {
 		expect((await request).postData()).toBe('resend=i1');
 		await close();
 	});
+
+	test('without JavaScript nothing that asks first, is locked or is unavailable posts', async ({ browser }) => {
+		const { page, section, close } = await openWithoutJs(browser, 'settings-item-list');
+		const posts: string[] = [];
+		page.on('request', (r) => {
+			if (r.method() === 'POST') posts.push(`${r.url()} ${r.postData() ?? ''}`);
+		});
+		await page.route('**/settings-demo/**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>posted</p>' }));
+		const members = section.getByTestId('il-members');
+		const ben = members.locator('li[data-item-id="m2"]');
+		// A confirm-first action with a route is a link to it, never a post.
+		await expect(ben.getByRole('link', { name: 'Remove' })).toHaveAttribute('href', '?dialog=remove-member&member=m2');
+		await expect(ben.locator('button[type=submit]', { hasText: 'Remove' })).toHaveCount(0);
+		// A locked row's buttons are plain buttons: even a forced click posts nothing.
+		const ada = members.locator('li[data-item-id="m1"]');
+		await expect(ada.getByRole('link')).toHaveCount(0);
+		for (const button of await ada.getByRole('button').all()) {
+			await expect(button).toHaveAttribute('type', 'button');
+			await button.click({ force: true });
+		}
+		// A confirm-first bulk action without a route waits for the page.
+		const bulk = section.getByTestId('il-exports').getByRole('button', { name: 'Delete selected' });
+		await expect(bulk).toHaveAttribute('type', 'button');
+		await expect(bulk).toHaveAttribute('aria-disabled', 'true');
+		await bulk.click({ force: true });
+		await page.waitForTimeout(300);
+		expect(posts).toEqual([]);
+		await close();
+	});
 });
 
 test.describe('UsageMeter', () => {
@@ -348,7 +478,7 @@ test.describe('CopyValue', () => {
 		await page.addInitScript(() => {
 			Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.resolve() }, configurable: true });
 		});
-		const section = await openSection(page, 'copy-value');
+		const section = await openOnClock(page, 'copy-value');
 		const command = section.getByTestId('cv-command');
 		await expect(command.getByRole('textbox', { name: 'Install command' })).toHaveValue('npx northwind-cli@latest connect');
 		await command.getByRole('button', { name: 'Copy Install command' }).click();
@@ -373,13 +503,26 @@ test.describe('CopyValue', () => {
 			Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('blocked')) }, configurable: true });
 			document.execCommand = () => false;
 		});
-		const section = await openSection(page, 'copy-value');
+		const section = await openOnClock(page, 'copy-value');
 		const id = section.getByTestId('cv-id');
 		await id.getByRole('button', { name: 'Copy Team ID' }).click();
 		await expect(id.getByRole('status')).toHaveText("Couldn't copy. The text is selected: press Ctrl+C or ⌘C.");
 		const input = id.getByRole('textbox', { name: 'Team ID' });
 		await expect(input).toBeFocused();
 		expect(await input.evaluate((el: HTMLInputElement) => [el.selectionStart, el.selectionEnd])).toEqual([0, 'tm_8f3k2q9x'.length]);
+	});
+
+	test('when the clipboard refuses a hidden value, it says to reveal it (nothing is selected)', async ({ page }) => {
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('blocked')) }, configurable: true });
+			document.execCommand = () => false;
+		});
+		const section = await openOnClock(page, 'copy-value');
+		const masked = section.getByTestId('cv-masked');
+		await masked.getByRole('button', { name: 'Copy API key' }).click();
+		await expect(masked.getByRole('status')).toHaveText("Couldn't copy. Choose Reveal, then select the text and copy it yourself.");
+		expect(await page.evaluate(() => String(window.getSelection() ?? ''))).toBe('');
+		await expect(masked.getByRole('textbox', { name: 'API key' })).not.toHaveValue(TOKEN);
 	});
 
 	test('a masked value is not in the page until Reveal, and is masked again after a remount', async ({ page }) => {
@@ -423,6 +566,7 @@ test.describe('CopyValue', () => {
 		await expect(input).toHaveValue('npx northwind-cli@latest connect');
 		await expect(input).toHaveAttribute('readonly', '');
 		await expect(command.getByRole('button', { name: 'Copy Install command' })).toHaveAttribute('aria-disabled', 'true');
+		await expect(section.getByTestId('cv-once').getByRole('button', { name: 'Done' })).toHaveAttribute('aria-disabled', 'true');
 		expect(await section.getByTestId('cv-masked').innerHTML()).not.toContain(TOKEN);
 		await close();
 	});
