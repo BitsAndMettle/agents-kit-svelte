@@ -38,7 +38,8 @@
 		isOpen = defaultOpen;
 	});
 
-	let panelId = $derived(`tool-result-${tool.replace(/[^a-zA-Z0-9_-]/g, '-')}`);
+	const uid = $props.id();
+	const panelId = `${uid}-output`;
 
 	/**
 	 * Copies the raw tool terminal output to the system clipboard.

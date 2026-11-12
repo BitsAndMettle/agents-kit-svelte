@@ -213,6 +213,8 @@
 			{agents}
 			{selectedAgentId}
 			onAgentChange={(id) => (selectedAgentId = id)}
+			activeSkill="Backend v2"
+			attachments={[{ id: 'worktree:trailside/1210-auth-redirect', label: 'trailside/1210-auth-redirect', kind: 'worktree' }]}
 			onSubmit={(submitted) => {
 				customPrompt = submitted;
 				composerValue = '';

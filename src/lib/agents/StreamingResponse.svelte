@@ -5,23 +5,27 @@
 	import { Check, Copy, RefreshCw, ThumbsDown, ThumbsUp } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import Citations from './Citations.svelte';
+	import Markdown from './Markdown.svelte';
 	import type { CitationItem } from '../types';
 
-	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'status' | 'copyText' | 'sources' | 'showActions' | 'onRetry' | 'children'> {
+	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'status' | 'copyText' | 'sources' | 'showActions' | 'onRetry' | 'children' | 'text'> {
 		status?: 'streaming' | 'complete' | 'error';
 		copyText?: string;
 		sources?: CitationItem[];
 		showActions?: boolean;
 		onRetry?: () => void;
 		class?: string;
-		children: Snippet;
+		/** The reply as Markdown, rendered safely with `Markdown` when there are no children. Also the default `copyText`. */
+		text?: string;
+		children?: Snippet;
 	}
 
 	const COPY_FEEDBACK_MS = 1600;
 
 	let {
 		status = 'complete',
-		copyText,
+		text,
+		copyText: copyTextProp,
 		sources = [],
 		showActions = true,
 		onRetry,
@@ -30,6 +34,7 @@
 		...rest
 	}: Props = $props();
 
+	let copyText = $derived(copyTextProp ?? text);
 	let copied = $state(false);
 	let feedback = $state<'up' | 'down' | null>(null);
 
@@ -48,7 +53,7 @@
 
 <div {...rest} data-state={status} aria-busy={status === 'streaming'} class={cn('w-full', className)}>
 	<div aria-live="polite" class="space-y-2.5 text-sm leading-6 text-fg-main">
-		{@render children()}
+		{#if children}{@render children()}{:else if text !== undefined}<Markdown {text} streaming={status === 'streaming'} />{/if}
 	</div>
 
 	{#if showActions && status !== 'streaming'}

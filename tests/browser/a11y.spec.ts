@@ -34,7 +34,7 @@ function loadBaseline(): Baseline {
  * timing. They are checked for regressions only (the baseline holds the union of what has been seen),
  * and updating the baseline adds to it rather than replacing it.
  */
-const VOLATILE = new Set(['chat-workbench']);
+const VOLATILE = new Set(['chat-workbench-demo']);
 
 const baseline = loadBaseline();
 const observed: Baseline = {};

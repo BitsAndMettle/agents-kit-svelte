@@ -100,6 +100,7 @@
 		ImageGeneration,
 		InsightCards,
 		IntelligentUIRenderer,
+		Markdown,
 		Message,
 		MessageBubble,
 		MessageScroller,
@@ -176,6 +177,10 @@
 		SkillInvocationStep,
 		SupportedAgentId,
 		SupportedAgentOption,
+		ChatWorkbenchMessage,
+		PromptContextOption,
+		PromptInputEffort,
+		PromptInputOption,
 		ContextSourceItem,
 		TodoItem,
 		ToolApprovalParam
@@ -476,6 +481,46 @@
 		{ id: 'codex', label: 'Codex CLI', version: '0.29.0', signedIn: true },
 		{ id: 'gemini', label: 'Gemini CLI', version: '2.4.1', signedIn: false },
 	];
+
+	const sampleContextOptions: PromptContextOption[] = [
+		{ label: 'Attach callback/+server.ts', attachment: { id: 'file', label: 'apps/web/src/routes/auth/callback/+server.ts', kind: 'file' } },
+		{ label: 'Include boundary gate check', attachment: { id: 'gate', label: 'check-boundaries', kind: 'gate' } }
+	];
+	const sampleModels: PromptInputOption[] = [
+		{ id: 'sonnet', label: 'Sonnet', detail: 'Fast and capable' },
+		{ id: 'opus', label: 'Opus', detail: 'Deepest reasoning' },
+		{ id: 'haiku', label: 'Haiku' }
+	];
+	const sampleEfforts: PromptInputEffort[] = [
+		{ id: 'low', label: 'Low' },
+		{ id: 'medium', label: 'Medium' },
+		{ id: 'high', label: 'High' },
+		{ id: 'max', label: 'Max' }
+	];
+	let sampleModel = $state('sonnet');
+	let sampleEffort = $state('medium');
+
+	const MARKDOWN_SAMPLE = [
+		'Two cards are **blocked**, both waiting on _review_:',
+		'',
+		'1. Card 1210 · needs `check-boundaries`',
+		'2. Card 1218 · needs a redirect policy',
+		'',
+		'```bash',
+		'trailside cards --blocked',
+		'```',
+		'',
+		'Details are on the [Board](https://bitsandmettle.github.io/agents-kit-svelte/). Raw HTML such as <b>this</b> stays text.'
+	].join('\n');
+	let workbenchMessages = $state<ChatWorkbenchMessage[]>([
+		{ id: 'w1', role: 'user', text: 'What is blocked right now?' },
+		{
+			id: 'w2',
+			role: 'assistant',
+			parts: [{ type: 'tool', tool: 'list_cards', summary: 'Done', status: 'success' }],
+			text: MARKDOWN_SAMPLE
+		}
+	]);
 
 	const sampleCitations: CitationItem[] = [
 		{
@@ -1312,10 +1357,33 @@
 									code={data.componentSources?.[item.slug] ?? item.usageSnippet}
 								/>
 							{:else if item.slug === 'chat-workbench'}
+								<div class="h-[560px] overflow-hidden rounded-xl border border-card-border">
+									<ChatWorkbench
+										title="Referee"
+										subtitle="devbox"
+										status={{ text: 'Online', tone: 'success' }}
+										assistantName="Referee"
+										messages={workbenchMessages}
+										layout="panel"
+										conversations={[
+											{ id: 'c1', title: 'What is blocked right now?', date: 'Nov 12', active: true },
+											{ id: 'c2', title: 'Release notes for 0.3', date: 'Nov 11' }
+										]}
+										models={sampleModels}
+										efforts={sampleEfforts}
+										bind:model={sampleModel}
+										bind:effort={sampleEffort}
+										onSend={(text) => workbenchMessages.push({ id: `w${workbenchMessages.length}`, role: 'user', text })}
+									/>
+								</div>
+							{:else if item.slug === 'chat-workbench-demo'}
 								<ChatWorkbench
+									demo
 									embedded={true}
 									class="rounded-xl border border-card-border"
 								/>
+							{:else if item.slug === 'markdown'}
+								<Message role="assistant" author="Referee"><Markdown text={MARKDOWN_SAMPLE} /></Message>
 							{:else if item.slug === 'agent-activity'}
 								{@const activityItems = liveActivity()}
 								<AgentActivity
@@ -1399,7 +1467,25 @@
 									/>
 								</div>
 							{:else if item.slug === 'prompt-input'}
-								<PromptInput agents={sampleAgents} selectedAgentId="claude-code" />
+								<div class="space-y-4">
+									<PromptInput
+										agents={sampleAgents}
+										selectedAgentId="claude-code"
+										activeSkill="Backend v2"
+										attachments={[{ id: 'worktree', label: 'trailside/1210-auth-redirect', kind: 'worktree' }]}
+										contextOptions={sampleContextOptions}
+									/>
+									<PromptInput
+										placeholder="Message the Referee"
+										pickerLabel="Model"
+										agents={sampleModels}
+										selectedAgentId={sampleModel}
+										onAgentChange={(id) => (sampleModel = id)}
+										efforts={sampleEfforts}
+										selectedEffort={sampleEffort}
+										onEffortChange={(id) => (sampleEffort = id)}
+									/>
+								</div>
 							{:else if item.slug === 'message'}
 								<Message
 									role="assistant"
