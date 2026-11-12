@@ -1410,6 +1410,41 @@ test.describe('Integration fixes: a retry holds the failure line', () => {
 	}
 });
 
+test.describe('Integration review fixes: Saving over a short failure', () => {
+	// The failure ("Offline") is narrower than Saving; the second row's Saving and Retry are longer
+	// (translated) and Saving has spaces. Saving sets the held line's width too: on one line, and
+	// never under the loading Retry beside it.
+	for (const width of [360, 1440]) {
+		for (const testId of ['short-fail', 'short-fail-long']) {
+			test(`at ${width}px Saving over a short failure (${testId === 'short-fail' ? 'default' : 'longer'} words) never runs under Retry`, async ({ page }) => {
+				await page.clock.install();
+				await page.setViewportSize({ width, height: 900 });
+				await page.goto('/fixtures/settings-retry/');
+				const control = page.getByTestId(testId);
+				await expect(control).toBeEnabled({ timeout: 45000 });
+				const row = rowOf(control);
+				await pauseClock(page);
+				await control.click();
+				await page.clock.runFor(SETTLE);
+				await expect(row.getByRole('alert')).toHaveText('Offline');
+				const retry = row.getByRole('button', { name: /^(Retry|Erneut versuchen)/ });
+				await retry.click();
+				await expect(retry).toHaveAttribute('aria-busy', 'true');
+				const saving = row.locator('[data-held-failure] [data-row-saving]');
+				await expect(saving).toBeVisible();
+				const [a, b] = [(await saving.boundingBox())!, (await retry.boundingBox())!];
+				const apart = a.x + a.width <= b.x + 0.5 || b.x + b.width <= a.x + 0.5 || a.y + a.height <= b.y + 0.5 || b.y + b.height <= a.y + 0.5;
+				expect(apart, `Saving ${JSON.stringify(a)} and Retry ${JSON.stringify(b)} do not intersect`).toBe(true);
+				expect(a.height, 'Saving on one line').toBeLessThan(21);
+				const rowBox = (await row.boundingBox())!;
+				expect(a.y + a.height, 'Saving inside the row').toBeLessThanOrEqual(rowBox.y + rowBox.height + 0.5);
+				await page.clock.runFor(SETTLE);
+				await expect(row.getByRole('alert')).toHaveText('Offline');
+			});
+		}
+	}
+});
+
 test.describe('Integration fixes: Saving stays inside the row', () => {
 	// Short labels (Play a sound, no state text) and state text (Compact lists); beside the label or wrapped under it.
 	for (const width of [320, 360, 393, 412, 768, 1440]) {
