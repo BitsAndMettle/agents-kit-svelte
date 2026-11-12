@@ -1,20 +1,20 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
 	CONSEQUENCE_TONES,
 	conflictChoices,
 	groupFlatConsequences,
 	headingBelow,
-	keepEditsMadeWhileSaving,
 	isGroupList,
 	isSuperseded,
 	readReassign,
 	reassignDefaults,
 	reassignFieldName,
 	reassignOptions,
-	snapshotControls,
 	summarizeChanges
 } from '../src/lib/settings/save/helpers.ts';
+import { adoptSnapshotAsDefaults, diffForm, snapshotForm } from '../src/lib/settings/shared/diff.ts';
 import { SAMPLE_CONFLICT_FIELDS, SAMPLE_CONSEQUENCES } from '../src/lib/fixtures/settings.ts';
 import type { ReassignSpec, SettingsChange } from '../src/lib/settings/shared/types.ts';
 
@@ -135,29 +135,44 @@ test('groupFlatConsequences puts ok items under "stays" only when there are effe
 	assert.deepEqual(groupFlatConsequences([ok], 'Happens', 'Stays'), [{ label: 'Happens', items: [ok] }]);
 });
 
-/** A tiny stand-in for a form's controls: setting a default moves the value of an untouched one, as in a browser. */
+/**
+ * A tiny stand-in for a form's controls. Setting an option's default selects it, as a browser can,
+ * so adopting defaults can move a value that must then be put back.
+ */
 function fakeForm() {
 	const text = { name: 'teamName', type: 'text', value: 'Saved', defaultValue: 'Saved' };
 	const check = { name: 'digest', type: 'checkbox', checked: true, defaultChecked: true };
-	const options = [
-		{ value: '30', selected: false, defaultSelected: false },
-		{ value: '90', selected: true, defaultSelected: true }
-	];
-	const select = { name: 'retention', type: 'select-one', options };
+	const select = { name: 'retention', type: 'select-one', options: [] as Array<{ value: string; selected: boolean; defaultSelected: boolean }> };
+	const option = (value: string, on: boolean) => {
+		let defaultSelected = on;
+		const o = {
+			value,
+			selected: on,
+			get defaultSelected() {
+				return defaultSelected;
+			},
+			set defaultSelected(next: boolean) {
+				defaultSelected = next;
+				if (next) select.options.forEach((other) => (other.selected = other === o));
+			}
+		};
+		return o;
+	};
+	select.options = [option('30', false), option('90', true)];
+	const choose = (value: string) => select.options.forEach((o) => (o.selected = o.value === value));
 	const hidden = { name: 'revision', type: 'hidden', value: '7', defaultValue: '7' };
-	return { text, check, select, options, form: { elements: [text, check, select, hidden] } };
+	const off = { name: 'note', type: 'text', value: 'x', defaultValue: 'x', disabled: true };
+	const fields = [
+		{ name: 'teamName', label: 'Team name' },
+		{ name: 'digest', label: 'Weekly digest' },
+		{ name: 'retention', label: 'Data retention' }
+	];
+	return { text, check, select, choose, fields, form: { elements: [text, check, select, hidden, off] } };
 }
 
-/** What the form does after a successful save: the current values become the defaults. */
-function adopt(f: ReturnType<typeof fakeForm>): void {
-	f.text.defaultValue = f.text.value;
-	f.check.defaultChecked = f.check.checked;
-	f.options.forEach((o) => (o.defaultSelected = o.selected));
-}
-
-test('snapshotControls records value-holding controls only', () => {
+test('snapshotForm records the value-holding, enabled controls only', () => {
 	const f = fakeForm();
-	const snapshot = snapshotControls(f.form);
+	const snapshot = snapshotForm(f.form);
 	assert.deepEqual(
 		snapshot.map((s) => s.control.name),
 		['teamName', 'digest', 'retention']
@@ -167,39 +182,53 @@ test('snapshotControls records value-holding controls only', () => {
 	assert.deepEqual(snapshot[2].selected, [false, true]);
 });
 
-test('keepEditsMadeWhileSaving gives edits made in flight their submitted value as the default', () => {
+test('adoptSnapshotAsDefaults saves what was submitted and keeps edits made while it was in flight', () => {
 	const f = fakeForm();
 	f.text.value = 'First';
-	const snapshot = snapshotControls(f.form);
+	const snapshot = snapshotForm(f.form);
 	// While the save is in flight the person edits two fields.
-	f.text.value = 'Second';
-	f.options[0].selected = true;
-	f.options[1].selected = false;
-	adopt(f);
-	const edited = keepEditsMadeWhileSaving(snapshot);
-	assert.deepEqual(
-		edited.map((c) => c.name),
-		['teamName', 'retention']
-	);
-	// The server got "First" and 90 days: those are the saved values now; the new edits are kept.
+	f.check.checked = false;
+	f.choose('30');
+	adoptSnapshotAsDefaults(snapshot);
+	// The server got "First", on and 90 days: those are the saved values now; the new edits are kept.
 	assert.equal(f.text.defaultValue, 'First');
-	assert.equal(f.text.value, 'Second');
+	assert.equal(f.text.value, 'First');
+	assert.equal(f.check.defaultChecked, true);
+	assert.equal(f.check.checked, false);
 	assert.deepEqual(
-		f.options.map((o) => [o.defaultSelected, o.selected]),
+		f.select.options.map((o) => [o.defaultSelected, o.selected]),
 		[
 			[false, true],
 			[true, false]
 		]
 	);
-	// Untouched controls keep what the save adopted.
-	assert.equal(f.check.defaultChecked, true);
+	assert.deepEqual(
+		diffForm(f.form, f.fields).map((c) => `${c.label}: ${c.from} → ${c.to}`),
+		['Weekly digest: On → Off', 'Data retention: 90 → 30']
+	);
 });
 
-test('keepEditsMadeWhileSaving changes nothing when nothing was edited in flight', () => {
+test('adoptSnapshotAsDefaults leaves the form clean when nothing was edited in flight', () => {
 	const f = fakeForm();
 	f.text.value = 'First';
-	const snapshot = snapshotControls(f.form);
-	adopt(f);
-	assert.deepEqual(keepEditsMadeWhileSaving(snapshot), []);
+	f.choose('30');
+	const snapshot = snapshotForm(f.form);
+	adoptSnapshotAsDefaults(snapshot);
 	assert.equal(f.text.defaultValue, 'First');
+	assert.deepEqual(
+		f.select.options.map((o) => [o.defaultSelected, o.selected]),
+		[
+			[true, true],
+			[false, false]
+		]
+	);
+	assert.deepEqual(diffForm(f.form, f.fields), []);
+});
+
+test('ConsequenceDialog spreads rest on its own form only, never on the draft-mode fieldset', () => {
+	const source = readFileSync(new URL('../src/lib/settings/save/ConsequenceDialog.svelte', import.meta.url), 'utf8');
+	const spreads = source.split('\n').filter((line) => /\{\.\.\.rest\b/.test(line));
+	assert.equal(spreads.length, 1);
+	assert.match(spreads[0], /^\s*<form \{\.\.\.rest\}/);
+	assert.doesNotMatch(source, /<fieldset[^>]*\.\.\.rest/);
 });

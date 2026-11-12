@@ -5,6 +5,8 @@
 	let failNext = $state(false);
 	let status = $state('');
 	let understood = $state(false);
+	let removed = $state(false);
+	let statusLine = $state<HTMLElement | null>(null);
 
 	/** Pretends to delete on a server: settles after a short wait, or fails when asked to. */
 	function deleteRun(): Promise<void> {
@@ -53,8 +55,17 @@
 		tone="danger"
 		confirmDisabled={!understood}
 		confirmDescribedBy={understood ? undefined : 'alert-dialog-demo-ack'}
-		onOpenChange={(open) => open && (understood = false)}
-		onConfirm={() => (status = '3 members removed')}
+		narrow="sheet"
+		returnFocus={() => (removed ? statusLine : null)}
+		onOpenChange={(open) => {
+			if (!open) return;
+			understood = false;
+			removed = false;
+		}}
+		onConfirm={() => {
+			status = '3 members removed';
+			removed = true;
+		}}
 	>
 		{#snippet trigger(t)}
 			<button {...t} class={buttonClass('secondary', 'md')}>Remove 3 members</button>
@@ -70,5 +81,6 @@
 		<input type="checkbox" bind:checked={failNext} class="size-4" />
 		Make the next delete fail
 	</label>
-	<p class="text-xs text-fg-light" aria-live="polite">{status}</p>
+	<!-- After a removal, focus lands here (the removed rows would be gone in a real list). -->
+	<p bind:this={statusLine} tabindex="-1" class="text-xs text-fg-light focus:outline-none" aria-live="polite" data-testid="alert-dialog-demo-status">{status}</p>
 </div>

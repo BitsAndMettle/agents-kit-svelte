@@ -110,6 +110,73 @@ test.describe('SettingsForm', () => {
 		await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toBeVisible();
 	});
 
+	test('the submitted values become the saved ones: a switch and a select changed in flight stay unsaved, and Discard restores the save', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		const digest = section.getByRole('switch', { name: 'Weekly digest' });
+		const retention = section.getByRole('combobox', { name: 'Data retention' });
+		const bar = section.locator('[data-layout="sticky"]');
+		// Counts input events on the form, to show nothing replays an edit.
+		await section.evaluate((el) => {
+			const log: string[] = [];
+			(window as unknown as { inputs: string[] }).inputs = log;
+			el.querySelector('form')?.addEventListener('input', (e) => log.push((e.target as HTMLInputElement).name));
+		});
+		await team.fill('First');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Save', exact: true }).click();
+		await digest.click();
+		await retention.selectOption('30');
+		const before = await page.evaluate(() => (window as unknown as { inputs: string[] }).inputs.length);
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 8: Team name → First');
+		await expect(bar).toContainText('2 unsaved changes');
+		await expect(section.getByText('Unsaved · was On')).toBeVisible();
+		await expect(section.getByText('Unsaved · was 90 days')).toBeVisible();
+		await expect(section.getByText('Unsaved · was Northwind Studio')).toHaveCount(0);
+		expect(await page.evaluate(() => (window as unknown as { inputs: string[] }).inputs.length)).toBe(before);
+		// Discard re-reads the form on the next task.
+		await page.clock.resume();
+		await bar.getByRole('button', { name: 'Discard' }).click();
+		await expect(team).toHaveValue('First');
+		await expect(digest).toBeChecked();
+		await expect(retention).toHaveValue('90');
+		await expect(bar).not.toContainText('unsaved change');
+	});
+
+	test('typing in a ConsequenceDialog inside it is not an edit: Save still returns focus to the last edited field', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await team.fill('Edited7');
+		await section.getByRole('button', { name: 'Clear…' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Clear all activity?' });
+		await dialog.getByRole('textbox', { name: 'Type “clear activity” to confirm' }).fill('abc');
+		await press(page, 'Escape');
+		await expect(dialog).toBeHidden();
+		await expect(section.locator('[data-layout="sticky"]')).toContainText('1 unsaved change');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Save', exact: true }).focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(800);
+		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 8: Team name → Edited7');
+		await expect(team).toBeFocused();
+	});
+
+	test('after a save, typing in a ConsequenceDialog inside it keeps "Changes saved."', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		await section.getByRole('textbox', { name: 'Team name' }).fill('Northwind Design');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(SETTLE);
+		const saved = section.getByRole('status').filter({ hasText: 'Changes saved.' });
+		await expect(saved).toHaveCount(1);
+		await page.clock.resume();
+		await section.getByRole('button', { name: 'Clear…' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Clear all activity?' });
+		await dialog.getByRole('textbox', { name: 'Type “clear activity” to confirm' }).pressSequentially('c');
+		await expect(saved).toHaveCount(1);
+	});
+
 	test('a field error marks and focuses the field; editing it clears the error', async ({ page }) => {
 		const section = await openOnClock(page, 'settings-form');
 		const team = section.getByRole('textbox', { name: 'Team name' });
@@ -343,6 +410,22 @@ test.describe('SaveBar', () => {
 });
 
 test.describe('ChangeNotice', () => {
+	test('at 320px every density option fits inside its section and can be chosen', async ({ page }) => {
+		const section = await openSection(page, 'change-notice');
+		await page.setViewportSize({ width: 320, height: 800 });
+		await section.scrollIntoViewIfNeeded();
+		const card = section.locator('section[aria-labelledby="cnd-heading"]');
+		const density = section.getByRole('radiogroup', { name: 'Density' });
+		const bounds = await card.boundingBox();
+		for (const name of ['Comfortable', 'Compact', 'Spacious']) {
+			const option = density.locator('label', { hasText: name });
+			const box = await option.boundingBox();
+			expect(box && bounds && box.x >= bounds.x && box.x + box.width <= bounds.x + bounds.width, `${name} is clipped`).toBe(true);
+		}
+		await density.locator('label', { hasText: 'Spacious' }).click();
+		await expect(density.getByRole('radio', { name: 'Spacious' })).toBeChecked();
+	});
+
 	test('a newer change takes Undo away from the older notice, with the reason; Undo reverses the newest', async ({ page }) => {
 		const section = await openOnClock(page, 'change-notice');
 		const density = section.getByRole('radiogroup', { name: 'Density' });
@@ -726,5 +809,90 @@ test.describe('AlertDialog route and confirm props', () => {
 		await confirm.click();
 		await expect(dialog).toBeHidden();
 		await expect(section.getByText('3 members removed')).toBeVisible();
+	});
+
+	test('returnFocus sends focus to the status after a removal, and back to the trigger after Cancel', async ({ page }) => {
+		const section = await openSection(page, 'alert-dialog');
+		const trigger = section.getByRole('button', { name: 'Remove 3 members' });
+		const dialog = page.getByRole('alertdialog', { name: 'Remove 3 members?' });
+		await trigger.click();
+		await dialog.getByRole('button', { name: 'Cancel' }).click();
+		await expect(dialog).toBeHidden();
+		await expect(trigger).toBeFocused();
+
+		await trigger.click();
+		await dialog.getByRole('checkbox', { name: 'They lose access at once' }).check();
+		await dialog.getByRole('button', { name: 'Remove members' }).click();
+		await expect(dialog).toBeHidden();
+		const status = section.getByTestId('alert-dialog-demo-status');
+		await expect(status).toHaveText('3 members removed');
+		await expect(status).toBeFocused();
+	});
+
+	test('narrow="sheet" docks it to the bottom edge on a phone', async ({ page }) => {
+		const section = await openSection(page, 'alert-dialog');
+		await page.setViewportSize({ width: 375, height: 800 });
+		await section.getByRole('button', { name: 'Remove 3 members' }).click();
+		const dialog = page.getByRole('alertdialog', { name: 'Remove 3 members?' });
+		await expect(dialog).toBeVisible();
+		await expect.poll(async () => {
+			const box = await dialog.boundingBox();
+			return box ? [Math.round(box.x), Math.round(box.width), Math.round(box.y + box.height)] : [];
+		}).toEqual([0, 375, 800]);
+		// Without `narrow` it stays a centred card.
+		await press(page, 'Escape');
+		await section.getByRole('button', { name: 'Sign out' }).click();
+		const card = page.getByRole('alertdialog', { name: 'Sign out of this computer?' });
+		await expect(card).toBeVisible();
+		await expect.poll(async () => Math.round((await card.boundingBox())?.width ?? 0)).toBeLessThan(375);
+	});
+});
+
+test.describe('Sheet route props', () => {
+	test('a link opens it; Escape and a backdrop press follow closeHref, and returnFocus puts focus back on the link', async ({ page }) => {
+		const section = await openSection(page, 'sheet');
+		const link = section.getByRole('link', { name: 'Filters as a link' });
+		const sheet = page.getByRole('dialog', { name: 'Filter runs' });
+		await link.click();
+		await expect(page).toHaveURL(/\?sheet=filters/);
+		await expect(sheet).toBeVisible();
+		expect(await sheet.evaluate((el) => el.matches(':modal'))).toBe(true);
+		await press(page, 'Escape');
+		await expect(page).not.toHaveURL(/sheet=/);
+		await expect(sheet).toBeHidden();
+		await expect(link).toBeFocused();
+
+		await link.click();
+		await expect(sheet).toBeVisible();
+		await page.mouse.click(40, 450);
+		await expect(page).not.toHaveURL(/sheet=/);
+		await expect(sheet).toBeHidden();
+		await expect(link).toBeFocused();
+	});
+
+	test('loading the URL opens it as a real modal after hydration; its close button is a link that closes it', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await page.goto('/?sheet=filters');
+		await expect(page.getByRole('button', { name: 'Toggle global color theme' })).toBeEnabled({ timeout: 45000 });
+		const sheet = page.getByRole('dialog', { name: 'Filter runs' });
+		await expect(sheet).toBeVisible();
+		await expect.poll(() => sheet.evaluate((el) => el.matches(':modal'))).toBe(true);
+		const close = sheet.getByRole('link', { name: 'Close' });
+		await expect(close).toHaveAttribute('href', './');
+		await close.click();
+		await expect(page).not.toHaveURL(/sheet=/);
+		await expect(sheet).toBeHidden();
+		await expect(page.locator('#sheet').getByRole('link', { name: 'Filters as a link' })).toBeFocused();
+	});
+
+	test('without JavaScript ssrOpen renders the route open, with a close link', async ({ browser }) => {
+		const { page, section, close } = await openWithoutJs(browser, 'sheet');
+		const sheet = section.locator('dialog[data-testid="sheet-route"]');
+		await expect(sheet).toHaveAttribute('open');
+		await expect(sheet).toHaveAccessibleName('Filter runs');
+		await expect(sheet).toBeVisible();
+		await expect(sheet.getByRole('link', { name: 'Close' })).toHaveAttribute('href', './');
+		expect(page.url()).not.toContain('sheet=');
+		await close();
 	});
 });

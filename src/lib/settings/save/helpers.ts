@@ -2,7 +2,6 @@
  * Pure helpers of the save group: change summaries, undo ownership, conflict choices,
  * consequence groups and reassignment fields. A leaf (type-only imports), so node tests load it.
  */
-import type { ControlLike, FormLike } from '../shared/diff';
 import type { ConflictField, ConsequenceGroup, ConsequenceItem, ReassignOption, ReassignSpec, SettingsChange } from '../shared/types';
 
 /** Which side of an edit conflict to keep for one field. */
@@ -116,69 +115,4 @@ export function readReassign(data: { get(name: string): unknown }, spec: Pick<Re
 		out[dependent.id] = typeof value === 'string' ? value : '';
 	}
 	return out;
-}
-
-/** Control types that hold no setting value. */
-const NOT_VALUES = new Set(['submit', 'button', 'reset', 'image', 'file', 'hidden', 'fieldset', 'output', 'object']);
-
-/** One form control's value at the moment a save was submitted. */
-export interface SubmittedControl {
-	control: ControlLike;
-	checked?: boolean;
-	selected?: boolean[];
-	value?: string;
-}
-
-/** Records every value-holding control's current value (call it when a save is submitted). */
-export function snapshotControls(form: FormLike): SubmittedControl[] {
-	const out: SubmittedControl[] = [];
-	for (let i = 0; i < form.elements.length; i++) {
-		const control = form.elements[i] as Partial<ControlLike> | null;
-		if (!control || typeof control.name !== 'string' || !control.name || typeof control.type !== 'string' || NOT_VALUES.has(control.type)) continue;
-		out.push(readControl(control as ControlLike));
-	}
-	return out;
-}
-
-function readControl(control: ControlLike): SubmittedControl {
-	if (control.type === 'checkbox' || control.type === 'radio') return { control, checked: Boolean(control.checked) };
-	if (control.type.startsWith('select')) return { control, selected: Array.from(control.options ?? [], (o) => o.selected) };
-	return { control, value: control.value ?? '' };
-}
-
-function differs(a: SubmittedControl, b: SubmittedControl): boolean {
-	if (a.selected || b.selected) return (a.selected ?? []).some((s, i) => s !== b.selected?.[i]);
-	return a.checked !== b.checked || a.value !== b.value;
-}
-
-function restore(state: SubmittedControl): void {
-	const { control } = state;
-	if (state.checked !== undefined) control.checked = state.checked;
-	else if (state.selected) Array.from(control.options ?? []).forEach((o, i) => (o.selected = state.selected?.[i] ?? false));
-	else if (state.value !== undefined && control.value !== state.value) control.value = state.value;
-}
-
-/**
- * After a save succeeded and the form made its current values the new defaults: every control
- * edited while the save was in flight gets the submitted value back as its default, so that edit
- * still counts as unsaved. Current values are kept (setting a default can move an untouched
- * control's value, so each one is put back).
- *
- * @param submitted - `snapshotControls` taken when the save was submitted.
- * @returns The controls that still have an unsaved edit.
- */
-export function keepEditsMadeWhileSaving(submitted: readonly SubmittedControl[]): ControlLike[] {
-	const current = submitted.map((s) => readControl(s.control));
-	const edited: ControlLike[] = [];
-	submitted.forEach((was, i) => {
-		if (!differs(was, current[i])) return;
-		const { control } = was;
-		if (was.checked !== undefined) control.defaultChecked = was.checked;
-		else if (was.selected) Array.from(control.options ?? []).forEach((o, j) => (o.defaultSelected = was.selected?.[j] ?? false));
-		else control.defaultValue = was.value ?? '';
-		edited.push(control);
-	});
-	// Radios share a group: put every control back, not only the edited ones.
-	if (edited.length > 0) current.forEach((state) => (differs(state, readControl(state.control)) ? restore(state) : undefined));
-	return edited;
 }

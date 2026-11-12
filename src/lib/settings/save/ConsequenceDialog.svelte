@@ -7,9 +7,11 @@
 	JavaScript). One danger submit, a Cancel link, and a footnote that says whether it can be
 	undone. It becomes a bottom sheet on a phone. Your server must check the phrase again.
 
-	Inside a SettingsForm it never nests a form: with JavaScript its fields belong to a form of
-	its own outside the page form; without it, Confirm posts the surrounding form to `action`
-	(the `intent` tells the posts apart) and its fields are switched off while it is closed.
+	Other attributes (and `enhance`) go on its `<form>`. Inside a SettingsForm it never nests a
+	form: with JavaScript its fields belong to a form of its own outside the page form; without
+	it, Confirm posts the surrounding form to `action` (the `intent` tells the posts apart) and
+	its fields are switched off while it is closed. There, form attributes and `enhance` belong on
+	the SettingsForm: other attributes are not applied (development warns once).
 -->
 <script lang="ts" module>
 	/** Every word ConsequenceDialog shows or announces. */
@@ -46,7 +48,7 @@
 <script lang="ts">
 	import { untrack, type Snippet } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
-	import type { HTMLAttributes, HTMLFormAttributes } from 'svelte/elements';
+	import type { HTMLFormAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
 	import type { Part, ChangeReason } from '../../headless/runtime/parts';
 	import { Alert } from '../../primitives/display';
@@ -123,7 +125,7 @@
 		/** The `<form>` element (inside a SettingsForm, its own form outside the page form). Bindable. */
 		ref?: HTMLFormElement | null;
 		labels?: Partial<ConsequenceDialogLabels>;
-		/** Classes for the dialog. Other attributes go on the form (inside a SettingsForm, on the fieldset that stands in for it). */
+		/** Classes for the dialog. Other attributes go on its `<form>`; inside a SettingsForm there is none, so put them (and `enhance`) on the SettingsForm. */
 		class?: string;
 	}
 
@@ -177,6 +179,18 @@
 
 	/** Inside a SettingsForm: no `<form>` of its own in the markup (forms never nest). */
 	const inDraft = getSettingsDraft() !== undefined;
+
+	// Vite (and SvelteKit) set this in development only; elsewhere it is undefined.
+	if (import.meta.env?.DEV && inDraft) {
+		let warned = false;
+		$effect(() => {
+			// Attachments (`{@attach enhance}`) arrive under symbol keys.
+			const names = Reflect.ownKeys(rest).map((key) => (typeof key === 'symbol' ? 'an attachment' : key));
+			if (warned || names.length === 0) return;
+			warned = true;
+			console.warn(`ConsequenceDialog: inside a SettingsForm it has no <form> of its own, so ${names.join(', ')} ${names.length === 1 ? 'is' : 'are'} not applied. Put form attributes and enhance on the SettingsForm.`);
+		});
+	}
 
 	const id = $props.id();
 	const formId = `${id}-form`;
@@ -355,8 +369,8 @@
 	class={cn(busy && 'cursor-progress', className)}
 >
 	{#if inDraft}
-		<!-- Forms never nest: a fieldset (off while closed) whose controls join the own form once it exists. -->
-		<fieldset {...rest as HTMLAttributes<HTMLElement>} bind:this={body} disabled={off} {@attach joinOwnForm} oninput={submit.oninput} class={cn(SETTINGS_CONTAINER, 'm-0 grid min-w-0 gap-4 border-0 p-0')}>
+		<!-- Forms never nest: a fieldset (off while closed) whose controls join the own form once it exists. Attributes meant for a form are not applied here. -->
+		<fieldset bind:this={body} disabled={off} {@attach joinOwnForm} oninput={submit.oninput} class={cn(SETTINGS_CONTAINER, 'm-0 grid min-w-0 gap-4 border-0 p-0')}>
 			{@render fields()}
 		</fieldset>
 	{:else}
