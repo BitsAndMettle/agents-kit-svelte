@@ -34,8 +34,15 @@ before(async () => {
 
 after(() => vite?.close());
 
-const html = (component: Component<Record<string, unknown>>, props: Record<string, unknown> = {}) =>
-	render(component, { props }).body.replace(/<!--[\s\S]*?-->/g, '');
+/** Rendered markup without Svelte's hydration comments, removed until none are left. */
+function html(component: Component<Record<string, unknown>>, props: Record<string, unknown> = {}): string {
+	let out = render(component, { props }).body;
+	for (let previous = ''; previous !== out; ) {
+		previous = out;
+		out = out.replace(/<!--[\s\S]*?-->/g, '');
+	}
+	return out;
+}
 
 const MESSAGES: ChatWorkbenchMessage[] = [
 	{ id: 'm1', role: 'user', text: 'What is blocked?' },
