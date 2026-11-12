@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { ArrowRight } from '@lucide/svelte';
-	import { SaveBar, SettingsForm } from '$lib/settings/save';
+	import { ConsequenceDialog, SaveBar, SettingsForm } from '$lib/settings/save';
 	import { RECIPES, SETTINGS_CONTAINER, type SettingsDraft, type SettingsResult, type SettingsSubmitContext, type SettingsValues } from '$lib/settings/shared';
 	import { Input, NativeSelect, Switch } from '$lib/primitives/form';
 	import { Button } from '$lib/primitives/actions';
 	import { cn } from '$lib/ui/cn';
+	import { buttonClass } from '$lib/ui/styles';
 
 	const RETENTION = [
 		{ value: '30', label: '30 days' },
@@ -38,6 +39,12 @@
 		}
 		revision += 1;
 		log = `Saved revision ${revision}: ${context.changes.map((c) => `${c.label} → ${c.to}`).join(', ')}`;
+	}
+
+	/** A danger action inside the staged form: it runs on its own, never with Save. */
+	async function clearActivity(): Promise<SettingsResult | void> {
+		await wait(600);
+		log = 'Activity cleared';
 	}
 
 	function goTo(place: string): void {
@@ -108,6 +115,40 @@
 							{#if draft.isDirty('digest')}<p class={WAS}>Unsaved · was {draft.previous('digest')}</p>{/if}
 						</div>
 						<Switch id="sfd-digest" name="digest" defaultChecked aria-describedby="sfd-digest-help" />
+					</li>
+				</ul>
+			</section>
+			<section aria-labelledby="sfd-danger" class={cn(RECIPES.section, RECIPES.danger)}>
+				<header class={cn(RECIPES.sectionHeader, 'border-status-danger/20')}>
+					<div class="min-w-0 flex-1">
+						<h3 id="sfd-danger" class="m-0 text-sm font-semibold text-status-danger">Danger zone</h3>
+						<p class={HELP}>Runs at once, on its own. Save does not include it.</p>
+					</div>
+				</header>
+				<ul role="list" class={RECIPES.list}>
+					<li class={RECIPES.row}>
+						<div class="min-w-0">
+							<p class={cn(LABEL, 'm-0')}>Clear activity</p>
+							<p class={HELP}>Deletes the activity history now, whatever the retention says.</p>
+						</div>
+						<ConsequenceDialog
+							title="Clear all activity?"
+							description="Every member's activity history is deleted now."
+							consequences={[
+								{ tone: 'no', label: 'All activity entries are deleted' },
+								{ tone: 'ok', label: 'Documents and these settings stay' }
+							]}
+							confirmPhrase="clear activity"
+							confirmLabel="Clear activity"
+							reversible={false}
+							action="/settings-demo/activity"
+							intent="clear-activity"
+							onConfirm={clearActivity}
+						>
+							{#snippet trigger(part)}
+								<button {...part} class={buttonClass('danger', 'sm')}>Clear…</button>
+							{/snippet}
+						</ConsequenceDialog>
 					</li>
 				</ul>
 			</section>

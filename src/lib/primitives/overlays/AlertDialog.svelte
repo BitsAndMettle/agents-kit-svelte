@@ -5,13 +5,14 @@
 	`onConfirm` returns a Promise the confirm button shows a loading state and the dialog stays
 	open until it resolves; a rejection keeps it open and shows the error. Route mode as on
 	Dialog: with `closeHref` Cancel is a link and Escape follows it; `ssrOpen` renders it open on
-	the server.
+	the server; `returnFocus` says where focus goes after it closes; `narrow` docks it on a phone.
 -->
 <script lang="ts" module>
 	import type { Snippet } from 'svelte';
 	import type { HTMLDialogAttributes } from 'svelte/elements';
 	import type { ChangeReason, Part } from '../../headless/runtime/parts';
 	import type { UiTone } from '../../ui/styles';
+	import type { DialogNarrow, DialogReturnFocus } from './Dialog.svelte';
 
 	export interface Props extends Omit<HTMLDialogAttributes, 'class' | 'children' | 'open' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
@@ -51,6 +52,10 @@
 		closeHref?: string;
 		/** As on Dialog: server-rendered open when `open` is true, a real modal on mount. */
 		ssrOpen?: boolean;
+		/** As on Dialog: where focus goes after it closes (a route-opened dialog has no opener). */
+		returnFocus?: DialogReturnFocus;
+		/** As on Dialog: on screens narrower than 640px, `sheet` docks it to the bottom edge, `fullscreen` fills the screen. */
+		narrow?: DialogNarrow;
 		/** Blocks the confirm action (it stays focusable and says it is unavailable), e.g. until a box is ticked. */
 		confirmDisabled?: boolean;
 		/** Id(s) of visible text that describes the confirm action, such as why it is unavailable. */
@@ -62,7 +67,7 @@
 <script lang="ts">
 	import { LoaderCircle } from '@lucide/svelte';
 	import { Dialog } from '../../headless/patterns/dialog.svelte';
-	import { followLink, NOT_MODAL, upgradeServerOpen } from './Dialog.svelte';
+	import { followLink, NARROW, NOT_MODAL, upgradeServerOpen } from './Dialog.svelte';
 	import { cn } from '../../ui/cn';
 	import { buttonClass } from '../../ui/styles';
 	import { BACKDROP, FADE_SCALE_MOTION, MODAL_DESCRIPTION, MODAL_SURFACE, MODAL_TITLE } from './overlay';
@@ -86,6 +91,8 @@
 		onOpenChange,
 		closeHref,
 		ssrOpen = false,
+		returnFocus,
+		narrow,
 		confirmDisabled = false,
 		confirmDescribedBy,
 		class: className = '',
@@ -119,7 +126,7 @@
 	/** The `open` attribute of a server-rendered route: written on the server only. */
 	const serverOpen = $derived(typeof document === 'undefined' && ssrOpen && open ? { open: true } : {});
 	const shownState = $derived(ssrOpen && open && !hydrated ? 'open' : dialog.state);
-	const upgrade = upgradeServerOpen(() => undefined);
+	const upgrade = upgradeServerOpen(() => returnFocus);
 
 	// A fresh open starts without the last attempt's error.
 	$effect(() => {
@@ -171,7 +178,7 @@
 	data-state={shownState}
 	aria-labelledby={dialog.content['aria-labelledby'] ?? (ssrOpen ? dialog.title.id : undefined)}
 	aria-busy={pending}
-	class={cn(MODAL_SURFACE, 'm-auto w-[min(26rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] rounded-card', ssrOpen && NOT_MODAL, ssrOpen && '[&:not(:modal)]:h-fit', FADE_SCALE_MOTION, BACKDROP, className)}
+	class={cn(MODAL_SURFACE, 'm-auto w-[min(26rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] rounded-card', narrow && NARROW[narrow], ssrOpen && NOT_MODAL, ssrOpen && narrow !== 'fullscreen' && '[&:not(:modal)]:h-fit', FADE_SCALE_MOTION, BACKDROP, className)}
 >
 	<div class="min-h-0 flex-1 overflow-y-auto px-5 pt-5 pb-4">
 		<h2 {...dialog.title} class={MODAL_TITLE}>{title}</h2>

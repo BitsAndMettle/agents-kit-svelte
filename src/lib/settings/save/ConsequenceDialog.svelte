@@ -6,11 +6,17 @@
 	phrase for unrecoverable loss (native `required` and `pattern`, so the gate works without
 	JavaScript). One danger submit, a Cancel link, and a footnote that says whether it can be
 	undone. It becomes a bottom sheet on a phone. Your server must check the phrase again.
+
+	Inside a SettingsForm it never nests a form: with JavaScript its fields belong to a form of
+	its own outside the page form; without it, Confirm posts the surrounding form to `action`
+	(the `intent` tells the posts apart) and its fields are switched off while it is closed.
 -->
 <script lang="ts" module>
 	/** Every word ConsequenceDialog shows or announces. */
 	export interface ConsequenceDialogLabels {
 		cancel: string;
+		/** Announced while the action runs. */
+		pending: string;
 		/** "Type “Northwind Studio” to confirm". */
 		typeToConfirm: (phrase: string) => string;
 		/** Describes the confirm button until the phrase matches. */
@@ -21,8 +27,10 @@
 		reversible: string;
 		/** Accessible name of one dependent's replacement select. */
 		replacementFor: (label: string) => string;
-		/** Heading of a flat consequence list. */
+		/** Heading of a flat consequence list (its effects). */
 		whatHappens: string;
+		/** Heading of a flat list's `ok` items, when it has effects too. */
+		whatStays: string;
 	}
 
 	/** What `onConfirm` receives. */
@@ -36,8 +44,9 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
-	import type { HTMLFormAttributes } from 'svelte/elements';
+	import { untrack, type Snippet } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
+	import type { HTMLAttributes, HTMLFormAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
 	import type { Part, ChangeReason } from '../../headless/runtime/parts';
 	import { Alert } from '../../primitives/display';
@@ -46,12 +55,13 @@
 	import { FormSubmit } from '../../primitives/form/submit.svelte';
 	import { Dialog } from '../../primitives/overlays';
 	import { matchesPhrase, phrasePattern, type PhraseOptions } from '../shared/confirm';
+	import { getSettingsDraft } from '../shared/context';
 	import { openerFor } from '../shared/focus';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES, SETTINGS_CONTAINER } from '../shared/recipes';
 	import type { ConsequenceGroup, ConsequenceItem, ReassignSpec, SettingsHandler, SettingsIcon, SettingsResult } from '../shared/types';
 	import ConsequenceList from './ConsequenceList.svelte';
-	import { isGroupList, readReassign, reassignDefaults, reassignFieldName, reassignOptions } from './helpers';
+	import { groupFlatConsequences, isGroupList, readReassign, reassignDefaults, reassignFieldName, reassignOptions } from './helpers';
 
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'title' | 'method' | 'onsubmit' | 'hidden'> {
 		/** Names the dialog ("Delete Northwind Studio?"). */
@@ -110,10 +120,10 @@
 		/** Extra fields inside the form (a successor choice, a reason). */
 		children?: Snippet;
 		onOpenChange?: (open: boolean, reason: ChangeReason) => void;
-		/** The `<form>` element. Bindable. */
+		/** The `<form>` element (inside a SettingsForm, its own form outside the page form). Bindable. */
 		ref?: HTMLFormElement | null;
 		labels?: Partial<ConsequenceDialogLabels>;
-		/** Classes for the dialog. Attributes go on the form. */
+		/** Classes for the dialog. Other attributes go on the form (inside a SettingsForm, on the fieldset that stands in for it). */
 		class?: string;
 	}
 
@@ -153,6 +163,7 @@
 
 	const text = $derived<ConsequenceDialogLabels>({
 		cancel: 'Cancel',
+		pending: 'Working…',
 		typeToConfirm: (phrase) => `Type “${phrase}” to confirm`,
 		phraseMismatch: 'Type the text exactly as shown to continue.',
 		failed: 'That did not work. Nothing was changed.',
@@ -160,8 +171,12 @@
 		reversible: 'You can undo this later.',
 		replacementFor: (label) => `New owner for ${label}`,
 		whatHappens: 'What happens',
+		whatStays: 'What stays',
 		...labels
 	});
+
+	/** Inside a SettingsForm: no `<form>` of its own in the markup (forms never nest). */
+	const inDraft = getSettingsDraft() !== undefined;
 
 	const id = $props.id();
 	const formId = `${id}-form`;
@@ -180,11 +195,14 @@
 	// Without JavaScript the native `pattern` gates the post, so the button is never shown as blocked then.
 	const ready = new ReadyGate();
 	const blocked = $derived(ready.current && !matched);
-	const groups = $derived<ConsequenceGroup[] | undefined>(
-		consequences && consequences.length > 0 ? (isGroupList(consequences) ? [...consequences] : undefined) : undefined
-	);
+	const groups = $derived.by<ConsequenceGroup[] | undefined>(() => {
+		if (!consequences || consequences.length === 0) return undefined;
+		if (isGroupList(consequences)) return [...consequences];
+		const split = groupFlatConsequences(consequences as ConsequenceItem[], text.whatHappens, text.whatStays);
+		return split.length > 1 ? split : undefined;
+	});
 	const flatItems = $derived<ConsequenceItem[] | undefined>(
-		consequences && consequences.length > 0 && !isGroupList(consequences) ? (consequences as ConsequenceItem[]) : undefined
+		!groups && consequences && consequences.length > 0 && !isGroupList(consequences) ? (consequences as ConsequenceItem[]) : undefined
 	);
 
 	const submit = new FormSubmit<ConsequenceConfirmContext>({
@@ -214,16 +232,69 @@
 		if (phraseInput && phraseInput.value) typed = phraseInput.value;
 	});
 
-	function handleOpenChange(next: boolean, reason: ChangeReason): void {
-		if (next) {
-			submit.clear();
-			typed = '';
-			reassigned = {};
-		}
-		onOpenChange?.(next, reason);
-	}
+	// Every open starts fresh: no earlier error, phrase or choice. Watches `open` itself, so a
+	// route that opens it again (a controlled `open`) resets it too. An open it starts with keeps
+	// what was typed before hydration.
+	let wasOpen = untrack(() => open);
+	$effect(() => {
+		const now = open;
+		untrack(() => {
+			if (now && !wasOpen) {
+				submit.clear();
+				typed = '';
+				reassigned = {};
+			}
+			wasOpen = now;
+		});
+	});
 
 	const busy = $derived(submit.pending);
+
+	// Inside a SettingsForm, with JavaScript: a form of its own at the end of the page, which the
+	// fields join through their `form` attribute, so FormSubmit and a native post work as usual.
+	let ownForm = $state<HTMLFormElement | null>(null);
+	$effect(() => {
+		if (!inDraft) return;
+		const form = document.createElement('form');
+		form.id = formId;
+		form.method = 'post';
+		form.hidden = true;
+		form.addEventListener('submit', submit.onsubmit);
+		document.body.append(form);
+		ownForm = form;
+		ref = form;
+		return () => {
+			form.removeEventListener('submit', submit.onsubmit);
+			form.remove();
+			ownForm = null;
+			if (ref === form) ref = null;
+		};
+	});
+	$effect(() => {
+		if (!ownForm) return;
+		if (action === undefined) ownForm.removeAttribute('action');
+		else ownForm.setAttribute('action', action);
+	});
+
+	/** Inside a SettingsForm before its own form exists (no JavaScript) its fields are the page form's: off while closed, so they never block or join a save. */
+	const off = $derived(inDraft && !ownForm && !open);
+
+	const CONTROLS = 'input, select, textarea, button, output, fieldset, object';
+	/** Points every control inside (children included, and ones added later) at the own form. */
+	const joinOwnForm: Attachment<HTMLElement> = (node) => {
+		const join = () => node.querySelectorAll(CONTROLS).forEach((el) => el.hasAttribute('form') || el.setAttribute('form', formId));
+		join();
+		const observer = new MutationObserver(join);
+		observer.observe(node, { childList: true, subtree: true });
+		return () => observer.disconnect();
+	};
+
+	// The own form is outside the dialog, so FormSubmit cannot find the error to focus: do it here.
+	let body = $state<HTMLElement | null>(null);
+	$effect(() => {
+		if (!inDraft || !submit.error || !body) return;
+		untrack(() => body?.querySelector<HTMLElement>('[data-form-error]')?.focus());
+	});
 	const footnoteText = $derived(typeof footnote === 'string' ? footnote : reversible === undefined ? undefined : reversible ? text.reversible : text.irreversible);
 	const FILLED: Record<'danger' | 'accent', string> = {
 		danger: 'border-transparent bg-status-danger text-fg-inverse shadow-none hover:bg-status-danger/90',
@@ -243,6 +314,7 @@
 			{#if typeof footnote === 'function'}{@render footnote()}{:else}{footnoteText}{/if}
 		</p>
 	{/if}
+	<span role="status" class="sr-only">{busy ? text.pending : ''}</span>
 	{#if closeHref !== undefined}
 		<Button href={closeHref} variant="ghost" bind:ref={cancelRef} disabled={busy} onclick={() => (open = false)}>{text.cancel}</Button>
 	{:else}
@@ -250,7 +322,9 @@
 	{/if}
 	<Button
 		type="submit"
-		form={formId}
+		form={inDraft && !ownForm ? undefined : formId}
+		formaction={inDraft && !ownForm ? action : undefined}
+		formmethod={inDraft && !ownForm ? 'post' : undefined}
 		variant={tone === 'danger' ? 'danger' : 'accent'}
 		loading={busy}
 		softDisabled={blocked}
@@ -275,12 +349,24 @@
 	returnFocus={openerKey ? () => openerFor(openerKey) : undefined}
 	initialFocus={() => phraseInput ?? cancelRef}
 	dismiss={{ escape: () => !busy, outside: () => !busy }}
-	onOpenChange={handleOpenChange}
+	{onOpenChange}
 	footer={actions}
 	aria-busy={busy || undefined}
 	class={cn(busy && 'cursor-progress', className)}
 >
-	<form {...rest} bind:this={ref} id={formId} method="post" {action} onsubmit={submit.onsubmit} oninput={submit.oninput} class={cn(SETTINGS_CONTAINER, 'grid min-w-0 gap-4')}>
+	{#if inDraft}
+		<!-- Forms never nest: a fieldset (off while closed) whose controls join the own form once it exists. -->
+		<fieldset {...rest as HTMLAttributes<HTMLElement>} bind:this={body} disabled={off} {@attach joinOwnForm} oninput={submit.oninput} class={cn(SETTINGS_CONTAINER, 'm-0 grid min-w-0 gap-4 border-0 p-0')}>
+			{@render fields()}
+		</fieldset>
+	{:else}
+		<form {...rest} bind:this={ref} id={formId} method="post" {action} onsubmit={submit.onsubmit} oninput={submit.oninput} class={cn(SETTINGS_CONTAINER, 'grid min-w-0 gap-4')}>
+			{@render fields()}
+		</form>
+	{/if}
+</Dialog>
+
+{#snippet fields()}
 		{#if intent !== undefined}<input type="hidden" name="intent" value={intent} />{/if}
 		{#each Object.entries(hidden ?? {}) as [name, value] (name)}
 			<input type="hidden" {name} {value} />
@@ -327,6 +413,7 @@
 								name={reassignFieldName(reassign, dependent.id)}
 								aria-label={text.replacementFor(dependent.label)}
 								options={reassignOptions(reassign, dependent.id)}
+								value={reassignValue[dependent.id]}
 								defaultValue={defaults[dependent.id]}
 								onValueChange={(value) => (reassigned = { ...reassigned, [dependent.id]: value })}
 								disabled={busy}
@@ -356,16 +443,16 @@
 					autocomplete="off"
 					spellcheck={false}
 					autocapitalize="off"
-					aria-describedby={mismatchId}
+					aria-describedby={matched ? undefined : mismatchId}
+					value={typed}
 					onValueChange={(value) => (typed = value)}
 					disabled={busy}
 				/>
-				<p id={mismatchId} class={cn('m-0 text-xs text-fg-light', matched && 'sr-only')}>{text.phraseMismatch}</p>
+				<p id={mismatchId} hidden={matched} class="m-0 text-xs text-fg-light">{text.phraseMismatch}</p>
 			</div>
 		{/if}
 
 		{#if submit.error}
 			<Alert tone="danger" live data-form-error tabindex={-1} description={submit.error} class="focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/40" />
 		{/if}
-	</form>
-</Dialog>
+{/snippet}

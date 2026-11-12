@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { CloudOff, Trash2, UserMinus } from '@lucide/svelte';
 	import { ConsequenceDialog, type ConsequenceConfirmContext } from '$lib/settings/save';
@@ -186,7 +187,12 @@
 			reversible={false}
 			action="/settings-demo/team"
 			intent="delete"
-			onConfirm={(context) => run(`Team deleted (typed “${context.typed}”)`, context)}
+			onConfirm={async (context) => {
+				const result = await run(`Team deleted (typed “${context.typed}”)`, context);
+				// Route mode: on success the app navigates to closeHref, which closes the dialog.
+				if (!result) void goto('./', { noScroll: true, keepFocus: true });
+				return result;
+			}}
 			data-testid="cdd-route"
 			class="[&:not(:modal)]:static [&:not(:modal)]:z-auto [&:not(:modal)]:w-full [&:not(:modal)]:shadow-none [&:not(:modal)]:hidden! noscript:[&:not(:modal)]:flex!"
 		>

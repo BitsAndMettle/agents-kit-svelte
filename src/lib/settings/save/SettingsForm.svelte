@@ -34,7 +34,7 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import type { HTMLFormAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
 	import { Alert } from '../../primitives/display';
@@ -44,6 +44,7 @@
 	import { setSettingsDraft } from '../shared/context';
 	import type { SettingsChange, SettingsFieldDescriptor, SettingsResult } from '../shared/types';
 	import { SaveBarPresence, setSaveBarPresence } from './presence.svelte';
+	import { keepEditsMadeWhileSaving, snapshotControls, type SubmittedControl } from './helpers';
 
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'onsubmit' | 'method' | 'hidden'> {
 		/** Where a native post goes (a server form action). */
@@ -120,11 +121,23 @@
 		...labels
 	});
 
+	/** The form's values when the save in flight was submitted. */
+	let submitted = $state.raw<SubmittedControl[] | null>(null);
+
+	const submit = $derived<SettingsSubmitHandler | undefined>(
+		onSubmit &&
+			((values, context) => {
+				const form = context.event.currentTarget;
+				if (form instanceof HTMLFormElement) submitted = snapshotControls(form);
+				return onSubmit(values, context);
+			})
+	);
+
 	const draft = new SettingsDraft({
 		fields: () => fields,
 		changes: () => changes,
 		revision: () => revision,
-		submit: () => onSubmit,
+		submit: () => submit,
 		result: () => result,
 		pending: () => pending,
 		onDirtyChange: () => onDirtyChange,
@@ -140,6 +153,25 @@
 	$effect.pre(() => {
 		controller = draft;
 	});
+
+	// A successful save makes the current values the saved ones, including edits made while it was
+	// in flight, which the server never got. Give those back their submitted value as the default,
+	// so they still count as unsaved (and the leave guard still holds them).
+	$effect(() => {
+		if (draft.pending || !submitted) return;
+		const snapshot = submitted;
+		submitted = null;
+		if (untrack(() => draft.status) !== 'saved') return;
+		const edited = keepEditsMadeWhileSaving(snapshot);
+		// The draft re-reads the form on an input event.
+		(edited.at(-1) as unknown as HTMLElement | undefined)?.dispatchEvent(new Event('input', { bubbles: true }));
+	});
+
+	/** After "Save and leave" failed, where focus goes once the dialog closes: the invalid field, else the error. */
+	function failedLeaveTarget(): HTMLElement | null {
+		if (!draft.guard.failed || !ref) return null;
+		return ref.querySelector<HTMLElement>('[aria-invalid="true"]:not([disabled])') ?? ref.querySelector<HTMLElement>('[data-form-error]');
+	}
 
 	let leaving = $state(false);
 
@@ -185,6 +217,7 @@
 		description={text.leaveDescription(draft.dirtyCount)}
 		size="sm"
 		narrow="sheet"
+		returnFocus={failedLeaveTarget}
 	>
 		<ul role="list" aria-label={text.changesList} class="m-0 grid list-none gap-1.5 rounded-control bg-canvas-secondary p-3 text-xs">
 			{#each draft.changes as change (change.name)}

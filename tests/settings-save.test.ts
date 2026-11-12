@@ -3,13 +3,16 @@ import test from 'node:test';
 import {
 	CONSEQUENCE_TONES,
 	conflictChoices,
+	groupFlatConsequences,
 	headingBelow,
+	keepEditsMadeWhileSaving,
 	isGroupList,
 	isSuperseded,
 	readReassign,
 	reassignDefaults,
 	reassignFieldName,
 	reassignOptions,
+	snapshotControls,
 	summarizeChanges
 } from '../src/lib/settings/save/helpers.ts';
 import { SAMPLE_CONFLICT_FIELDS, SAMPLE_CONSEQUENCES } from '../src/lib/fixtures/settings.ts';
@@ -118,4 +121,85 @@ test('readReassign reads each dependent from posted data', () => {
 	const form = new FormData();
 	form.set('owner.weekly', 'ada');
 	assert.deepEqual(readReassign(form, { name: 'owner', dependents: [{ id: 'weekly', label: 'Weekly' }] }), { weekly: 'ada' });
+});
+
+test('groupFlatConsequences puts ok items under "stays" only when there are effects too', () => {
+	const no = { tone: 'no' as const, label: 'Deleted' };
+	const warn = { tone: 'warn' as const, label: 'Invites stop' };
+	const ok = { tone: 'ok' as const, label: 'Invoices stay' };
+	assert.deepEqual(groupFlatConsequences([no, ok, warn], 'Happens', 'Stays'), [
+		{ label: 'Happens', items: [no, warn] },
+		{ label: 'Stays', items: [ok] }
+	]);
+	assert.deepEqual(groupFlatConsequences([no, warn], 'Happens', 'Stays'), [{ label: 'Happens', items: [no, warn] }]);
+	assert.deepEqual(groupFlatConsequences([ok], 'Happens', 'Stays'), [{ label: 'Happens', items: [ok] }]);
+});
+
+/** A tiny stand-in for a form's controls: setting a default moves the value of an untouched one, as in a browser. */
+function fakeForm() {
+	const text = { name: 'teamName', type: 'text', value: 'Saved', defaultValue: 'Saved' };
+	const check = { name: 'digest', type: 'checkbox', checked: true, defaultChecked: true };
+	const options = [
+		{ value: '30', selected: false, defaultSelected: false },
+		{ value: '90', selected: true, defaultSelected: true }
+	];
+	const select = { name: 'retention', type: 'select-one', options };
+	const hidden = { name: 'revision', type: 'hidden', value: '7', defaultValue: '7' };
+	return { text, check, select, options, form: { elements: [text, check, select, hidden] } };
+}
+
+/** What the form does after a successful save: the current values become the defaults. */
+function adopt(f: ReturnType<typeof fakeForm>): void {
+	f.text.defaultValue = f.text.value;
+	f.check.defaultChecked = f.check.checked;
+	f.options.forEach((o) => (o.defaultSelected = o.selected));
+}
+
+test('snapshotControls records value-holding controls only', () => {
+	const f = fakeForm();
+	const snapshot = snapshotControls(f.form);
+	assert.deepEqual(
+		snapshot.map((s) => s.control.name),
+		['teamName', 'digest', 'retention']
+	);
+	assert.equal(snapshot[0].value, 'Saved');
+	assert.equal(snapshot[1].checked, true);
+	assert.deepEqual(snapshot[2].selected, [false, true]);
+});
+
+test('keepEditsMadeWhileSaving gives edits made in flight their submitted value as the default', () => {
+	const f = fakeForm();
+	f.text.value = 'First';
+	const snapshot = snapshotControls(f.form);
+	// While the save is in flight the person edits two fields.
+	f.text.value = 'Second';
+	f.options[0].selected = true;
+	f.options[1].selected = false;
+	adopt(f);
+	const edited = keepEditsMadeWhileSaving(snapshot);
+	assert.deepEqual(
+		edited.map((c) => c.name),
+		['teamName', 'retention']
+	);
+	// The server got "First" and 90 days: those are the saved values now; the new edits are kept.
+	assert.equal(f.text.defaultValue, 'First');
+	assert.equal(f.text.value, 'Second');
+	assert.deepEqual(
+		f.options.map((o) => [o.defaultSelected, o.selected]),
+		[
+			[false, true],
+			[true, false]
+		]
+	);
+	// Untouched controls keep what the save adopted.
+	assert.equal(f.check.defaultChecked, true);
+});
+
+test('keepEditsMadeWhileSaving changes nothing when nothing was edited in flight', () => {
+	const f = fakeForm();
+	f.text.value = 'First';
+	const snapshot = snapshotControls(f.form);
+	adopt(f);
+	assert.deepEqual(keepEditsMadeWhileSaving(snapshot), []);
+	assert.equal(f.text.defaultValue, 'First');
 });

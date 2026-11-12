@@ -68,6 +68,15 @@
 		};
 	}
 
+	/**
+	 * Classes for each `narrow` look, shared with AlertDialog.
+	 * @internal
+	 */
+	export const NARROW: Record<DialogNarrow, string> = {
+		sheet: 'max-sm:mx-0 max-sm:mb-0 max-sm:mt-auto max-sm:h-fit max-sm:max-h-[85dvh] max-sm:w-dvw max-sm:rounded-none max-sm:rounded-t-window max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[env(safe-area-inset-bottom)]',
+		fullscreen: 'max-sm:m-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-dvw max-sm:rounded-none max-sm:border-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)]'
+	};
+
 	export interface Props extends Omit<HTMLDialogAttributes, 'class' | 'children' | 'open' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
 		open?: boolean;
@@ -195,11 +204,6 @@
 	const shownState = $derived(ssrOpen && open && !hydrated ? 'open' : dialog.state);
 	/** Runs before the headless layer attaches (see `upgradeServerOpen`). */
 	const upgrade = upgradeServerOpen(() => returnFocus);
-
-	const NARROW: Record<DialogNarrow, string> = {
-		sheet: 'max-sm:mx-0 max-sm:mb-0 max-sm:mt-auto max-sm:h-fit max-sm:max-h-[85dvh] max-sm:w-dvw max-sm:rounded-none max-sm:rounded-t-window max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[env(safe-area-inset-bottom)]',
-		fullscreen: 'max-sm:m-0 max-sm:h-dvh max-sm:max-h-none max-sm:w-dvw max-sm:rounded-none max-sm:border-0 max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)]'
-	};
 
 	const SIZES: Record<DialogSize, string> = {
 		sm: 'm-auto w-[min(24rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] rounded-card',

@@ -33,6 +33,7 @@
 	import { Alert } from '../../primitives/display';
 	import { Button } from '../../primitives/actions';
 	import { getSettingsDraft } from '../shared/context';
+	import { nextFocusAfterRemoval, restoreFocus } from '../shared/focus';
 	import { actionButtonProps } from '../shared/recipes';
 	import type { SettingsAction, SettingsHandler, SettingsResult } from '../shared/types';
 	import { isSuperseded } from './helpers';
@@ -58,6 +59,11 @@
 		secondary?: SettingsAction;
 		/** Shows a dismiss button that calls this. The notice does not remove itself: stop rendering it. */
 		onDismiss?: () => void;
+		/**
+		 * Where focus goes once Dismiss removed the notice. Default: the next notice beside it, else
+		 * the nearest control before it, else the one after it.
+		 */
+		refocus?: () => HTMLElement | string | null | undefined;
 		/** `inline` sits where it is; `sticky` sticks to the bottom of the scrolling area. */
 		placement?: 'inline' | 'sticky';
 		/** Set when the app already undid the change (for example after a native post came back). */
@@ -77,6 +83,7 @@
 		hidden,
 		secondary,
 		onDismiss,
+		refocus,
 		placement = 'inline',
 		undone = false,
 		labels,
@@ -102,6 +109,7 @@
 	/** Inside a SettingsForm the notice must not render a form of its own. */
 	const insideForm = getSettingsDraft() !== undefined;
 
+	let root = $state<HTMLDivElement | null>(null);
 	let undoing = $state(false);
 	let didUndo = $state(false);
 	let failure = $state<string | null>(null);
@@ -118,6 +126,7 @@
 		if (!onUndo) return;
 		event.preventDefault();
 		if (undoing || superseded || finished) return;
+		const startedInside = root?.contains(document.activeElement) ?? false;
 		failure = null;
 		undoing = true;
 		// Let a cleared failure reach the page first, so the same failure is announced again.
@@ -131,8 +140,40 @@
 		}
 		undoing = false;
 		const message = result && (result.error || Object.values(result.errors ?? {}).find(Boolean) || result.conflict?.message);
-		if (message || (result && result.conflict)) failure = message || text.undoFailed;
-		else didUndo = true;
+		if (message || (result && result.conflict)) {
+			failure = message || text.undoFailed;
+			return;
+		}
+		didUndo = true;
+		await tick();
+		// Undo is gone now (the app may already have removed it): keep focus on the notice, which says it was undone.
+		const active = document.activeElement;
+		if (startedInside && root?.isConnected && (!active || active === document.body)) root.focus();
+	}
+
+	/** Focusable controls, in page order, for where focus goes once the notice is gone. */
+	const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+	async function dismiss(): Promise<void> {
+		const node = root;
+		const hadFocus = node?.contains(document.activeElement) ?? false;
+		const parent = node?.parentElement ?? null;
+		const index = parent && node ? Array.prototype.indexOf.call(parent.children, node) : -1;
+		let before: HTMLElement | null = null;
+		let after: HTMLElement | null = null;
+		if (hadFocus && node) {
+			for (const candidate of document.querySelectorAll<HTMLElement>(FOCUSABLE)) {
+				if (node.contains(candidate) || candidate.checkVisibility?.({ visibilityProperty: true }) === false) continue;
+				if (candidate.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) before = candidate;
+				else if (!after) after = candidate;
+			}
+		}
+		onDismiss?.();
+		if (!hadFocus) return;
+		await tick();
+		const active = document.activeElement;
+		if (node?.isConnected || (active && active !== document.body)) return;
+		restoreFocus(refocus?.(), parent?.isConnected ? nextFocusAfterRemoval(parent, index) : null, before, after);
 	}
 
 	async function runSecondary(): Promise<void> {
@@ -185,8 +226,9 @@
 	{/if}
 {/snippet}
 
-<div {...rest} data-placement={placement} class={cn('min-w-0', placement === 'sticky' && 'sticky bottom-3 z-10', className)}>
-	<Alert {tone} live="polite" {onDismiss} dismissLabel={text.dismiss} actions={offersUndo || secondary ? actions : undefined} class={placement === 'sticky' ? 'ak-shadow-soft' : undefined}>
+<!-- Takes focus (tabindex -1) when Undo goes away under it. -->
+<div {...rest} bind:this={root} tabindex="-1" data-placement={placement} class={cn('min-w-0 rounded-card focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary/40', placement === 'sticky' && 'sticky bottom-3 z-10', className)}>
+	<Alert {tone} live="polite" onDismiss={onDismiss ? dismiss : undefined} dismissLabel={text.dismiss} actions={offersUndo || secondary ? actions : undefined} class={placement === 'sticky' ? 'ak-shadow-soft' : undefined}>
 		<p class="m-0 font-semibold text-fg-main">
 			{#if typeof lead === 'string'}{lead}{:else}{@render lead()}{/if}
 		</p>

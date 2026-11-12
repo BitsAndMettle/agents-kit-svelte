@@ -112,7 +112,7 @@
 		'relative inline-flex h-7 cursor-pointer items-center rounded-full px-3 text-xs font-medium text-fg-light transition-colors hover:text-fg-main has-[:checked]:bg-card-bg has-[:checked]:text-fg-main has-[:checked]:shadow-btn has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-accent-primary has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 has-[:disabled]:hover:text-fg-light';
 </script>
 
-<fieldset {...rest} aria-describedby={`${id}-description`} class={cn('m-0 min-w-0 border-0 p-0', className)}>
+<fieldset {...rest} aria-describedby={[`${id}-description`, rest['aria-describedby']].filter(Boolean).join(' ')} class={cn('m-0 min-w-0 border-0 p-0', className)}>
 	<legend class="m-0 p-0 text-sm font-semibold text-fg-main">{text.legend}</legend>
 	<p id={`${id}-description`} class="m-0 mt-1 text-xs leading-5 text-fg-light">
 		{text.description}
@@ -143,8 +143,8 @@
 							<span aria-hidden="true" class={MINI_LABEL}>{text.theirs}</span>
 							<span class="min-w-0 text-fg-main">{field.theirs}</span>
 						</td>
-						<td class="px-3 py-2 align-top @max-lg/settings:p-0 @max-lg/settings:pt-1">
-							<div role="radiogroup" aria-labelledby={fieldId(index, 'label')} aria-describedby={noBoth ? fieldId(index, 'reason') : undefined} class="inline-flex flex-wrap items-center gap-0.5 rounded-full bg-canvas-secondary p-0.5">
+						<td class="w-px px-3 py-2 align-top @max-lg/settings:w-auto @max-lg/settings:p-0 @max-lg/settings:pt-1">
+							<div role="radiogroup" aria-labelledby={fieldId(index, 'label')} aria-describedby={noBoth ? fieldId(index, 'reason') : undefined} class="inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-canvas-secondary p-0.5">
 								{#each ['mine', 'theirs', 'both'] as const as side (side)}
 									<label class={SEGMENT}>
 										<input

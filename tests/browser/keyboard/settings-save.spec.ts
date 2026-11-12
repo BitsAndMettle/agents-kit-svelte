@@ -91,6 +91,25 @@ test.describe('SettingsForm', () => {
 		await expect(team).toBeFocused();
 	});
 
+	test('an edit made while a save is in flight stays unsaved after the save', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await team.fill('First');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Save', exact: true }).click();
+		await team.fill('Second');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 8: Team name → First');
+		await expect(team).toHaveValue('Second');
+		const bar = section.locator('[data-layout="sticky"]');
+		await expect(bar).toContainText('1 unsaved change');
+		await expect(section.getByText('Unsaved · was First')).toBeVisible();
+		await expect(section.getByRole('status').filter({ hasText: 'Changes saved.' })).toHaveCount(0);
+		// The leave guard still holds it.
+		await section.getByRole('button', { name: 'Go to Members' }).click();
+		await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toBeVisible();
+	});
+
 	test('a field error marks and focuses the field; editing it clears the error', async ({ page }) => {
 		const section = await openOnClock(page, 'settings-form');
 		const team = section.getByRole('textbox', { name: 'Team name' });
@@ -152,6 +171,51 @@ test.describe('SettingsForm', () => {
 		await expect(section.getByTestId('sf-log')).toHaveText('Saved revision 8: Team name → Northwind Design');
 	});
 
+	test('when Save and leave fails on a field, closing the dialog focuses that field', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await team.fill('');
+		await section.getByRole('button', { name: 'Go to Members' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
+		await pauseClock(page);
+		await dialog.getByRole('button', { name: 'Save and leave' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(dialog.getByRole('alert')).toContainText("Couldn't save, so you are still here.");
+		await dialog.getByRole('button', { name: 'Keep editing' }).click();
+		await expect(dialog).toBeHidden();
+		await expect(team).toHaveAttribute('aria-invalid', 'true');
+		await expect(team).toBeFocused();
+		await expect(section.getByTestId('sf-here')).toHaveText('General');
+	});
+
+	test('a ConsequenceDialog inside it runs on its own form: no nested form, and Save never includes it', async ({ page }) => {
+		const errors: string[] = [];
+		page.on('console', (m) => {
+			if (m.type() === 'error') errors.push(m.text());
+		});
+		page.on('pageerror', (e) => errors.push(e.message));
+		const section = await openOnClock(page, 'settings-form');
+		expect(await section.locator('form form').count()).toBe(0);
+		await section.getByRole('button', { name: 'Clear…' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Clear all activity?' });
+		await expect(dialog).toBeVisible();
+		await expect(dialog.getByRole('list', { name: 'What happens' })).toContainText('All activity entries are deleted');
+		await expect(dialog.getByRole('list', { name: 'What stays' })).toContainText('Documents and these settings stay');
+		const phrase = dialog.getByRole('textbox', { name: 'Type “clear activity” to confirm' });
+		await phrase.fill('clear activity');
+		// Its fields are not the settings form's.
+		expect(await phrase.evaluate((el) => (el as HTMLInputElement).form?.getAttribute('aria-label'))).toBeNull();
+		await expect(section.locator('[data-layout="sticky"]')).not.toContainText('unsaved change');
+		await pauseClock(page);
+		await dialog.getByRole('button', { name: 'Clear activity' }).click();
+		await expect(dialog.getByRole('status').filter({ hasText: 'Working…' })).toHaveCount(1);
+		await page.clock.runFor(SETTLE);
+		await expect(dialog).toBeHidden();
+		await expect(section.getByTestId('sf-log')).toHaveText('Activity cleared');
+		await expect(section.getByRole('button', { name: 'Clear…' })).toBeFocused();
+		expect(errors.filter((e) => /hydrat/i.test(e))).toEqual([]);
+	});
+
 	test('Leave without saving goes at once, and a later edit asks again', async ({ page }) => {
 		const section = await openSection(page, 'settings-form');
 		const team = section.getByRole('textbox', { name: 'Team name' });
@@ -188,6 +252,8 @@ test.describe('SettingsForm', () => {
 		await expect(form).toHaveAttribute('action', '/settings-demo/general');
 		// The bar always shows without JavaScript, with Save enabled.
 		await expect(section.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+		// The closed ConsequenceDialog inside does not nest a form.
+		expect(await section.locator('form').count()).toBe(1);
 		await section.getByRole('textbox', { name: 'Team name' }).fill('Northwind Design');
 		const posted = await catchPost(page, '/settings-demo/general');
 		await section.getByRole('button', { name: 'Save', exact: true }).click();
@@ -195,6 +261,9 @@ test.describe('SettingsForm', () => {
 		expect(body.get('revision')).toBe('7');
 		expect(body.get('teamName')).toBe('Northwind Design');
 		expect(body.get('retention')).toBe('90');
+		// Nor do its fields block or join the post.
+		expect(body.has('intent')).toBe(false);
+		expect(body.has('confirm')).toBe(false);
 		await close();
 	});
 });
@@ -301,6 +370,39 @@ test.describe('ChangeNotice', () => {
 		await expect(newest.getByRole('button', { name: 'Undo' })).toHaveCount(0);
 	});
 
+	test('focus stays with the notice after Undo, and moves to the next notice or control after Dismiss', async ({ page }) => {
+		const section = await openOnClock(page, 'change-notice');
+		const density = section.getByRole('radiogroup', { name: 'Density' });
+		await pauseClock(page);
+		await density.getByText('Compact').click();
+		await page.clock.runFor(SETTLE);
+		await density.getByText('Spacious').click();
+		await page.clock.runFor(SETTLE);
+		const notices = section.getByTestId('cnd-notices').getByRole('status');
+		await expect(notices).toHaveCount(2);
+
+		// Dismiss the newest: focus goes to the notice that moved into its place.
+		await notices.nth(0).getByRole('button', { name: 'Dismiss' }).focus();
+		await press(page, 'Enter');
+		await expect(notices).toHaveCount(1);
+		await expect(notices.nth(0).getByRole('button', { name: 'Undo' })).toBeFocused();
+
+		// Undo with the keyboard: the button goes away, focus stays on the notice that says so.
+		const native = section.getByTestId('cnd-native');
+		await native.getByRole('button', { name: 'Undo' }).focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(native).toContainText('Undone. The change was reversed.');
+		await expect(native).toBeFocused();
+
+		// Dismiss the last notice: focus goes to the nearest control before it, never the page body.
+		await native.getByRole('button', { name: 'Dismiss' }).focus();
+		await press(page, 'Enter');
+		await expect(native).toHaveCount(0);
+		expect(await page.evaluate(() => document.activeElement !== document.body && document.activeElement !== null)).toBe(true);
+		await expect(section.getByTestId('cnd-notices').getByRole('button', { name: 'Undo' })).toBeFocused();
+	});
+
 	test('a failed change reverts and adds no notice; Dismiss removes a notice', async ({ page }) => {
 		const section = await openOnClock(page, 'change-notice');
 		await section.getByRole('checkbox', { name: 'Make the next change fail' }).check();
@@ -360,6 +462,21 @@ test.describe('ConflictResolver', () => {
 		await expect(dialog).toBeHidden();
 		await page.clock.runFor(SETTLE);
 		await expect(section.getByTestId('crd-log')).toHaveText('Saved revision 14: Northwind Design · Email, Phone · 1 year');
+	});
+
+	test('in the wide review each Keep choice stays one segmented line', async ({ page }) => {
+		const section = await openOnClock(page, 'conflict-resolver');
+		await section.getByRole('textbox', { name: 'Team name' }).fill('Northwind Design');
+		await pauseClock(page);
+		await section.getByRole('button', { name: 'Save', exact: true }).click();
+		await page.clock.runFor(SETTLE);
+		await section.getByRole('button', { name: 'Review changes' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Review changes' });
+		await expect(dialog).toBeVisible();
+		for (const group of await dialog.getByRole('radiogroup').all()) {
+			const box = await group.boundingBox();
+			expect(box?.height ?? 0).toBeLessThan(40);
+		}
 	});
 
 	test('arrow keys move the choice within a setting', async ({ page }) => {
@@ -439,9 +556,10 @@ test.describe('ConsequenceDialog', () => {
 		const weekly = dialog.getByRole('combobox', { name: 'New owner for Weekly summary' });
 		await expect(weekly).toHaveValue('ada');
 		await expect(dialog.getByRole('combobox', { name: 'New owner for Quality dashboard' })).toHaveValue('chloe');
-		await expect(dialog.getByRole('status')).toHaveText('Ada Park takes 2 · Chloé Martin takes 1');
+		const summary = dialog.getByRole('status').filter({ hasText: 'takes' });
+		await expect(summary).toHaveText('Ada Park takes 2 · Chloé Martin takes 1');
 		await weekly.selectOption('dev');
-		await expect(dialog.getByRole('status')).toHaveText('Dev Rao takes 1 · Ada Park takes 1 · Chloé Martin takes 1');
+		await expect(summary).toHaveText('Dev Rao takes 1 · Ada Park takes 1 · Chloé Martin takes 1');
 
 		await pauseClock(page);
 		await dialog.getByRole('button', { name: 'Remove member' }).click();
@@ -453,6 +571,61 @@ test.describe('ConsequenceDialog', () => {
 		await page.clock.runFor(SETTLE);
 		await expect(dialog).toBeHidden();
 		await expect(section.getByTestId('cdd-status')).toHaveText('Ben Ortiz removed (weekly→dev, churn→ada, quality→chloe)');
+	});
+
+	test('reopening starts fresh: the choices and the summary agree again', async ({ page }) => {
+		const section = await openSection(page, 'consequence-dialog');
+		await section.getByRole('button', { name: 'Remove…' }).click();
+		const dialog = page.getByRole('dialog', { name: 'Remove Ben Ortiz from the team?' });
+		const weekly = dialog.getByRole('combobox', { name: 'New owner for Weekly summary' });
+		const summary = dialog.getByRole('status').filter({ hasText: 'takes' });
+		await weekly.selectOption('dev');
+		await expect(summary).toHaveText('Dev Rao takes 1 · Ada Park takes 1 · Chloé Martin takes 1');
+		await dialog.getByRole('button', { name: 'Cancel' }).click();
+		await expect(dialog).toBeHidden();
+		await section.getByRole('button', { name: 'Remove…' }).click();
+		await expect(weekly).toHaveValue('ada');
+		await expect(summary).toHaveText('Ada Park takes 2 · Chloé Martin takes 1');
+	});
+
+	test('route mode: opening the route again clears the last failure and the typed phrase', async ({ page }) => {
+		const section = await openOnClock(page, 'consequence-dialog');
+		await section.getByRole('checkbox', { name: 'Make the next action fail' }).check();
+		const link = section.getByRole('link', { name: 'Delete team…' });
+		await link.click();
+		const dialog = page.getByRole('dialog', { name: 'Delete Northwind Studio?' });
+		const phrase = dialog.getByRole('textbox', { name: 'Type “Northwind Studio” to confirm' });
+		await phrase.fill('Northwind Studio');
+		await pauseClock(page);
+		await dialog.getByRole('button', { name: 'Delete team' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(dialog.getByRole('alert')).toHaveText('The server did not answer in time. Nothing was changed.');
+		// Let time run again: closing and the navigation use timers.
+		await page.clock.resume();
+		await press(page, 'Escape');
+		await expect(dialog).toBeHidden();
+		await expect(page).not.toHaveURL(/dialog=/);
+		await link.click();
+		await expect(dialog).toBeVisible();
+		await expect(dialog.getByRole('alert')).toHaveCount(0);
+		await expect(phrase).toHaveValue('');
+		await expect(dialog.getByRole('button', { name: 'Delete team' })).toHaveAttribute('aria-disabled', 'true');
+	});
+
+	test('route mode: a successful confirm navigates to closeHref, which closes it, and focus returns to the link', async ({ page }) => {
+		const section = await openOnClock(page, 'consequence-dialog');
+		const link = section.getByRole('link', { name: 'Delete team…' });
+		await link.click();
+		await expect(page).toHaveURL(/\?dialog=delete-team/);
+		const dialog = page.getByRole('dialog', { name: 'Delete Northwind Studio?' });
+		await dialog.getByRole('textbox', { name: 'Type “Northwind Studio” to confirm' }).fill('Northwind Studio');
+		await pauseClock(page);
+		await dialog.getByRole('button', { name: 'Delete team' }).click();
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('cdd-status')).toHaveText('Team deleted (typed “Northwind Studio”)');
+		await expect(page).not.toHaveURL(/dialog=/);
+		await expect(dialog).toBeHidden();
+		await expect(link).toBeFocused();
 	});
 
 	test('route mode: a link opens it, the typed phrase gates confirm, Escape follows closeHref and focus returns to the link', async ({ page }) => {
@@ -472,6 +645,9 @@ test.describe('ConsequenceDialog', () => {
 		await expect(confirm).toHaveAttribute('aria-disabled', 'true');
 		await phrase.fill('Northwind Studio');
 		await expect(confirm).not.toHaveAttribute('aria-disabled', 'true');
+		// Once it matches, nothing says it does not.
+		await expect(phrase).toHaveAccessibleDescription('');
+		await expect(confirm).toHaveAccessibleDescription('');
 		await expect(dialog).toContainText('This can’t be undone.');
 
 		await press(page, 'Escape');

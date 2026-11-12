@@ -37,7 +37,7 @@ export const PRIMITIVES_OVERLAYS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/overlays/AlertDialog.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Confirmation with role="alertdialog": a backdrop press does nothing, Escape cancels, and focus starts on the safe Cancel action. tone (UiTone): "danger" for destructive actions. When onConfirm returns a Promise, the confirm button shows a loading state and the dialog stays open until it resolves; a rejection keeps it open and shows the error. confirmDisabled keeps the confirm action focusable but inert (aria-disabled), with confirmDescribedBy pointing at the visible reason. Route mode as on Dialog: closeHref makes Cancel a link that Escape follows, and ssrOpen renders it open on the server.',
+			'Confirmation with role="alertdialog": a backdrop press does nothing, Escape cancels, and focus starts on the safe Cancel action. tone (UiTone): "danger" for destructive actions. When onConfirm returns a Promise, the confirm button shows a loading state and the dialog stays open until it resolves; a rejection keeps it open and shows the error. confirmDisabled keeps the confirm action focusable but inert (aria-disabled), with confirmDescribedBy pointing at the visible reason. Route mode as on Dialog: closeHref makes Cancel a link that Escape follows, ssrOpen renders it open on the server, and returnFocus says where focus goes after a close when there was no opener; narrow="sheet" docks it to the bottom on phones ("fullscreen" fills them).',
 		usageSnippet: `<script lang="ts">
   import { AlertDialog, buttonClass } from 'agents-kit-svelte/primitives';
 

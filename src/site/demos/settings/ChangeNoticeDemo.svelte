@@ -66,9 +66,9 @@
 					<span class="inline-flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
 						{#if density.pending}<Spinner size="sm" />{/if}
 					</span>
-					<div role="radiogroup" aria-labelledby="cnd-density" aria-busy={density.pending || undefined} class="inline-flex max-w-full flex-wrap items-center gap-0.5 rounded-full bg-canvas-secondary p-0.5">
+					<div role="radiogroup" aria-labelledby="cnd-density" aria-busy={density.pending || undefined} class="inline-flex max-w-full items-center gap-0.5 whitespace-nowrap rounded-full bg-canvas-secondary p-0.5">
 						{#each DENSITY as option (option.value)}
-							<label class="relative inline-flex h-7 cursor-pointer items-center rounded-full px-3 text-xs font-medium text-fg-light transition-colors hover:text-fg-main has-[:checked]:bg-card-bg has-[:checked]:text-fg-main has-[:checked]:shadow-btn has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-accent-primary">
+							<label class="relative inline-flex h-7 cursor-pointer items-center rounded-full px-2.5 text-xs @max-lg/settings:px-2 font-medium text-fg-light transition-colors hover:text-fg-main has-[:checked]:bg-card-bg has-[:checked]:text-fg-main has-[:checked]:shadow-btn has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-1 has-[:focus-visible]:outline-accent-primary">
 								<input type="radio" name="cnd-density" value={option.value} checked={density.current === option.value} onchange={() => choose(option.value)} class="absolute inset-0 m-0 cursor-pointer appearance-none rounded-full opacity-0" />
 								{option.label}
 							</label>
