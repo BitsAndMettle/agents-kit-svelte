@@ -190,13 +190,28 @@
 	const selected = $derived(new Set(value));
 	const hiddenSelected = $derived(value.filter((id) => !shown.some((item) => item.id === id) && items.some((item) => item.id === id)));
 	const actionable = $derived(selectableIds(items, value));
-	/** Failures of rows the filter hides: their own status is not on the page, so the list announces them. */
+	/**
+	 * Failures that arrived while the filter hid their row: the row's own status is not on the page,
+	 * so the list announces them. Only new failures: hiding a row that already failed says nothing again.
+	 */
+	let unseenFailures = $state<Record<string, string>>({});
 	const hiddenFailures = $derived(
-		Object.keys(failed)
-			.filter((id) => failed[id] && !shown.some((item) => item.id === id) && items.some((item) => item.id === id))
-			.map((id) => failed[id])
+		Object.keys(unseenFailures)
+			.filter((id) => items.some((item) => item.id === id))
+			.map((id) => unseenFailures[id])
 			.join(' ')
 	);
+
+	// Once its row is shown again, the row carries its own failure and the list forgets it.
+	$effect(() => {
+		for (const item of shown) if (item.id in unseenFailures) delete unseenFailures[item.id];
+	});
+
+	function fail(item: T, message: string): void {
+		removals.delete(item.id);
+		failed[item.id] = message;
+		if (!shown.some((s) => s.id === item.id)) unseenFailures[item.id] = message;
+	}
 
 	// A removed row takes its focused button with it: move focus to the next row, the previous, then the heading.
 	$effect(() => {
@@ -231,6 +246,7 @@
 		const list = root?.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(item.id)}"]`)?.closest<HTMLElement>('[data-list]');
 		if (list) removals.set(item.id, { list: list.dataset.list ?? '', index: Array.from(list.children).findIndex((li) => (li as HTMLElement).dataset.itemId === item.id) });
 		delete failed[item.id];
+		delete unseenFailures[item.id];
 		// Let a cleared message reach the page first, so a failure that comes straight back is announced again.
 		await tick();
 		try {
@@ -240,13 +256,9 @@
 				result = await result;
 			}
 			const message = failureOf(result);
-			if (message) {
-				removals.delete(item.id);
-				failed[item.id] = message;
-			}
+			if (message) fail(item, message);
 		} catch {
-			removals.delete(item.id);
-			failed[item.id] = text.failed(item.label);
+			fail(item, text.failed(item.label));
 		} finally {
 			delete pending[item.id];
 		}

@@ -398,8 +398,10 @@
 		row: 'border-t border-canvas-border',
 		rowHeader: 'py-3 pr-4 text-left align-top font-normal',
 		cell: 'px-2 py-3 text-center align-top',
-		cellInner: 'inline-flex flex-col items-center gap-1',
-		cellLabel: 'sr-only'
+		cellInner: 'relative inline-flex flex-col items-center gap-1',
+		cellLabel: 'sr-only',
+		// Beside the checkbox, out of flow, so the column keeps its width.
+		spinner: 'absolute -right-4 top-0.5 inline-flex'
 	};
 	const LIST = {
 		table: 'block w-full text-left',
@@ -412,7 +414,9 @@
 		rowHeader: 'block pb-2 text-left font-normal',
 		cell: 'inline-block pr-5 pb-1 align-top',
 		cellInner: 'inline-flex flex-row flex-wrap items-center gap-x-2 gap-y-0.5',
-		cellLabel: 'text-[13px] text-fg-main'
+		cellLabel: 'text-[13px] text-fg-main',
+		// In flow after the label, so it never covers it.
+		spinner: 'inline-flex'
 	};
 	const AUTO_NARROW = {
 		table: '@max-lg/settings:block',
@@ -425,7 +429,8 @@
 		rowHeader: '@max-lg/settings:block @max-lg/settings:py-0 @max-lg/settings:pr-0 @max-lg/settings:pb-2',
 		cell: '@max-lg/settings:inline-block @max-lg/settings:px-0 @max-lg/settings:py-0 @max-lg/settings:pr-5 @max-lg/settings:pb-1 @max-lg/settings:text-left',
 		cellInner: '@max-lg/settings:flex-row @max-lg/settings:flex-wrap @max-lg/settings:gap-x-2 @max-lg/settings:gap-y-0.5',
-		cellLabel: '@max-lg/settings:not-sr-only @max-lg/settings:text-[13px] @max-lg/settings:text-fg-main'
+		cellLabel: '@max-lg/settings:not-sr-only @max-lg/settings:text-[13px] @max-lg/settings:text-fg-main',
+		spinner: '@max-lg/settings:static'
 	};
 	/**
 	 * Column toggles live in the header. In the list (or the narrow auto) layout the header becomes a
@@ -534,9 +539,9 @@
 												onCheckedChange={(checked) => setCell(key, checked)}
 											/>
 										{/if}
-										{#if snap?.status === 'pending'}<span class="absolute -right-4 top-0.5"><Spinner size="xs" decorative /></span>{/if}
 									</span>
 									<label for={id} class={look('cellLabel')}>{channel.label}</label>
+									{#if snap?.status === 'pending'}<span class={look('spinner')} data-cell-spinner=""><Spinner size="xs" decorative /></span>{/if}
 									{#if fixed}
 										<span class="inline-flex items-center gap-0.5 text-[11px] leading-4 text-fg-light [&_svg]:size-3"><Lock aria-hidden="true" />{fixed.checked ? text.alwaysOn : text.alwaysOff}</span>
 									{/if}
