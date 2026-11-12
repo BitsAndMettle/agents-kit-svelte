@@ -32,7 +32,7 @@
 </script>
 
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { ChevronRight, Search } from '@lucide/svelte';
 	import { cn } from '../../ui/cn';
@@ -70,8 +70,8 @@
 		top?: Snippet;
 		/** Content under the links (a help link, a version line). */
 		footer?: Snippet;
-		/** Level of the title; group headings sit one below it. Default 2. */
-		headingLevel?: 2 | 3;
+		/** Level of the title; group headings sit one below it. Default 2; use 1 when the index is the whole page. */
+		headingLevel?: 1 | 2 | 3;
 		/** Words, merged over the English defaults. */
 		labels?: Partial<SettingsNavLabels>;
 		class?: string;
@@ -123,6 +123,13 @@
 	const titleTag = $derived(`h${headingLevel}`);
 	const groupTag = $derived(`h${groupLevel}`);
 
+	// Text typed into the server-rendered box before the page was interactive is the query.
+	onMount(() => {
+		if (!filter || !input || input.value === query) return;
+		query = input.value;
+		onFilterChange?.(query);
+	});
+
 	function clearFilter(event: MouseEvent): void {
 		event.preventDefault();
 		query = '';
@@ -156,7 +163,7 @@
 	/** Parts only the index look shows. */
 	const INDEX_ONLY = { rail: 'hidden', index: '', auto: '@3xl/settings:hidden' } as const;
 	const LINK =
-		'group relative flex w-full items-center text-fg-main no-underline outline-none transition-colors hover:bg-canvas-secondary focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary aria-[current=page]:bg-accent-subtle aria-[current=page]:font-medium aria-[current=page]:shadow-[inset_3px_0_0_var(--color-accent-primary)]';
+		'group relative flex w-full items-center text-fg-main no-underline outline-none transition-colors hover:bg-canvas-secondary focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent-primary aria-[current=page]:bg-accent-subtle aria-[current=page]:font-medium aria-[current=page]:shadow-[inset_3px_0_0_var(--color-accent-primary)] forced-colors:aria-[current=page]:border-s-4 forced-colors:aria-[current=page]:border-solid';
 </script>
 
 <!-- The link's name is its label alone. Marks, badge, description and meta describe it
@@ -166,7 +173,7 @@
 {#snippet marks(link: SettingsLink, base: string)}
 	{#if link.dirty}
 		<span class="inline-flex shrink-0 items-center">
-			<span aria-hidden="true" class="size-1.5 rounded-full bg-accent-primary"></span>
+			<span aria-hidden="true" data-nav-dirty class="size-1.5 rounded-full bg-accent-primary forced-colors:border-[3px] forced-colors:border-solid"></span>
 			<span id="{base}-dirty" aria-hidden="true" class="sr-only">{asSentence(text.unsaved)}</span>
 		</span>
 	{/if}

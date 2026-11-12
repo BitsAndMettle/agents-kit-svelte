@@ -519,3 +519,140 @@ test.describe('AttentionList', () => {
 		await expect(narrow.locator('[data-attention-count]')).toHaveCount(0);
 	});
 });
+
+/** The focus ring a focused element actually draws, and whether it matches :focus-visible. */
+async function ring(target: Locator): Promise<{ style: string; width: string; visible: boolean }> {
+	return target.evaluate((el) => {
+		const style = getComputedStyle(el);
+		return { style: style.outlineStyle, width: style.outlineWidth, visible: el.matches(':focus-visible') };
+	});
+}
+
+test.describe('Shell: focus rings, forced colours, the index alone and early typing', () => {
+	test('a keyboard-focused nav link, search result and attention heading each draw a solid ring', async ({ page }) => {
+		const layout = (await openSection(page, 'settings-layout')).getByTestId('layout-frame');
+		await layout.getByRole('searchbox', { name: 'Filter settings' }).focus();
+		await press(page, 'Tab');
+		const profile = layout.getByRole('link', { name: /^Profile/ });
+		await expect(profile).toBeFocused();
+		expect(await ring(profile)).toEqual({ style: 'solid', width: '2px', visible: true });
+
+		const search = page.locator('#settings-search').getByTestId('search-inline');
+		await search.getByRole('searchbox', { name: 'Search settings' }).fill('retention');
+		await press(page, 'ArrowDown');
+		const result = search.getByRole('link', { name: /Data retention/ });
+		await expect(result).toBeFocused();
+		expect(await ring(result)).toEqual({ style: 'solid', width: '2px', visible: true });
+
+		const narrow = page.locator('#attention-list').getByTestId('attention-narrow');
+		for (const label of ['Confirm your contact email', 'Almost out of seats', 'Unsaved changes in General']) {
+			await narrow.getByRole('button', { name: `Dismiss: ${label}` }).focus();
+			await press(page, 'Enter');
+			await expect(narrow.getByRole('button', { name: `Dismiss: ${label}` })).toHaveCount(0);
+		}
+		const heading = narrow.getByRole('heading', { name: 'Before you go' });
+		await expect(heading).toBeFocused();
+		expect(await ring(heading)).toEqual({ style: 'solid', width: '2px', visible: true });
+	});
+
+	test('in forced colours the current link has an edge and the unsaved dot is drawn as a border', async ({ page }) => {
+		await page.emulateMedia({ forcedColors: 'active' });
+		const rail = (await openSection(page, 'settings-nav')).getByTestId('nav-rail');
+		const current = rail.locator('[data-nav-link="general"]');
+		await expect(current).toHaveAttribute('aria-current', 'page');
+		const edge = (link: Locator) => link.evaluate((el) => getComputedStyle(el).borderInlineStartWidth);
+		expect(await edge(current)).toBe('4px');
+		expect(await edge(rail.locator('[data-nav-link="profile"]'))).toBe('0px');
+		expect(await current.locator('[data-nav-dirty]').evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe('3px');
+		// Outside forced colours the accent bar and the filled dot carry it; no border.
+		await page.emulateMedia({ forcedColors: 'none' });
+		expect(await edge(current)).toBe('0px');
+	});
+
+	test('a wide layout with nothing current shows the index on its own, attention on top, and no empty page', async ({ page }) => {
+		const section = await openSection(page, 'settings-layout');
+		const frame = section.getByTestId('layout-frame');
+		await section.getByRole('button', { name: '360 px' }).click();
+		await frame.getByRole('link', { name: 'All settings' }).click();
+		await expect(section.getByTestId('layout-current')).toHaveText('the index');
+		await section.getByRole('button', { name: '1300 px' }).click();
+		await expect.poll(async () => (await frame.boundingBox())!.width).toBeGreaterThan(800);
+		await expect(frame.locator('[data-overview]')).toHaveCount(1);
+		await expect(frame.locator('[data-settings-page]')).toHaveCount(0);
+		const attention = frame.getByRole('heading', { name: 'Needs attention' });
+		await expect(attention).toBeVisible();
+		// The index look: descriptions show, under the attention list.
+		await expect(frame.getByText('Your name, photo and contact email.')).toBeVisible();
+		const profile = frame.getByRole('link', { name: /^Profile/ });
+		expect((await attention.boundingBox())!.y).toBeLessThan((await profile.boundingBox())!.y);
+	});
+
+	test('the composed area with nothing current has one h1 at phone and desktop width', async ({ page }) => {
+		// The fixture is prerendered on its Workspace page and reads `?section=` in the browser, so go
+		// to the index the way a person does: the back link.
+		await page.setViewportSize({ width: 390, height: 900 });
+		await page.goto('/fixtures/settings-composed/');
+		await expect(page.getByRole('switch', { name: 'Play a sound' })).toBeEnabled({ timeout: 45000 });
+		await page.getByRole('link', { name: 'All settings' }).click();
+		await expect(page).toHaveURL(/[?&]section=$/);
+		for (const width of [390, 1440]) {
+			await page.setViewportSize({ width, height: 900 });
+			await expect(page.getByRole('heading', { level: 1, name: 'Settings' })).toBeVisible();
+			await expect(page.getByRole('heading', { level: 2, name: 'Needs attention' })).toBeVisible();
+			await expect(page.locator('h1')).toHaveCount(1);
+			const results = await new AxeBuilder({ page }).withRules(['page-has-heading-one', 'heading-order']).analyze();
+			expect(results.violations.map((v) => v.id)).toEqual([]);
+		}
+	});
+
+	test('text typed into the nav filter before the page is interactive filters once it is', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		let release: () => void = () => undefined;
+		const held = new Promise<void>((resolve) => (release = resolve));
+		await page.route('**/_app/immutable/**/*.js', async (route) => {
+			await held;
+			await route.continue();
+		});
+		await page.goto('/', { waitUntil: 'domcontentloaded' });
+		const frame = page.getByTestId('layout-frame');
+		const filter = frame.getByRole('searchbox', { name: 'Filter settings' });
+		await filter.fill('invoices');
+		release();
+		await expect(page.getByRole('button', { name: 'Toggle global color theme' })).toBeEnabled({ timeout: 45000 });
+		await expect(filter).toHaveValue('invoices');
+		await expect(frame.locator('[data-nav-link]')).toHaveCount(1);
+		await expect(frame.getByRole('status').filter({ hasText: 'setting' })).toHaveText('1 setting shown');
+	});
+
+	test('the search clear button needs JavaScript, so it only appears once the page is ready', async ({ browser, baseURL, page }) => {
+		const { page: noJs, close } = await openWithoutJs(browser, baseURL);
+		await expect(noJs.getByTestId('search-page').getByRole('searchbox')).toHaveValue('email');
+		await expect(noJs.getByTestId('search-page').getByRole('button', { name: 'Clear search' })).toHaveCount(0);
+		await close();
+		const section = await openSection(page, 'settings-search');
+		const results = section.getByTestId('search-page');
+		await results.getByRole('button', { name: 'Clear search' }).click();
+		await expect(results.getByRole('searchbox')).toHaveValue('');
+	});
+
+	test('an attention callback action loads while it runs and shows a refusal; a retry works', async ({ page }) => {
+		const section = await openOnClock(page, 'attention-list');
+		const list = section.getByTestId('attention-callback');
+		const item = list.locator('[data-attention-item="export"]');
+		const send = list.getByRole('button', { name: 'Email it to me' });
+		await pauseClock(page);
+		await send.focus();
+		await press(page, 'Enter');
+		await expect(item).toHaveAttribute('aria-busy', 'true');
+		await expect(send).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(list.getByRole('alert')).toHaveText('The mail server didn’t answer. Try again.');
+		await expect(item).not.toHaveAttribute('aria-busy');
+		await expect(send).toBeFocused();
+		await press(page, 'Enter');
+		await expect(list.getByRole('alert')).toHaveCount(0);
+		await page.clock.runFor(SETTLE);
+		await expect(list.getByText('Sent. Check your inbox.')).toBeVisible();
+		await expect(list.getByRole('alert')).toHaveCount(0);
+	});
+});
