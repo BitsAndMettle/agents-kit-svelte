@@ -45,6 +45,10 @@ test.describe('without JavaScript', () => {
 		await expect(page.getByRole('searchbox', { name: 'Search settings' })).toBeVisible();
 		await expect(page.getByRole('meter', { name: 'Seats' })).toBeVisible();
 		expect(await page.locator('form form').count()).toBe(0);
+		// Buttons that only call back (no native path) wait, soft-disabled, until the page is interactive.
+		for (const name of ['Send again for Storage region', 'Cancel request for Storage region']) {
+			await expect(page.getByRole('button', { name })).toHaveAttribute('aria-disabled', 'true');
+		}
 		expect(errors).toEqual([]);
 	});
 });

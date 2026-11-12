@@ -846,6 +846,54 @@ test.describe('RequestedChange in a form', () => {
 	});
 });
 
+test.describe('Enter in a staged field', () => {
+	/** Every POST the page sends, by path. */
+	function postsOf(page: Page): string[] {
+		const posts: string[] = [];
+		page.on('request', (r) => {
+			if (r.method() === 'POST') posts.push(new URL(r.url()).pathname);
+		});
+		return posts;
+	}
+
+	test('with JavaScript, Enter on a clean form does nothing; after an edit it saves the form, never Send again', async ({ page }) => {
+		const posts = postsOf(page);
+		const section = await openOnClock(page, 'settings-row');
+		await stubPosts(page, '/settings-demo/requests');
+		const name = section.getByRole('textbox', { name: 'Team name' });
+		await pauseClock(page);
+		await name.focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('row-saves')).toHaveText('0');
+		await expect(section.getByTestId('row-dirty')).toHaveText('No unsaved changes');
+
+		await name.fill('Northwind Labs');
+		await press(page, 'Enter');
+		await expect(section.getByTestId('row-dirty')).toHaveText('Saving…');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('row-saves')).toHaveText('1');
+		expect(posts).toEqual([]);
+		expect(new URL(page.url()).pathname).toBe('/');
+	});
+
+	test('without JavaScript, Enter in a field posts the form to its own action, not Send again', async ({ browser, baseURL }) => {
+		const { page, close } = await noJsPage(browser, baseURL);
+		const posts = postsOf(page);
+		await stubPosts(page, '/settings-demo/general');
+		await stubPosts(page, '/settings-demo/requests');
+		const request = page.waitForRequest((r) => r.method() === 'POST');
+		await page.locator('#settings-row').getByRole('textbox', { name: 'Team name' }).press('Enter');
+		const sent = await request;
+		const body = new URLSearchParams(sent.postData() ?? '');
+		expect(new URL(sent.url()).pathname).toBe('/settings-demo/general');
+		expect(body.get('teamName')).toBe('Northwind Studio');
+		expect(body.getAll('intent')).toEqual([]);
+		expect(posts).toEqual(['/settings-demo/general']);
+		await close();
+	});
+});
+
 /** Opens the composed settings fixture at a width, ready for keys and clicks. */
 async function openComposed(page: Page, width = 1440): Promise<void> {
 	await page.setViewportSize({ width, height: 900 });
@@ -886,13 +934,16 @@ test.describe('Buttons that need JavaScript', () => {
 			page.getByTestId('requested-awaiting').getByRole('button', { name: 'Send again for Parallel runs' }),
 			page.getByTestId('requested-awaiting').getByRole('button', { name: 'Cancel request for Parallel runs' }),
 			page.getByTestId('row-codes').getByRole('button', { name: 'Regenerate' }),
-			page.getByTestId('facts-connection').getByRole('button', { name: 'Sync now' })
+			page.getByTestId('facts-connection').getByRole('button', { name: 'Sync now' }),
+			page.getByTestId('lock-action-callback').getByRole('button', { name: 'Take the tour' })
 		];
 		for (const button of waiting) await expect(button).toHaveAttribute('aria-disabled', 'true');
 		const native = [
 			page.getByTestId('lock-request-ok').getByRole('button', { name: 'Request access' }),
 			page.locator('#settings-row').getByRole('button', { name: 'Ask an owner to upgrade' }),
-			page.getByTestId('requested-nojs').getByRole('button', { name: 'Send again for Billing access' })
+			page.getByTestId('requested-nojs').getByRole('button', { name: 'Send again for Billing access' }),
+			page.getByTestId('section-request-post').getByRole('button', { name: 'Ask an admin' }),
+			page.getByTestId('toggle-instant').getByRole('button', { name: 'Ask an owner' })
 		];
 		for (const button of native) await expect(button).not.toHaveAttribute('aria-disabled', 'true');
 		await close();
@@ -905,6 +956,18 @@ test.describe('Buttons that need JavaScript', () => {
 		await expect(page.getByTestId('requested-awaiting').getByRole('button', { name: 'Send again for Parallel runs' })).not.toHaveAttribute('aria-disabled', 'true');
 		await expect(page.getByTestId('row-codes').getByRole('button', { name: 'Regenerate' })).not.toHaveAttribute('aria-disabled', 'true');
 		await expect(page.getByTestId('facts-connection').getByRole('button', { name: 'Sync now' })).not.toHaveAttribute('aria-disabled', 'true');
+		await expect(page.getByTestId('lock-action-callback').getByRole('button', { name: 'Take the tour' })).not.toHaveAttribute('aria-disabled', 'true');
+	});
+
+	test("a lock's way forward that only calls back loads, then runs once the page is interactive", async ({ page }) => {
+		const section = await openOnClock(page, 'lock-reason');
+		const tour = section.getByTestId('lock-action-callback').getByRole('button', { name: 'Take the tour' });
+		await pauseClock(page);
+		await tour.click();
+		await expect(tour).toHaveAttribute('aria-busy', 'true');
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('lock-tours')).toHaveText('1');
+		await expect(tour).not.toHaveAttribute('aria-busy', 'true');
 	});
 
 	test('without JavaScript, Request access posts its intent to requestAction, on its own and inside a staged form', async ({ browser, baseURL }) => {
@@ -923,6 +986,19 @@ test.describe('Buttons that need JavaScript', () => {
 		sent = await request;
 		expect(new URL(sent.url()).search).toBe('?setting=sso');
 		expect(new URLSearchParams(sent.postData() ?? '').getAll('intent')).toEqual(['request-access']);
+
+		// A section's and a toggle's lock pass requestAction on to their reason.
+		for (const [testId, name, query] of [
+			['section-request-post', 'Ask an admin', '?setting=export'],
+			['toggle-instant', 'Ask an owner', '?setting=sidebar']
+		]) {
+			await page.goto('/');
+			request = posted();
+			await page.getByTestId(testId).getByRole('button', { name }).click();
+			sent = await request;
+			expect(new URL(sent.url()).search, name).toBe(query);
+			expect(sent.postData(), name).toBe('intent=request-access');
+		}
 		await close();
 	});
 
@@ -994,6 +1070,44 @@ test.describe('Row layout', () => {
 		expect(reason.width).toBeGreaterThanOrEqual(0.6 * (box.width - 32) - 1);
 		await expect(downloads.getByText('Always on')).toBeVisible();
 	});
+
+	for (const width of [393, 400, 412]) {
+		test(`at ${width}px a save never moves the switch: Saving and Saved sit on the label line`, async ({ page }) => {
+			await page.clock.install();
+			await openComposed(page, width);
+			const compact = page.getByRole('switch', { name: 'Compact lists' });
+			await compact.scrollIntoViewIfNeeded();
+			const row = rowOf(compact);
+			const next = row.locator('xpath=following-sibling::li[1]');
+			const where = async () => {
+				const [own, below] = [await compact.boundingBox(), await next.boundingBox()];
+				return { x: own!.x, y: own!.y, next: below!.y };
+			};
+			const idle = await where();
+			await pauseClock(page);
+			await compact.click();
+			await expect(row).toHaveAttribute('data-status', 'pending');
+			const pending = await where();
+			await page.clock.runFor(SETTLE);
+			await expect(row).toHaveAttribute('data-status', 'saved');
+			await expect(row.locator('[aria-hidden="true"]', { hasText: 'Saved' })).toBeVisible();
+			const saved = await where();
+			await page.clock.runFor(2500);
+			await expect(row).toHaveAttribute('data-status', 'idle');
+			const after = await where();
+			for (const [phase, at] of [
+				['pending', pending],
+				['saved', saved],
+				['idle again', after]
+			] as const) {
+				expect(Math.abs(at.x - idle.x), `x while ${phase}`).toBeLessThan(0.5);
+				expect(Math.abs(at.y - idle.y), `y while ${phase}`).toBeLessThan(0.5);
+			}
+			// The rows below stay put while saving, and when Saved clears (Undo arrives with the save).
+			expect(Math.abs(pending.next - idle.next), 'next row while pending').toBeLessThan(0.5);
+			expect(Math.abs(after.next - saved.next), 'next row when Saved clears').toBeLessThan(0.5);
+		});
+	}
 
 	test('facts line up with the meter beside them in a list={false} section', async ({ page }) => {
 		for (const width of [1440, 320]) {

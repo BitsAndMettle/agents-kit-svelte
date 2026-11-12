@@ -318,6 +318,12 @@
 					<span id={labelId} class="text-[13px] leading-5 font-medium text-fg-main">{@render text(label)}</span>
 				{/if}
 				{#if isDirty}<Badge tone="accent" size="sm" aria-hidden="true">{words.unsaved}</Badge>{/if}
+				<!-- Saving and Saved sit on the label line, never beside the control: the control keeps its place (and a narrow row its wrap) whatever the save state. -->
+				{#if shownStatus === 'pending'}
+					<Spinner size="sm" decorative class="text-fg-light" />
+				{:else if shownStatus === 'saved'}
+					<span aria-hidden="true" data-row-saved class={cn('inline-flex items-center gap-1 text-xs leading-5 font-medium', STATUS_TEXT_CLASS.success)}><Check class="size-3.5" />{statusText ?? words.saved}</span>
+				{/if}
 			</div>
 			{#if description}
 				<p id="{uid}-description" class="m-0 text-xs leading-5 text-fg-light">{@render text(description)}</p>
@@ -340,13 +346,8 @@
 			{/each}
 		</div>
 	</div>
-	{#if control || value !== undefined || badgeOnly || actionList.length || (action && typeof action === 'function') || shownStatus === 'pending' || shownStatus === 'saved'}
+	{#if control || value !== undefined || badgeOnly || actionList.length || (action && typeof action === 'function')}
 		<div class={cn('flex min-w-0 flex-wrap items-center gap-2', layout !== 'stacked' && '@lg/settings:shrink-0 @lg/settings:flex-nowrap @lg/settings:justify-end')}>
-			{#if shownStatus === 'pending'}
-				<Spinner size="sm" decorative class="text-fg-light" />
-			{:else if shownStatus === 'saved'}
-				<span aria-hidden="true" class={cn('inline-flex items-center gap-1 text-xs font-medium', STATUS_TEXT_CLASS.success)}><Check class="size-3.5" />{statusText ?? words.saved}</span>
-			{/if}
 			{#if summary}
 				<div class="flex min-w-0 items-center gap-2 @lg/settings:hidden">
 					<span class="min-w-0 text-[13px] text-fg-main">{@render summary()}</span>

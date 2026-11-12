@@ -1,14 +1,14 @@
 <!--
 	SettingsRow in a staged form. The form is wired by hand with the shared SettingsDraft (the same
 	model SettingsForm uses), so rows register, show "Unsaved" and "was X", and the form posts natively
-	without JavaScript.
+	without JavaScript. A hand-wired form needs its own default submit button (see the form below).
 -->
 <script lang="ts">
 	import { Globe, KeyRound } from '@lucide/svelte';
 	import { Button } from '$lib/primitives/actions';
 	import { Input, NativeSelect, Switch } from '$lib/primitives/form';
 	import { RequestedChange, SettingsRow, SettingsSection } from '$lib/settings/rows';
-	import { SettingsDraft, setSettingsDraft, type SettingStatus, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
+	import { ReadyGate, SettingsDraft, setSettingsDraft, type SettingStatus, type SettingsResult, type SettingsValues } from '$lib/settings/shared';
 
 	const RETENTION = [
 		{ value: '30', label: '30 days' },
@@ -86,9 +86,16 @@
 		genericError: () => "Couldn't save. Your changes are still here."
 	});
 	setSettingsDraft(draft);
+	const ready = new ReadyGate();
 </script>
 
 <form method="post" action="/settings-demo/general" data-testid="row-form" class="max-w-3xl" {@attach draft.attach} onsubmit={draft.onsubmit}>
+	<!--
+		Enter in a field submits with the form's first submit button. Rows below hold other submit
+		buttons (Send again, Ask an owner to upgrade), so this hidden Save comes first. Once the page is
+		interactive it is disabled while nothing changed, so Enter on a clean form does nothing.
+	-->
+	<button type="submit" hidden data-testid="row-default-submit" disabled={ready.current && draft.dirtyCount === 0}>Save</button>
 	<SettingsSection title="General" description="Name, retention and access for Northwind Studio.">
 		<SettingsRow name="teamName" label="Team name" description="Shown on invites and in the browser tab." required>
 			{#snippet control()}

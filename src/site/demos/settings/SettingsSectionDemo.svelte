@@ -68,6 +68,19 @@
 		<SettingsRow label="Billing contact" value="finance@northwind.example" />
 	</SettingsSection>
 
+	<!-- With requestAction the section's request also posts without JavaScript. -->
+	<SettingsSection
+		data-testid="section-request-post"
+		title="Data export"
+		description="Download everything this team has made."
+		lock={{ kind: 'permission', source: 'Admins only' }}
+		onRequest={requestAccess}
+		requestAction="/settings-demo/access?setting=export"
+		lockLabels={{ request: 'Ask an admin' }}
+	>
+		<SettingsRow label="Export format" value="ZIP of Markdown files" />
+	</SettingsSection>
+
 	<SettingsSection data-testid="section-group" title="Appearance" description="How lists look for you on this device.">
 		<SettingsRow label="Density" description="How much space lists leave between rows." group>
 			{#snippet control()}
