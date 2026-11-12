@@ -25,6 +25,7 @@ export interface InstantOptions<T> {
  * - A failure reverts to the last committed value. `error` holds only a message the handler
  *   returned; show `error ?? labels.failed` (the generic "Couldn't save. Changed back.").
  * - `saved` for 2s, then idle. One undo point, superseded by any later `set()`; undo makes none.
+ * - `undo()` resolves false when it could not undo (nothing current, or the undo failed).
  *
  * Show `current` in the control. If the component has a bindable value, mirror `committed` into
  * it (never `current`), so the app's state only ever holds saved values. Construct it while the
@@ -96,7 +97,11 @@ export class InstantSetting<T> {
 		return this.#core.retry();
 	}
 
-	/** Reverses the last change; with a token, only while that token is current. */
+	/**
+	 * Reverses the last change; with a token, only while that token is current. Resolves true once
+	 * undone; false when there was nothing current to undo or the undo failed (then `status` is
+	 * `error` and `error` holds the handler's message, if any). Pass a false on as a failure.
+	 */
 	undo(token?: number): Promise<boolean> {
 		return this.#core.undo(token);
 	}

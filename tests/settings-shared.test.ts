@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, posix, relative } from 'node:path';
 import test from 'node:test';
 import { adoptCurrentAsDefaults, describeChanges, diffForm, readCurrent, readDefaults, sameValue, undescribedChanges, type ControlLike, type OptionLike } from '../src/lib/settings/shared/diff.ts';
-import { InstantCore, UndoSlot, type InstantSnapshot } from '../src/lib/settings/shared/undo.ts';
+import { InstantCore, readResult, UndoSlot, type InstantSnapshot } from '../src/lib/settings/shared/undo.ts';
 import { LOCK_LABELS, LOCK_PRECEDENCE, lockAttrs, lockReasonText, pickLock } from '../src/lib/settings/shared/lock.ts';
 import { matchesPhrase, phrasePattern } from '../src/lib/settings/shared/confirm.ts';
 import { filterSettingsLinks, highlightSegments, searchSettings, toPaletteCommands } from '../src/lib/settings/shared/search.ts';
@@ -284,6 +284,79 @@ test('sync adopts an outside value unless a change is pending', async () => {
 	instance.dispose();
 });
 
+test('a superseded change that succeeded becomes the committed value a later failure reverts to', async () => {
+	const first = deferred<void | SettingsResult>();
+	const second = deferred<void | SettingsResult>();
+	const { instance } = core<boolean>(false, (v: boolean) => (v ? first.promise : second.promise));
+	const a = instance.set(true);
+	const b = instance.set(false);
+	first.resolve();
+	await a;
+	// The handler accepted `true`; the newer change is still pending and owns the status.
+	assert.deepEqual([instance.snapshot.current, instance.snapshot.committed, instance.snapshot.status], [false, true, 'pending']);
+	second.resolve({ error: 'No' });
+	await b;
+	// The failure reverts to what the handler has now, not to the starting value.
+	assert.deepEqual([instance.snapshot.current, instance.snapshot.committed, instance.snapshot.status], [true, true, 'error']);
+	instance.dispose();
+});
+
+test('a superseded success that lands after the newest failed shows the saved value; after a newer success it is ignored', async () => {
+	const slow = deferred<void | SettingsResult>();
+	const failing = core<string>('a', (v: string) => (v === 'b' ? slow.promise : { error: 'No' }));
+	const pending = failing.instance.set('b');
+	await failing.instance.set('c');
+	assert.deepEqual([failing.instance.snapshot.current, failing.instance.snapshot.status], ['a', 'error']);
+	slow.resolve();
+	await pending;
+	assert.deepEqual([failing.instance.snapshot.current, failing.instance.snapshot.committed, failing.instance.snapshot.status], ['b', 'b', 'error']);
+	failing.instance.dispose();
+
+	const late = deferred<void | SettingsResult>();
+	const winning = core<string>('a', (v: string) => (v === 'b' ? late.promise : undefined));
+	const older = winning.instance.set('b');
+	await winning.instance.set('c');
+	late.resolve();
+	await older;
+	assert.deepEqual([winning.instance.snapshot.current, winning.instance.snapshot.committed, winning.instance.snapshot.status], ['c', 'c', 'saved']);
+	winning.instance.dispose();
+});
+
+test('undo resolves false when the undo itself fails', async () => {
+	let calls = 0;
+	const { instance } = core<boolean>(false, () => (++calls === 2 ? { error: 'Undo refused' } : undefined));
+	await instance.set(true);
+	const token = instance.snapshot.undoToken;
+	assert.equal(await instance.undo(token), false);
+	assert.deepEqual([instance.snapshot.current, instance.snapshot.status, instance.snapshot.error], [true, 'error', 'Undo refused']);
+	// A rejected undo fails the same way, and a successful one resolves true.
+	const rejecting = new InstantCore<number>({ initial: 1, commit: () => () => undefined, undo: () => () => Promise.reject(new Error('x')), savedForMs: () => 5 });
+	await rejecting.set(2);
+	assert.equal(await rejecting.undo(), false);
+	assert.equal(rejecting.snapshot.status, 'error');
+	const fine = new InstantCore<number>({ initial: 1, commit: () => () => Promise.resolve(), savedForMs: () => 5 });
+	await fine.set(2);
+	assert.equal(await fine.undo(), true);
+	rejecting.dispose();
+	fine.dispose();
+	instance.dispose();
+});
+
+test('readResult: errors, field errors and any conflict fail and keep only returned text; anything else succeeds', () => {
+	assert.deepEqual(readResult(undefined), { ok: true });
+	assert.deepEqual(readResult('done'), { ok: true });
+	assert.deepEqual(readResult({}), { ok: true });
+	assert.deepEqual(readResult({ notice: 'Sent again.' }), { ok: true, notice: 'Sent again.' });
+	assert.deepEqual(readResult({ error: '  ' }), { ok: true });
+	assert.deepEqual(readResult({ errors: { reason: undefined } }), { ok: true });
+	assert.deepEqual(readResult({ error: 'Offline.' }), { ok: false, error: 'Offline.' });
+	assert.deepEqual(readResult({ error: 'Offline.', errors: { name: 'Too long.' } }), { ok: false, error: 'Offline.' });
+	assert.deepEqual(readResult({ errors: { name: 'Too long.', email: 'Taken.' } }), { ok: false, error: 'Too long. Taken.' });
+	// A conflict is a failure even without a message: never "done".
+	assert.deepEqual(readResult({ conflict: {} }), { ok: false, conflict: {} });
+	assert.deepEqual(readResult({ conflict: { message: 'Scope conflict text' } }), { ok: false, error: 'Scope conflict text', conflict: { message: 'Scope conflict text' } });
+});
+
 test('UndoSlot hands a snapshot back once, to its own token only', () => {
 	const slot = new UndoSlot<string>();
 	const a = slot.remember('first');
@@ -472,6 +545,22 @@ test('actionButtonProps draws links, intents and unavailable actions the same wa
 	assert.deepEqual(actionButtonProps({ label: 'Do it', onSelect: () => undefined }), { variant: 'secondary', type: 'button' });
 });
 
+test('actionButtonProps waits for the page to be ready before a button that only calls back', () => {
+	const select = () => undefined;
+	// A callback does nothing without JavaScript, and a click before hydration is lost.
+	assert.deepEqual(actionButtonProps({ label: 'Regenerate', onSelect: select }, undefined, { ready: false }), { variant: 'secondary', type: 'button', softDisabled: true });
+	assert.deepEqual(actionButtonProps({ label: 'Regenerate', onSelect: select }, undefined, { ready: true }), { variant: 'secondary', type: 'button' });
+	// Nothing to call: unavailable for good.
+	assert.deepEqual(actionButtonProps({ label: 'Nothing' }, undefined, { ready: true }), { variant: 'secondary', type: 'button', softDisabled: true });
+	// Links and intents in a form work natively, so they never wait.
+	assert.deepEqual(actionButtonProps({ label: 'Docs', href: '/docs' }, undefined, { ready: false }), { variant: 'secondary', href: '/docs' });
+	assert.deepEqual(actionButtonProps({ label: 'Reset', intent: 'reset' }, undefined, { ready: false }), { variant: 'secondary', type: 'submit', name: 'intent', value: 'reset' });
+	// An intent with no form to post it is a callback action.
+	assert.deepEqual(actionButtonProps({ label: 'Reset', intent: 'reset', onSelect: select }, undefined, { ready: false, inForm: false }), { variant: 'secondary', type: 'button', softDisabled: true });
+	assert.deepEqual(actionButtonProps({ label: 'Reset', intent: 'reset', onSelect: select }, undefined, { ready: true, inForm: false }), { variant: 'secondary', type: 'button' });
+	assert.deepEqual(actionButtonProps({ label: 'Reset', intent: 'reset' }, undefined, { ready: true, inForm: false }), { variant: 'secondary', type: 'button', softDisabled: true });
+});
+
 // ---------- structure rules every settings component follows ----------
 
 const settingsDir = join(process.cwd(), 'src', 'lib', 'settings');
@@ -484,6 +573,13 @@ function files(dir: string): string[] {
 const sources = files(settingsDir).map((path) => ({ rel: relative(process.cwd(), path).replace(/\\/g, '/'), source: readFileSync(path, 'utf8') }));
 
 const GROUPS = ['shell', 'rows', 'save', 'controls'];
+
+test('dev-only code reads isDev() (esm-env), never import.meta.env, so it works outside Vite and svelte-package stays quiet', () => {
+	const offenders = sources.filter(({ source }) => /import\.meta\.env/.test(source)).map(({ rel }) => rel);
+	assert.deepEqual(offenders, []);
+	const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { dependencies?: Record<string, string> };
+	assert.ok(pkg.dependencies?.['esm-env'], 'esm-env is a declared dependency');
+});
 
 /** Import targets in a group file that reach another group: directly, or through a barrel that re-exports every group. */
 function crossGroupImports(rel: string, source: string): string[] {

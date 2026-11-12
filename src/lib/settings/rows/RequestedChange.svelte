@@ -49,7 +49,7 @@
 	import { RECIPES } from '../shared/recipes';
 	import type { SettingsHandler } from '../shared/types';
 	import { formatRequestedAgo, withQuery } from './helpers';
-	import { HandlerRun } from './run.svelte';
+	import { SettingsHandlerRun } from '../shared/run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, 'class' | 'children' | 'hidden'> {
 		/** Names the setting. */
@@ -106,8 +106,8 @@
 	const uid = $props.id();
 	const draft = getSettingsDraft();
 	const startedAt = Date.now();
-	const cancel = new HandlerRun();
-	const resend = new HandlerRun();
+	const cancel = new SettingsHandlerRun();
+	const resend = new SettingsHandlerRun();
 
 	const words = $derived<RequestedChangeLabels>({
 		awaiting: 'Awaiting approval',

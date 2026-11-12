@@ -42,6 +42,7 @@
 	import { Dialog } from '../../primitives/overlays';
 	import { SettingsDraft, type SettingsSubmitHandler } from '../shared/staged.svelte';
 	import { setSettingsDraft } from '../shared/context';
+	import { firstInvalidControl } from '../shared/focus';
 	import type { SettingsChange, SettingsFieldDescriptor, SettingsResult } from '../shared/types';
 	import { SaveBarPresence, setSaveBarPresence } from './presence.svelte';
 
@@ -144,7 +145,7 @@
 	/** After "Save and leave" failed, where focus goes once the dialog closes: the invalid field, else the error. */
 	function failedLeaveTarget(): HTMLElement | null {
 		if (!draft.guard.failed || !ref) return null;
-		return ref.querySelector<HTMLElement>('[aria-invalid="true"]:not([disabled])') ?? ref.querySelector<HTMLElement>('[data-form-error]');
+		return firstInvalidControl(ref) ?? ref.querySelector<HTMLElement>('[data-form-error]');
 	}
 
 	let leaving = $state(false);

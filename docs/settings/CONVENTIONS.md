@@ -17,12 +17,14 @@ Everything in `docs/primitives/CONVENTIONS.md` and `docs/auth/CONVENTIONS.md` ap
 |---|---|---|
 | Cross-group types (`SettingLock`, `SettingsAction`, `SettingsResult`, `SettingsHandler`, `SettingsChange`, ...) | import the type | `shared/types.ts` |
 | Instant model | `InstantSetting` (runes); rules in `InstantCore`, `UndoSlot` | `shared/instant.svelte.ts`, `shared/undo.ts` |
+| Reading a callback's result | `readResult` (the only reader: `{error}`, `{errors}` and any `{conflict}` fail); `SettingsHandlerRun` for one button's callback | `shared/undo.ts`, `shared/run.svelte.ts` |
 | Staged model | `SettingsDraft`; pure `readDefaults`, `diffForm`, `describeChanges`, `adoptCurrentAsDefaults` | `shared/staged.svelte.ts`, `shared/diff.ts` |
 | Locks | `pickLock`, `lockAttrs`, `lockReasonText`, `LOCK_PRECEDENCE`, `LOCK_LABELS`; `LOCK_ICONS` | `shared/lock.ts`, `shared/lock-icons.ts` |
 | Contexts | `set/getSettingsScope`, `set/getSettingsDraft`, `set/getSectionContext` | `shared/context.ts` |
 | Not-yet-hydrated gate | `ReadyGate` | `shared/ready.svelte.ts` |
 | Search | `searchSettings`, `filterSettingsLinks`, `toPaletteCommands`, `highlightSegments` | `shared/search.ts` |
-| Focus | `rememberOpener`, `openerFor`, `restoreFocus`, `nextFocusAfterRemoval`, `focusIndexAfterRemoval` | `shared/focus.ts` |
+| Focus | `rememberOpener`, `openerFor`, `restoreFocus`, `nextFocusAfterRemoval`, `focusIndexAfterRemoval`, `firstInvalidControl` | `shared/focus.ts` |
+| Dev-only warnings | `isDev()` (esm-env's `DEV`; never `import.meta.env`) | `shared/env.ts` |
 | Copy | `CopyState` (over `copyText` in `src/lib/ui/clipboard.ts`) | `shared/copy.svelte.ts` |
 | Typed confirmation | `matchesPhrase`, `phrasePattern` | `shared/confirm.ts` |
 | Layout and look | `SETTINGS_CONTAINER`, `CQ`, `RECIPES`, `actionButtonProps` | `shared/recipes.ts` |
@@ -61,12 +63,13 @@ Each setting uses exactly one, chosen by the app.
 - Every mutation is a native post, cancelled only when a handler exists.
 - Never nest forms: components detect the SettingsDraft context and drop their own form.
 - Pending submits are ignored, not queued.
-- `ReadyGate` (or `getSettingsScope()?.ready()`) holds back only JS-only affordances: copy, reveal, a matrix column toggle, an instant control with no `action`. A control with a native fallback is never disabled by it.
+- `ReadyGate` (or `getSettingsScope()?.ready()`) holds back only JS-only affordances: copy, reveal, a matrix column toggle, an instant control with no `action`, and an action that only calls back (`onSelect` with no `href` or form `intent`: pass `{ ready }` to `actionButtonProps`, which soft-disables it until then). A control with a native fallback is never disabled by it.
 
 ## Callbacks
 
 - `onSubmit(values, ctx)` for a form's main submit, `onCommit(value)` for instant controls, `onConfirm(ctx)` for confirmations. Everything else is `on<Intent>`: `onUndo`, `onRequest`, `onCancelRequest`, `onResend`, `onDismiss`, `onCopy`, `onAction`, `onReviewConflict`.
-- A callback may return nothing, a `SettingsResult`, or a promise of either (type it `SettingsHandler<[...]>`). The owning button shows `loading` until the promise settles (`isThenable`). `{error}` and `{errors}` are shown; a rejection shows the generic label.
+- A callback may return nothing, a `SettingsResult`, or a promise of either (type it `SettingsHandler<[...]>`). The owning button shows `loading` until the promise settles (`isThenable`). Read the result with `readResult`, never by hand: `{error}`, `{errors}` and `{conflict}` (with or without a message) are failures and their text is shown; a rejection shows the generic label.
+- `InstantSetting.undo()` resolves false when it could not undo (nothing current, or the undo failed). An `onUndo` built on it passes that on as a failure (`{ error }`), so ChangeNotice never says "Undone" for an undo that failed.
 - Status is announced politely through one sr-only `role="status"` per row or bar. Form errors use `role="alert"`, carry `data-form-error` and `tabindex="-1"`, and receive focus.
 
 ## Status words
@@ -87,7 +90,7 @@ Each setting uses exactly one, chosen by the app.
 
 - Container queries only, against the `settings` container (`SETTINGS_CONTAINER` on SettingsLayout's root). Use only the `CQ` breakpoints, written out literally so Tailwind finds them: `@lg/settings:` (rows inline) and `@3xl/settings:` (wide), or their `@max-` forms. No viewport breakpoints (`md:`), no `@media` width queries, no twin DOM. The shared tests enforce this.
 - Semantic tokens only, never hex values. Build on `RECIPES` (`section`, `sectionHeader`, `sectionFooter`, `danger`, `list`, `row`, `rowStaged`, `note`, `iconTile`) instead of restating them.
-- Render a `SettingsAction` with `<Button {...actionButtonProps(action, reasonId)}>`, and show `action.unavailable` as visible text at `reasonId`.
+- Render a `SettingsAction` with `<Button {...actionButtonProps(action, reasonId, { ready })}>`, and show `action.unavailable` as visible text at `reasonId`. Pass `inForm: false` when you know no form will post an `intent`.
 - Semantics: sections are `<section aria-labelledby>`; rows are `<li>` in `<ul role="list">`; facts are `<dl>`; meters are `role="meter"`; results are `role="status"` and errors `role="alert"`; consequence tones carry sr-only prefixes, so meaning never rests on colour or icon alone.
 - A kit control inside a row keeps one label and is described by the row's description, status and lock reason: provide Field context with `createFieldState({ id, describedBy: () => [statusId, reasonId] })`.
 - Touch targets come from the primitives. Do not add your own hit-area padding.

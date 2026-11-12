@@ -3,7 +3,7 @@
  * directly.
  */
 import type { TimeInput } from '../../core/time';
-import type { SettingsAction, SettingsFact, SettingsResult } from '../shared/types';
+import type { SettingsAction, SettingsFact } from '../shared/types';
 
 /**
  * Splits a row's actions into the ones shown as buttons and the ones collapsed into a menu. Up to
@@ -52,20 +52,6 @@ export function formatRequestedAgo(at: TimeInput, now: number): string {
 	if (hours < 24) return `${hours} h ago`;
 	const days = Math.floor(hours / 24);
 	return days === 1 ? 'yesterday' : `${days} days ago`;
-}
-
-/** What a settled callback means for the button that ran it. */
-export type ActionOutcome = { ok: true; notice?: string } | { ok: false; error?: string };
-
-/**
- * Reads a callback's result: a returned `{error}`, `{errors}` or `{conflict}` is a failure that
- * keeps the handler's own message; anything else (nothing, `{}`, `{notice}`) is success.
- */
-export function readOutcome(result: void | SettingsResult | undefined): ActionOutcome {
-	if (!result) return { ok: true };
-	const message = result.error || Object.values(result.errors ?? {}).find(Boolean) || result.conflict?.message;
-	if (message || result.conflict || Object.values(result.errors ?? {}).some(Boolean)) return { ok: false, error: message || undefined };
-	return { ok: true, notice: result.notice };
 }
 
 /**

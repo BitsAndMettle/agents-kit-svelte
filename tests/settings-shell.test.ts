@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { badgeLabel, countLinks, coveringLock, layoutView, matchesShortcut, parseShortcut, resultMessage, asSentence, sentenceStop, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
+import { badgeLabel, countLinks, coveringLock, layoutView, matchesShortcut, parseShortcut, asSentence, sentenceStop, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
 import { pickLock } from '../src/lib/settings/shared/lock.ts';
 import { SAMPLE_SETTINGS_NAV } from '../src/lib/fixtures/settings.ts';
 import { filterSettingsLinks } from '../src/lib/settings/shared/search.ts';
@@ -70,18 +70,6 @@ test('coveringLock: the stronger lock wins, with its own reason; a tie goes to t
 	assert.equal(coveringLock(undefined, 'own-reason', weakParent, pickLock), weakParent);
 	const tie = { lock: { kind: 'permission' as const }, reasonId: 'parent-reason' };
 	assert.deepEqual(coveringLock(own, 'own-reason', tie, pickLock), { lock: own, reasonId: 'own-reason' });
-});
-
-test('resultMessage shows a returned error, else field errors, else nothing', () => {
-	assert.equal(resultMessage(undefined), undefined);
-	assert.equal(resultMessage('done'), undefined);
-	assert.equal(resultMessage({}), undefined);
-	assert.equal(resultMessage({ error: '  ' }), undefined);
-	assert.equal(resultMessage({ error: 'Server said no' }), 'Server said no');
-	assert.equal(resultMessage({ error: 'Server said no', errors: { name: 'Too long' } }), 'Server said no');
-	assert.equal(resultMessage({ errors: { name: 'Too long.', email: 'Taken.' } }), 'Too long. Taken.');
-	assert.equal(resultMessage({ errors: { name: undefined } }), undefined);
-	assert.equal(resultMessage({ notice: 'Saved' }), undefined);
 });
 
 test('sentenceStop and asSentence end a spoken part with a full stop unless it has one', () => {

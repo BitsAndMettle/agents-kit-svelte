@@ -64,6 +64,7 @@
 	// ---- Fixture harness (not part of the composition) ----
 	let viewer = $state(false);
 	let someoneSavesFirst = $state(false);
+	let rejectRole = $state(false);
 	let log = $state('');
 
 	// ---- Routing: the app's, not the kit's ----
@@ -295,6 +296,7 @@
 		await wait();
 		const name = String(values.workspaceName ?? '').trim();
 		if (!name) return { errors: { workspaceName: 'Enter a workspace name.' } };
+		if (rejectRole) return { errors: { defaultRole: 'Pick a role your plan allows.' } };
 		if (someoneSavesFirst && Number(context.revision) === revision) {
 			someoneSavesFirst = false;
 			revision += 1;
@@ -367,6 +369,7 @@
 		<strong class="font-semibold text-fg-main">Composed settings fixture</strong>
 		<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={viewer} data-testid="as-viewer" /> View as a viewer</label>
 		<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={someoneSavesFirst} data-testid="someone-saves" /> Someone else saves first</label>
+			<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={rejectRole} data-testid="reject-role" /> Reject the default role</label>
 		<span class="ml-auto" aria-live="polite" data-testid="composed-log">{log}</span>
 	</div>
 
@@ -488,8 +491,8 @@
 								{/snippet}
 							</SettingsRow>
 							<SettingsToggle name="guests" label="Allow guests" description="Members can invite people from outside." defaultChecked={false} />
-							<!-- Not `group`: a group row hides its label id, and staged ChoiceCards then throws reading it. -->
-							<SettingsRow label="Default role" description="What people get when they join." labelFor={false} layout="stacked">
+							<!-- Not `group`: a group row hides its label id, and staged ChoiceCards then throws reading it. `name` describes the radios to the draft and shows its field error. -->
+							<SettingsRow name="defaultRole" label="Default role" description="What people get when they join." labelFor={false} layout="stacked">
 								{#snippet control()}
 									<ChoiceCards name="defaultRole" variant="rows" options={ROLE_OPTIONS} defaultValue="member" readout={roleReadout} />
 								{/snippet}

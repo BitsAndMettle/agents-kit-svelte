@@ -58,6 +58,7 @@
 	import { Dialog } from '../../primitives/overlays';
 	import { matchesPhrase, phrasePattern, type PhraseOptions } from '../shared/confirm';
 	import { getSettingsDraft } from '../shared/context';
+	import { isDev } from '../shared/env';
 	import { openerFor } from '../shared/focus';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES, SETTINGS_CONTAINER } from '../shared/recipes';
@@ -181,7 +182,7 @@
 	const inDraft = getSettingsDraft() !== undefined;
 
 	// Vite (and SvelteKit) set this in development only; elsewhere it is undefined.
-	if (import.meta.env?.DEV && inDraft) {
+	if (isDev() && inDraft) {
 		let warned = false;
 		$effect(() => {
 			// Attachments (`{@attach enhance}`) arrive under symbol keys.

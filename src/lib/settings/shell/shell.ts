@@ -101,21 +101,6 @@ export function coveringLock(
 }
 
 /**
- * The message a settings callback's result asks to show: its `error`, else its field `errors`
- * joined, else nothing. Anything that is not a `SettingsResult` shows nothing.
- */
-export function resultMessage(result: unknown): string | undefined {
-	if (!result || typeof result !== 'object') return undefined;
-	const { error, errors } = result as { error?: unknown; errors?: unknown };
-	if (typeof error === 'string' && error.trim()) return error;
-	if (errors && typeof errors === 'object') {
-		const messages = Object.values(errors).filter((m): m is string => typeof m === 'string' && m.trim() !== '');
-		if (messages.length) return messages.join(' ');
-	}
-	return undefined;
-}
-
-/**
  * The full stop a spoken part needs so a screen reader pauses after it: `'.'`, or `''` when the
  * part is empty or already ends in punctuation.
  */

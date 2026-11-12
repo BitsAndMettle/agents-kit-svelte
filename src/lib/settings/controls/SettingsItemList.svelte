@@ -48,13 +48,13 @@
 		LOCK_ICONS,
 		lockReasonText,
 		nextFocusAfterRemoval,
+		readResult,
 		ReadyGate,
 		RECIPES,
 		restoreFocus,
 		type SettingsAction,
 		type SettingsItem,
-		type SettingsItemAction,
-		type SettingsResult
+		type SettingsItemAction
 	} from '../shared';
 	import { filterSettingsItems, groupSettingsItems, selectableIds } from './item-list';
 	import { idPart } from './ids';
@@ -235,12 +235,6 @@
 		onValueChange?.(next);
 	}
 
-	function failureOf(result: unknown): string | undefined {
-		const r = result as SettingsResult | undefined;
-		if (!r || typeof r !== 'object') return undefined;
-		return r.error || Object.values(r.errors ?? {}).find(Boolean) || r.conflict?.message || undefined;
-	}
-
 	async function perform(action: SettingsItemAction, item: T): Promise<void> {
 		if (pending[item.id]) return;
 		const list = root?.querySelector<HTMLElement>(`[data-item-id="${CSS.escape(item.id)}"]`)?.closest<HTMLElement>('[data-list]');
@@ -255,8 +249,8 @@
 				pending[item.id] = action.id;
 				result = await result;
 			}
-			const message = failureOf(result);
-			if (message) fail(item, message);
+			const outcome = readResult(result);
+			if (!outcome.ok) fail(item, outcome.error ?? text.failed(item.label));
 		} catch {
 			fail(item, text.failed(item.label));
 		} finally {
@@ -274,7 +268,8 @@
 				bulkPending = action.id;
 				result = await result;
 			}
-			bulkFailed = failureOf(result) ?? '';
+			const outcome = readResult(result);
+			bulkFailed = outcome.ok ? '' : (outcome.error ?? text.failed(action.label));
 		} catch {
 			bulkFailed = text.failed(action.label);
 		} finally {
@@ -504,7 +499,7 @@
 		{#if empty}
 			<EmptyState size="compact" title={empty.title} description={empty.description} headingLevel={subHeading as 3 | 4 | 5}>
 				{#snippet primaryAction()}
-					{#if empty.action}<Button size="sm" {...actionButtonProps(empty.action, `${uid}-empty-reason`)}>{empty.action.label}</Button>{/if}
+					{#if empty.action}<Button size="sm" {...actionButtonProps(empty.action, `${uid}-empty-reason`, { ready: ready.current })} onclick={empty.action.onSelect && !empty.action.unavailable ? () => empty?.action?.onSelect?.() : undefined}>{empty.action.label}</Button>{/if}
 				{/snippet}
 			</EmptyState>
 			{#if empty.action?.unavailable}<p id="{uid}-empty-reason" class="m-0 px-4 pb-4 text-center text-xs text-fg-light">{empty.action.unavailable}</p>{/if}
@@ -577,7 +572,7 @@
 	{#if addAction || footer}
 		<div class={RECIPES.sectionFooter}>
 			{#if addAction}
-				<Button size="sm" {...actionButtonProps(addAction, addReasonId)} loading={addLoading} onclick={addAction.onSelect && !addAction.unavailable ? runAdd : undefined}>
+				<Button size="sm" {...actionButtonProps(addAction, addReasonId, { ready: ready.current })} loading={addLoading} onclick={addAction.onSelect && !addAction.unavailable ? runAdd : undefined}>
 					{#snippet leading()}<Plus aria-hidden="true" />{/snippet}
 					{addAction.label}
 				</Button>

@@ -30,7 +30,7 @@
 	import { actionButtonProps } from '../shared/recipes';
 	import type { SettingsAction, SettingsFact } from '../shared/types';
 	import { factCopyText } from './helpers';
-	import { HandlerRun } from './run.svelte';
+	import { SettingsHandlerRun } from '../shared/run.svelte';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		/** The facts, in order. */
@@ -54,7 +54,7 @@
 	let refusedId = $state<string | undefined>(undefined);
 	let fallback = $state<HTMLElement | null>(null);
 	/** Facts' actions: one runs at a time; its failure shows under that fact. */
-	const actionRun = new HandlerRun();
+	const actionRun = new SettingsHandlerRun();
 	let runningId = $state<string | undefined>(undefined);
 
 	const words = $derived<SettingsFactsLabels>({
@@ -143,7 +143,7 @@
 						{/if}
 						{#if fact.action}
 							<Button
-								{...actionButtonProps(fact.action, fact.action.unavailable ? `${uid}-${fact.id}-unavailable` : undefined)}
+								{...actionButtonProps(fact.action, fact.action.unavailable ? `${uid}-${fact.id}-unavailable` : undefined, { ready: ready.current })}
 								size="xs"
 								class="@lg/settings:ml-auto"
 								loading={actionRun.pending && runningId === fact.id}

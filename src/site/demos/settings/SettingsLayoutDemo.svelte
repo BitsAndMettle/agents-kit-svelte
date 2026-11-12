@@ -180,7 +180,7 @@
 			<figure class="flex w-[360px] max-w-full flex-col gap-2">
 				<figcaption class="text-xs text-fg-light">Phone, filtered by the server with <code>?q=webhooks</code></figcaption>
 				<div data-testid="layout-nomatch-frame" class="overflow-hidden rounded-window border border-card-border bg-canvas-primary">
-					<SettingsLayout {groups} current={null} filter={{ value: 'webhooks', action: '?section=#settings-layout' }} labels={{ title: 'Settings' }} />
+					<SettingsLayout {groups} current={null} filter={{ value: 'webhooks', action: '?#settings-layout' }} labels={{ title: 'Settings' }} />
 				</div>
 			</figure>
 		</div>

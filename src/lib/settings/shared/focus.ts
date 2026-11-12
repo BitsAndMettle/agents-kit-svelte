@@ -88,3 +88,22 @@ export function nextFocusAfterRemoval(list: HTMLElement, removedIndex: number, f
 	const item = items[index];
 	return item.matches(FOCUSABLE) ? item : (item.querySelector<HTMLElement>(FOCUSABLE) ?? fallback);
 }
+
+/** Elements that take focus themselves. */
+const CONTROL = 'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href], [tabindex]';
+
+/**
+ * The control to focus after a failed save: the first `[aria-invalid="true"]` that can take
+ * focus. A group marked invalid as a whole (a `role="radiogroup"` or a fieldset, which cannot
+ * take focus) gives its checked choice, else its first enabled control. Disabled controls and
+ * groups with nothing enabled are skipped.
+ */
+export function firstInvalidControl(root: ParentNode): HTMLElement | null {
+	for (const node of root.querySelectorAll<HTMLElement>('[aria-invalid="true"]')) {
+		if (node.matches(':disabled')) continue;
+		if (node.matches(CONTROL)) return node;
+		const inner = node.querySelector<HTMLElement>('input:checked:not([disabled]):not([type="hidden"])') ?? node.querySelector<HTMLElement>(CONTROL);
+		if (inner) return inner;
+	}
+	return null;
+}

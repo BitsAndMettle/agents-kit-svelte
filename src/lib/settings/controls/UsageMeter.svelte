@@ -40,7 +40,7 @@
 	import { isThenable } from '../../core/promise';
 	import { Button } from '../../primitives/actions';
 	import { Badge } from '../../primitives/display';
-	import { actionButtonProps, type MeterSegment, type SettingsAction } from '../shared';
+	import { actionButtonProps, getSettingsScope, ReadyGate, type MeterSegment, type SettingsAction } from '../shared';
 	import { timeUntil, usageLevel, usagePercent, usageScale, usageTone, type UsageThresholds } from './meter';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
@@ -175,6 +175,8 @@
 	const BAR: Record<NonNullable<Props['size']>, string> = { sm: 'h-1', md: 'h-1.5', lg: 'h-2.5' };
 	const fillFor = (t: UiTone | 'muted' | undefined) => (t === 'muted' ? 'bg-fg-light/40' : TONE_FILL_CLASS[t ?? 'accent']);
 
+	const scope = getSettingsScope();
+	const ready = new ReadyGate(() => (scope ? scope.ready() : undefined));
 	let acting = $state(false);
 	async function runAction(): Promise<void> {
 		if (!action?.onSelect || acting) return;
@@ -284,7 +286,7 @@
 {#snippet actionButton()}
 	{#if action}
 		<span class="inline-flex flex-col items-start gap-1">
-			<Button size="sm" {...actionButtonProps(action, reasonId)} loading={acting} onclick={action.onSelect && !action.unavailable ? runAction : undefined}>{action.label}</Button>
+			<Button size="sm" {...actionButtonProps(action, reasonId, { ready: ready.current })} loading={acting} onclick={action.onSelect && !action.unavailable ? runAction : undefined}>{action.label}</Button>
 			{#if action.unavailable}<span id={reasonId} class="text-xs leading-5 text-fg-light">{action.unavailable}</span>{/if}
 		</span>
 	{/if}
