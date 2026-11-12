@@ -435,27 +435,95 @@ test.describe('Integration fixes: drafts, conflicts and focus', () => {
 		expect(where).toEqual({ body: false, inRail: false });
 	});
 
+	const LONG_LEAVE = ['Weiter bearbeiten', 'Ohne Speichern verlassen', 'Speichern und verlassen'];
 	for (const width of [320, 1280]) {
-		test(`Composed settings: at ${width}px the leave dialog's actions read in the order Tab moves through them`, async ({ page }) => {
+		for (const long of [false, true]) {
+			test(`Composed settings: at ${width}px the leave dialog's ${long ? 'longer (translated) ' : ''}actions stay inside it and read in the order Tab moves through them`, async ({ page }) => {
+				await page.setViewportSize({ width, height: 900 });
+				await open(page);
+				if (long) await page.getByTestId('long-leave').check();
+				await page.getByRole('textbox', { name: 'Workspace name' }).fill('Racing');
+				const away = width >= 1024 ? rail(page).getByRole('link', { name: /^Members/ }) : page.getByRole('link', { name: 'All settings' });
+				await away.click();
+				const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
+				await expect(dialog).toBeVisible();
+				// Measure once the dialog has finished opening (it scales in).
+				await dialog.evaluate((node) => Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)));
+				const frame = (await dialog.boundingBox())!;
+				const boxes = [];
+				for (const name of long ? LONG_LEAVE : ['Keep editing', 'Leave without saving', 'Save and leave']) boxes.push((await dialog.getByRole('button', { name, exact: true }).boundingBox())!);
+				for (const [i, box] of boxes.entries()) {
+					expect(box.x, `button ${i + 1} starts inside the dialog`).toBeGreaterThanOrEqual(frame.x - 0.5);
+					expect(box.x + box.width, `button ${i + 1} ends inside the dialog`).toBeLessThanOrEqual(frame.x + frame.width + 0.5);
+				}
+				for (let i = 1; i < boxes.length; i++) {
+					const [a, b] = [boxes[i - 1], boxes[i]];
+					const below = b.y >= a.y + a.height - 0.5;
+					const beside = Math.abs(b.y - a.y) < 0.5 && b.x >= a.x + a.width - 0.5;
+					expect(below || beside, `button ${i + 1} comes after button ${i}`).toBe(true);
+				}
+				// Where they fit (desktop, the default words), the three share one line.
+				if (width >= 1024 && !long) expect(Math.max(...boxes.map((b) => b.y)) - Math.min(...boxes.map((b) => b.y))).toBeLessThan(1);
+			});
+		}
+	}
+});
+
+test.describe('Integration review fixes: focus after saves, removals and requests', () => {
+	test('Composed settings: after a failed save, focus reaches the first invalid box the filter shows, else the list error', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await openOnClock(page);
+		await page.getByTestId('reject-approvers').check();
+		const approvers = page.getByTestId('composed-approvers');
+		const chloe = approvers.getByRole('checkbox', { name: 'Select Chloe Martin' });
+		await chloe.check();
+		const filter = approvers.getByRole('searchbox', { name: 'Filter Approvers' });
+		// Ada's box (ticked, first in the page) is hidden by the filter.
+		await filter.fill('Chloe');
+		await expect(approvers.getByRole('checkbox', { name: 'Select Ada Park' })).toBeHidden();
+		const save = page.getByRole('button', { name: 'Save', exact: true });
+		await save.click();
+		await page.clock.runFor(700);
+		await expect(chloe).toHaveAttribute('aria-invalid', 'true');
+		await expect(chloe).toBeFocused();
+
+		// Every invalid box hidden: the list's own error takes focus.
+		await filter.fill('zzzz');
+		await save.click();
+		await page.clock.runFor(700);
+		const error = approvers.locator('[data-field-error]');
+		await expect(error).toHaveText('Pick at most two approvers.');
+		await expect(error).toBeFocused();
+	});
+
+	test('Composed settings: removing a member while a filter hides rows moves focus to the next row the filter shows', async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await openOnClock(page);
+		const members = page.getByTestId('composed-members');
+		// "n" hides Ada Park (before Ben) and Dev Rao; Ben Ortiz and Chloe Martin stay.
+		await members.getByRole('searchbox').fill('n');
+		await expect(members.locator('li[data-item-id="m1"]')).toBeHidden();
+		await members.getByRole('button', { name: 'Remove Ben Ortiz' }).click();
+		await page.getByRole('alertdialog', { name: 'Remove Ben Ortiz?' }).getByRole('button', { name: 'Remove' }).click();
+		await page.clock.runFor(700);
+		await expect(members.locator('li[data-item-id="m2"]')).toHaveCount(0);
+		await expect(members.getByRole('combobox', { name: 'Role for Chloe Martin' })).toBeFocused();
+	});
+
+	for (const width of [393, 1440]) {
+		test(`Composed settings: at ${width}px a Cancel that declines the request in place moves focus to the line saying so, not the page`, async ({ page }) => {
 			await page.setViewportSize({ width, height: 900 });
-			await open(page);
-			await page.getByRole('textbox', { name: 'Workspace name' }).fill('Racing');
-			const away = width >= 1024 ? rail(page).getByRole('link', { name: /^Members/ }) : page.getByRole('link', { name: 'All settings' });
-			await away.click();
-			const dialog = page.getByRole('dialog', { name: 'Leave without saving?' });
-			await expect(dialog).toBeVisible();
-			// Measure once the dialog has finished opening (it scales in).
-			await dialog.evaluate((node) => Promise.all(node.getAnimations({ subtree: true }).map((animation) => animation.finished)));
-			const boxes = [];
-			for (const name of ['Keep editing', 'Leave without saving', 'Save and leave']) boxes.push((await dialog.getByRole('button', { name, exact: true }).boundingBox())!);
-			for (let i = 1; i < boxes.length; i++) {
-				const [a, b] = [boxes[i - 1], boxes[i]];
-				const below = b.y >= a.y + a.height - 0.5;
-				const beside = Math.abs(b.y - a.y) < 0.5 && b.x >= a.x + a.width - 0.5;
-				expect(below || beside, `button ${i + 1} comes after button ${i}`).toBe(true);
-			}
-			// Where they fit (desktop), the three share one line.
-			if (width >= 1024) expect(Math.max(...boxes.map((b) => b.y)) - Math.min(...boxes.map((b) => b.y))).toBeLessThan(1);
+			await openOnClock(page);
+			const cancel = page.getByRole('button', { name: 'Cancel request for Storage region' });
+			const row = page.locator('#region li[data-status]');
+			await expect(row).toHaveAttribute('data-status', 'awaiting');
+			await cancel.focus();
+			await page.keyboard.press('Enter');
+			await page.clock.runFor(700);
+			await expect(row).toHaveAttribute('data-status', 'declined');
+			const focused = await page.evaluate(() => ({ body: document.activeElement === document.body, text: document.activeElement?.textContent?.trim() ?? '' }));
+			expect(focused.body).toBe(false);
+			expect(focused.text).toMatch(/was declined\.$/);
 		});
 	}
 });

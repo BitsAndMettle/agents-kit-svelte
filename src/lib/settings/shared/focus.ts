@@ -105,14 +105,29 @@ const CONTROL = 'input:not([disabled]):not([type="hidden"]), select:not([disable
  * The control to focus after a failed save: the first `[aria-invalid="true"]` that can take
  * focus. A group marked invalid as a whole (a `role="radiogroup"` or a fieldset, which cannot
  * take focus) gives its checked choice, else its first enabled control. Disabled controls and
- * groups with nothing enabled are skipped.
+ * groups with nothing enabled are skipped, and so are controls that cannot be seen (a row a
+ * filter hides): focus goes to the first one that can. When every invalid control is hidden, it
+ * goes to the error describing the first of them, if that error can take focus (`tabindex="-1"`).
  */
 export function firstInvalidControl(root: ParentNode): HTMLElement | null {
+	let hidden: HTMLElement | null = null;
 	for (const node of root.querySelectorAll<HTMLElement>('[aria-invalid="true"]')) {
 		if (node.matches(':disabled')) continue;
-		if (node.matches(CONTROL)) return node;
-		const inner = node.querySelector<HTMLElement>('input:checked:not([disabled]):not([type="hidden"])') ?? node.querySelector<HTMLElement>(CONTROL);
-		if (inner) return inner;
+		const target = node.matches(CONTROL)
+			? node
+			: (node.querySelector<HTMLElement>('input:checked:not([disabled]):not([type="hidden"])') ?? node.querySelector<HTMLElement>(CONTROL));
+		if (!target) continue;
+		if (isVisible(target)) return target;
+		hidden ??= target;
+	}
+	return hidden ? describingError(hidden) : null;
+}
+
+/** The first element describing `node` (`aria-describedby`) that can be seen and focused: its error. */
+function describingError(node: HTMLElement): HTMLElement | null {
+	for (const id of (node.getAttribute('aria-describedby') ?? '').split(/\s+/)) {
+		const described = id ? node.ownerDocument.getElementById(id) : null;
+		if (described && described.matches('[tabindex]') && isVisible(described)) return described;
 	}
 	return null;
 }

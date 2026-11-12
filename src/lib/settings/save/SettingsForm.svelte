@@ -225,9 +225,9 @@
 			<Alert tone="danger" live description={text.leaveFailed} class="mt-3" />
 		{/if}
 		{#snippet footer()}
-			<!-- One line where the three fit, else a full-width stack: either way they read, and Tab moves, in the same order, with the primary action last. -->
+			<!-- A full-width stack in a narrow dialog; from 25rem one line, right-aligned, wrapping onto the next line where longer words (a translation) do not fit. Either way they read, and Tab moves, in the same order, with the primary action last. -->
 			<div class="@container/leave grow" data-leave-actions="">
-				<div class="flex flex-col items-stretch gap-2 @[25rem]/leave:flex-row @[25rem]/leave:items-center @[25rem]/leave:justify-end">
+				<div class="flex flex-col items-stretch gap-2 @[25rem]/leave:flex-row @[25rem]/leave:flex-wrap @[25rem]/leave:items-center @[25rem]/leave:justify-end">
 					<Button variant="ghost" disabled={leaving} onclick={() => decide('stay')}>{text.stay}</Button>
 					<Button variant="danger" disabled={leaving} onclick={() => decide('leave')}>{text.leave}</Button>
 					{#if onSubmit}

@@ -190,15 +190,25 @@
 	 */
 	const lineContent = $derived(committing && (instant?.status === 'error' || Boolean(instant?.canUndo && !locked)));
 	let holdLine = $state(false);
+	/**
+	 * A save started after a failure (Retry, or another flip) keeps the Retry button where it was
+	 * until it settles: loading when it was pressed, invisible otherwise. With the row's invisible
+	 * copy of the failure beside it, the line keeps exactly its room.
+	 */
+	let afterFailure = $state(false);
+	let retrying = $state(false);
 	$effect(() => {
 		if (status === 'idle' || status === undefined) holdLine = false;
+		if (status !== 'pending') afterFailure = false;
 	});
 	const showFeedback = $derived(lineContent || (holdLine && status !== 'idle'));
+	const keepRetry = $derived(afterFailure && status === 'pending');
 
 	function change(next: boolean): void {
 		if (!instant) return;
 		undoing = false;
 		holdLine = lineContent;
+		afterFailure = instant.status === 'error';
 		void instant.set(next);
 	}
 
@@ -224,9 +234,12 @@
 		if (!instant) return;
 		const button = event.currentTarget as HTMLElement;
 		holdLine = true;
+		afterFailure = true;
+		retrying = true;
 		const pending = instant.retry();
 		void keepFocus(button);
 		await pending;
+		retrying = false;
 		void keepFocus(button);
 	}
 
@@ -269,8 +282,8 @@
 {/snippet}
 
 {#snippet feedback()}
-	{#if instant && status === 'error'}
-		<Button size="xs" variant="secondary" onclick={retry}>{words.retry}<span class="sr-only"> {label}</span></Button>
+	{#if instant && (status === 'error' || keepRetry)}
+		<Button size="xs" variant="secondary" loading={keepRetry && retrying} onclick={retry} class={cn(keepRetry && !retrying && 'invisible')}>{words.retry}<span class="sr-only"> {label}</span></Button>
 	{:else if committing && instant?.canUndo && !locked}
 		<Button size="xs" variant="ghost" onclick={undo}>{words.undo}<span class="sr-only"> {label}</span></Button>
 	{/if}

@@ -138,7 +138,8 @@
 					</li>
 					<SettingsRow label="Invite link" description="Anyone with it can ask to join." value="northwind.example/join/8f3k" mono action={{ label: 'Reset link', intent: 'reset-invite' }} />
 				</ul>
-				{#if draft.status === 'conflict' && draft.conflict?.fields?.length}
+				<!-- Drawn from draft.conflict, not the status: the review and its choices stay through a retry and a failed save, until a save succeeds. -->
+				{#if draft.conflict?.fields?.length}
 					<div class="border-t border-canvas-border px-4 py-3">
 						<ConflictResolver fields={draft.conflict.fields} changedBy={{ name: 'Ben Ortiz', at: CHANGED_AT }} now={NOW} />
 					</div>

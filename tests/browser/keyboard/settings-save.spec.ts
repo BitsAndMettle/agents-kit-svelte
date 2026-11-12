@@ -1299,3 +1299,40 @@ test.describe('Final fixes: every failure is shown', () => {
 		await expect(page.getByRole('dialog', { name: 'Remove it?' }).locator('[data-form-error]')).toHaveText('Someone else removed it first.');
 	});
 });
+
+test.describe('Integration review fixes: the catalogue conflict review', () => {
+	test('a choice in the settings-form conflict review outlives a failed retry, Enter in it keeps focus, and the next save keeps it', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-form');
+		await pauseClock(page);
+		await section.getByRole('checkbox', { name: 'A teammate saves first' }).check();
+		const team = section.getByRole('textbox', { name: 'Team name' });
+		await team.fill('Mine');
+		const save = section.getByRole('button', { name: 'Save', exact: true });
+		await save.click();
+		await page.clock.runFor(SETTLE);
+		const resolver = section.getByRole('radiogroup', { name: 'Team name' });
+		const latest = resolver.getByRole('radio', { name: 'Latest' });
+		await latest.check();
+		// A retry that fails on another field: the review stays through it and after it.
+		await team.fill('');
+		await save.click();
+		await page.clock.runFor(100);
+		await expect(resolver).toHaveCount(1);
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByText('Enter a team name.')).toBeVisible();
+		await expect(resolver).toHaveCount(1);
+		await expect(latest).toBeChecked();
+		// Enter on the choice saves; the review it sits in stays while that save runs, and so does focus.
+		await team.fill('Mine again');
+		await latest.focus();
+		await press(page, 'Enter');
+		await page.clock.runFor(100);
+		await expect(latest).toBeFocused();
+		await page.clock.runFor(SETTLE);
+		await expect(section.getByTestId('sf-log')).toContainText('Saved revision');
+		await expect(team).toHaveValue('Northwind Studio Ltd');
+		await expect(resolver).toHaveCount(0);
+		expect(await page.evaluate(() => document.activeElement === document.body)).toBe(false);
+	});
+});
+

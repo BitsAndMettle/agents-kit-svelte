@@ -650,7 +650,8 @@
 	<p role="status" data-list-status="" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, hiddenFailures ? 'border-t border-canvas-border px-4 py-2' : 'sr-only')}>{hiddenFailures}</p>
 	<p role="status" data-item-status="" class="sr-only">{statusNews}</p>
 	{#if draft}
-		<p id={errorId} role="alert" data-field-error="" class={cn('m-0 text-xs leading-5 font-medium', DANGER_TEXT, fieldError ? 'border-t border-canvas-border px-4 py-2' : 'sr-only')}>{fieldError ?? ''}</p>
+		<!-- Focusable (tabindex -1): after a failed save, focus comes here when the filter hides every invalid box. -->
+		<p id={errorId} role="alert" data-field-error="" tabindex="-1" class={cn('m-0 text-xs leading-5 font-medium outline-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid focus-visible:outline-accent-primary', DANGER_TEXT, fieldError ? 'border-t border-canvas-border px-4 py-2' : 'sr-only')}>{fieldError ?? ''}</p>
 	{/if}
 
 	{#if selectable}

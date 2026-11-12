@@ -685,9 +685,11 @@ test.describe('Focus and hydration', () => {
 		const retry = rowOf(sounds).getByRole('button', { name: 'Retry Play sounds' });
 		await retry.focus();
 		await press(page, 'Enter');
-		await expect(retry).toHaveCount(0);
-		await expect(sounds).toBeFocused();
+		// Retry stays, loading and focused, while it runs (it holds the failure line's place).
+		await expect(retry).toHaveAttribute('aria-busy', 'true');
+		await expect(retry).toBeFocused();
 		await page.clock.runFor(SETTLE);
+		await expect(retry).toHaveCount(0);
 		await expect(sounds).toBeChecked();
 		await expect(sounds).toBeFocused();
 	});
@@ -1159,9 +1161,9 @@ test.describe('Row layout', () => {
 	}
 
 	// A failed save puts its alert and Retry on the status line, under the switch: the switch stays
-	// where it was, beside the label (1440) or wrapped under it (320), through the failure, a Retry
-	// and the failure again, so tapping it again flips it.
-	for (const width of [1440, 320]) {
+	// where it was, beside the label (1440) or wrapped under it (360, 320), through the failure, a
+	// Retry and the failure again, so tapping it again flips it.
+	for (const width of [1440, 360, 320]) {
 		test(`at ${width}px a failed save and its Retry never move the switch`, async ({ page }) => {
 			await page.clock.install();
 			await openComposed(page, width);
@@ -1192,10 +1194,9 @@ test.describe('Row layout', () => {
 				expect(Math.abs(at.x - idle.x), `switch x while ${phase}`).toBeLessThan(0.5);
 				expect(Math.abs(at.y - idle.y), `switch y while ${phase}`).toBeLessThan(0.5);
 			}
-			// The failure line keeps its room through the Retry: where it fits on one line, the row below
-			// holds still (at 320px the alert and Retry wrap onto two lines and Saving needs one).
-			if (width >= 1024) expect(Math.abs(retrying.next - failed.next), 'next row while retrying').toBeLessThan(0.5);
-			expect(retrying.next - failed.next, 'next row never jumps above the line while retrying').toBeGreaterThan(-25);
+			// The failure line keeps exactly its room through the Retry (an invisible copy of the alert, and
+			// Retry loading in its place), even where they wrap onto two lines: the row below holds still.
+			expect(Math.abs(retrying.next - failed.next), 'next row while retrying').toBeLessThan(0.5);
 			expect(Math.abs(failedAgain.next - failed.next), 'next row once failed again').toBeLessThan(0.5);
 			// A second tap where the switch was flips it again.
 			await page.mouse.click(failedAgain.cx, failedAgain.cy);
@@ -1330,6 +1331,26 @@ test.describe('Integration fixes: a retry holds the failure line', () => {
 		});
 	}
 
+	test('at 393px a row action run again after it failed keeps the failure line exactly until it settles', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-row');
+		await page.setViewportSize({ width: 393, height: 900 });
+		const codes = section.getByTestId('row-codes');
+		const regenerate = codes.getByRole('button', { name: 'Regenerate' });
+		const next = codes.locator('xpath=following-sibling::li[1]');
+		await regenerate.scrollIntoViewIfNeeded();
+		await pauseClock(page);
+		await regenerate.click();
+		await page.clock.runFor(SETTLE);
+		await expect(codes.getByRole('alert')).toHaveText("Couldn't make new codes. Your old ones still work.");
+		const failed = await top(page, next);
+		await regenerate.click();
+		await expect(regenerate).toHaveAttribute('aria-busy', 'true');
+		await expect(codes.getByRole('alert')).toHaveText('');
+		expect(Math.abs((await top(page, next)) - failed), 'next row while it runs again').toBeLessThan(0.5);
+		await page.clock.runFor(SETTLE);
+		await expect(regenerate).not.toHaveAttribute('aria-busy', 'true');
+	});
+
 	for (const width of [1440, 393]) {
 		test(`at ${width}px Send again after a failed Cancel keeps the failure's room until it settles`, async ({ page }) => {
 			const section = await openOnClock(page, 'requested-change');
@@ -1373,7 +1394,8 @@ test.describe('Integration fixes: a retry holds the failure line', () => {
 
 			const plans = section.getByTestId('lock-action-fail');
 			const compare = plans.getByRole('button', { name: 'Compare plans' });
-			const after = plans.locator('xpath=following-sibling::*[1]');
+			// The next lock is visually hidden and never moves: measure the visible line further down.
+			const after = section.getByTestId('lock-tours');
 			await compare.click();
 			await page.clock.runFor(SETTLE);
 			// Not a request: the lock's own words for a failed way forward.
@@ -1389,7 +1411,8 @@ test.describe('Integration fixes: a retry holds the failure line', () => {
 });
 
 test.describe('Integration fixes: Saving stays inside the row', () => {
-	for (const width of [1440, 320]) {
+	// Short labels (Play a sound, no state text) and state text (Compact lists); beside the label or wrapped under it.
+	for (const width of [320, 360, 393, 412, 768, 1440]) {
 		test(`at ${width}px Saving under a switch starts and ends inside the row's content`, async ({ page }) => {
 			await page.clock.install();
 			await openComposed(page, width);
@@ -1409,4 +1432,21 @@ test.describe('Integration fixes: Saving stays inside the row', () => {
 			}
 		});
 	}
+
+	test('at 412px Saving under a catalogue switch stays inside its row', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-toggle');
+		await page.setViewportSize({ width: 412, height: 900 });
+		const control = section.getByTestId('toggle-instant').getByRole('switch', { name: 'Play sounds' });
+		const row = rowOf(control);
+		await control.scrollIntoViewIfNeeded();
+		await pauseClock(page);
+		await control.click();
+		const saving = row.locator('[data-row-saving]');
+		await expect(saving).toBeVisible();
+		const [box, rowBox] = [(await saving.boundingBox())!, (await row.boundingBox())!];
+		const padding = await row.evaluate((node) => ({ start: parseFloat(getComputedStyle(node).paddingLeft), end: parseFloat(getComputedStyle(node).paddingRight) }));
+		expect(box.x).toBeGreaterThanOrEqual(rowBox.x + padding.start - 0.5);
+		expect(box.x + box.width).toBeLessThanOrEqual(rowBox.x + rowBox.width - padding.end + 0.5);
+		expect(box.y + box.height).toBeLessThanOrEqual(rowBox.y + rowBox.height + 0.5);
+	});
 });

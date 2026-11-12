@@ -37,7 +37,7 @@
 
 <script lang="ts">
 	import { ArrowRight, Hourglass } from '@lucide/svelte';
-	import { untrack, type Snippet } from 'svelte';
+	import { tick, untrack, type Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { Button } from '../../primitives/actions';
 	import { Badge } from '../../primitives/display';
@@ -46,6 +46,7 @@
 	import { cn } from '../../ui/cn';
 	import type { UiTone } from '../../ui/styles';
 	import { getSettingsDraft, getSettingsScope } from '../shared/context';
+	import { focusLost, restoreFocus } from '../shared/focus';
 	import { ReadyGate } from '../shared/ready.svelte';
 	import { RECIPES } from '../shared/recipes';
 	import type { SettingsHandler } from '../shared/types';
@@ -135,6 +136,8 @@
 		...labels
 	});
 
+	/** A line focus may be moved to (`tabindex="-1"`): no outline for a pointer, a ring for the keyboard. */
+	const FOCUS_TARGET = 'rounded-sm outline-hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-solid focus-visible:outline-accent-primary';
 	const TONE: Record<RequestedChangeStatus, UiTone> = { awaiting: 'warning', approved: 'success', declined: 'danger', expired: 'neutral' };
 	const nowMs = $derived(now === undefined ? startedAt : now instanceof Date ? now.getTime() : typeof now === 'number' ? now : Date.parse(now));
 	const ago = $derived(requestedAt === undefined ? '' : formatTime(requestedAt, nowMs));
@@ -178,11 +181,20 @@
 		}
 		event.preventDefault();
 		if (cancel.pending || resend.pending) return;
+		const button = event.currentTarget as HTMLElement;
 		heldFailure = failure;
 		(which === 'cancel' ? resend : cancel).reset();
-		await (which === 'cancel' ? cancel : resend).run(handler);
+		const ok = await (which === 'cancel' ? cancel : resend).run(handler);
 		heldFailure = undefined;
+		if (!ok) return;
+		// The app may move `status` on as it answers, taking the buttons away: focus goes to the line
+		// that says where the request stands, else the label, never to the page.
+		await tick();
+		if (!button.isConnected && focusLost()) restoreFocus(outcome, labelEl);
 	}
+
+	let outcome = $state<HTMLElement | null>(null);
+	let labelEl = $state<HTMLElement | null>(null);
 
 	/** Submit buttons need a form: their own, or (inside a SettingsForm) the outer one via `formaction`. */
 	const buttonType = $derived<'submit' | 'button'>(action !== undefined ? 'submit' : 'button');
@@ -233,7 +245,7 @@
 <li {...rest} data-status={status} aria-busy={cancel.pending || resend.pending ? 'true' : undefined} class={cn(RECIPES.row, '@lg/settings:flex-wrap @lg/settings:items-start @lg/settings:gap-y-2', className)}>
 	<div class="flex min-w-0 flex-1 flex-col gap-1">
 		<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-			<span id="{uid}-label" class="text-[13px] leading-5 font-medium text-fg-main">{label}</span>
+			<span id="{uid}-label" bind:this={labelEl} tabindex="-1" class={cn('text-[13px] leading-5 font-medium text-fg-main', FOCUS_TARGET)}>{label}</span>
 			<Badge tone={TONE[status]} dot={status !== 'awaiting'} size="sm">
 				{#snippet icon()}{#if awaiting}<Hourglass aria-hidden="true" />{/if}{/snippet}
 				{words[status]}
@@ -255,7 +267,7 @@
 				<div class="mt-1 min-w-0 rounded-control border border-canvas-border bg-canvas-secondary/60 px-3 py-2 text-xs leading-5 text-fg-main">{@render instructions()}</div>
 			{/if}
 		{:else}
-			<p class="m-0 text-xs leading-5 text-fg-light">
+			<p bind:this={outcome} tabindex="-1" class={cn('m-0 text-xs leading-5 text-fg-light', FOCUS_TARGET)}>
 				{status === 'approved' ? words.approvedLine(effective) : status === 'declined' ? words.declinedLine(effective, requested) : words.expiredLine(effective)}
 			</p>
 		{/if}

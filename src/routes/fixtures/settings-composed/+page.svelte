@@ -68,6 +68,10 @@
 	let viewer = $state(false);
 	let someoneSavesFirst = $state(false);
 	let rejectRole = $state(false);
+	let rejectApprovers = $state(false);
+	/** Longer words for the leave dialog's buttons, as a translation brings. */
+	let longLeave = $state(false);
+	const LONG_LEAVE = { stay: 'Weiter bearbeiten', leave: 'Ohne Speichern verlassen', saveAndLeave: 'Speichern und verlassen' };
 	let log = $state('');
 	/** The app draws its own h1 (read in the browser only: the page is prerendered). */
 	const embedded = $derived(browser && page.url.searchParams.get('embedded') === '1');
@@ -314,6 +318,7 @@
 		const name = String(values.workspaceName ?? '').trim();
 		if (!name) return { errors: { workspaceName: 'Enter a workspace name.' } };
 		if (rejectRole) return { errors: { defaultRole: 'Pick a role your plan allows.' } };
+		if (rejectApprovers) return { errors: { approvers: 'Pick at most two approvers.' } };
 		if (someoneSavesFirst && Number(context.revision) === revision) {
 			someoneSavesFirst = false;
 			revision += 1;
@@ -387,6 +392,8 @@
 		<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={viewer} data-testid="as-viewer" /> View as a viewer</label>
 		<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={someoneSavesFirst} data-testid="someone-saves" /> Someone else saves first</label>
 			<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={rejectRole} data-testid="reject-role" /> Reject the default role</label>
+			<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={rejectApprovers} data-testid="reject-approvers" /> Reject the approvers</label>
+			<label class="inline-flex items-center gap-1.5"><input type="checkbox" bind:checked={longLeave} data-testid="long-leave" /> Long leave words</label>
 		<span class="ml-auto" aria-live="polite" data-testid="composed-log">{log}</span>
 	</div>
 	{#if embedded}<h1 class="m-0 px-4 pt-3 text-base font-semibold">Admin console</h1>{/if}
@@ -485,6 +492,7 @@
 					onDirtyChange={(changes) => (unsaved = changes)}
 					bind:controller
 					aria-label="Workspace policy"
+					labels={longLeave ? LONG_LEAVE : undefined}
 					data-testid="composed-form"
 					class="grid gap-5"
 				>
