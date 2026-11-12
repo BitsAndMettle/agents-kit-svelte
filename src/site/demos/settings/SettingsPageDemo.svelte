@@ -23,15 +23,28 @@
 		requested = true;
 	}
 
+	let notifying = $state(false);
+
+	/** A slow server call that always succeeds. */
+	async function notifyMe(): Promise<void> {
+		await new Promise((resolve) => setTimeout(resolve, 600));
+		notifying = true;
+	}
+
 	const readOnly = $derived<SettingsPageScope>({
 		label: 'Read-only for your role',
 		description: 'You can see how data is kept, but only admins can change it.',
 		tone: 'warning',
 		lock: { kind: 'permission', reason: 'Only admins can change data settings.', source: 'Set by your team’s owner' },
-		actions: requested
-			? [{ label: 'Access requested', unavailable: 'An admin has your request and will get back to you.' }]
-			: // Without JavaScript the button posts intent=request-access; with it, the callback runs instead.
-				[{ label: 'Request access', tone: 'accent', intent: 'request-access', onSelect: requestAccess }]
+		actions: [
+			requested
+				? { label: 'Access requested', unavailable: 'An admin has your request and will get back to you.' }
+				: // Without JavaScript the button posts intent=request-access; with it, the callback runs instead.
+					{ label: 'Request access', tone: 'accent', intent: 'request-access', onSelect: requestAccess },
+			notifying
+				? { label: 'You’ll be notified', unavailable: 'We’ll email you when your role changes.' }
+				: { label: 'Notify me', intent: 'notify-me', onSelect: notifyMe }
+		]
 	});
 </script>
 

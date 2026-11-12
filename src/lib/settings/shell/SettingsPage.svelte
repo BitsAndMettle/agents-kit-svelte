@@ -132,12 +132,15 @@
 	const scopeActions = $derived((scope?.actions ?? (scope?.lock?.action ? [scope.lock.action] : [])).slice(0, 2));
 	const postsIntent = $derived(scopeActions.some((action) => action.intent !== undefined && !action.unavailable && action.href === undefined));
 	let busy = $state<Record<number, boolean>>({});
-	/** What the last scope action's callback reported: its `{ error }`, or the generic label after a rejection. */
-	let failure = $state<string | undefined>();
+	/**
+	 * What each scope action's last run reported: its `{ error }`, or the generic label after a
+	 * rejection. Kept per action, so one action finishing never clears another's error.
+	 */
+	let failures = $state<Record<number, string | undefined>>({});
 
 	async function run(index: number, onSelect: () => unknown): Promise<void> {
 		if (busy[index]) return;
-		failure = undefined;
+		failures[index] = undefined;
 		let result: unknown;
 		try {
 			result = onSelect();
@@ -146,12 +149,12 @@
 				result = await result;
 			}
 		} catch {
-			failure = text.actionFailed;
+			failures[index] = text.actionFailed;
 			return;
 		} finally {
 			busy[index] = false;
 		}
-		failure = resultMessage(result);
+		failures[index] = resultMessage(result);
 	}
 
 	function select(event: MouseEvent, index: number, action: SettingsAction): void {
@@ -216,7 +219,9 @@
 				{#if scope.lock}
 					<p id={reasonId} class="m-0 text-[13px] text-fg-main/80">{lockReasonText(scope.lock)}{#if scope.lock.source}<span class="block text-xs text-fg-main/70">{scope.lock.source}</span>{/if}</p>
 				{/if}
-				{#if failure}<p role="alert" data-settings-scope-error class="m-0 text-[13px] font-medium text-fg-main">{failure}</p>{/if}
+				{#each scopeActions as _, index (index)}
+					{#if failures[index]}<p role="alert" data-settings-scope-error class="m-0 text-[13px] font-medium text-fg-main">{failures[index]}</p>{/if}
+				{/each}
 			</Alert>
 		{/if}
 		{@render banner?.()}

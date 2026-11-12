@@ -16,7 +16,7 @@
 		unsaved: string;
 		/** Screen-reader text for the lock mark. */
 		locked: string;
-		/** Screen-reader text for a badge (the badge itself is drawn as given). */
+		/** Screen-reader text for a badge (the badge itself is drawn as given). Default: `Count: 3` for a number, a word as it is. */
 		badge: (value: string | number) => string;
 	}
 
@@ -42,7 +42,7 @@
 	import { LOCK_ICONS } from '../shared/lock-icons';
 	import type { SettingsLink, SettingsNavGroup } from '../shared/types';
 	import { insideSettingsLayout } from './layout-context';
-	import { countLinks } from './shell';
+	import { asSentence, badgeLabel, countLinks, sentenceStop } from './shell';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title'> {
 		/** The links, in groups. A group without `label` draws no heading. */
@@ -104,7 +104,7 @@
 		matches: (count) => (count === 1 ? '1 setting shown' : `${count} settings shown`),
 		unsaved: 'Unsaved changes',
 		locked: 'Locked',
-		badge: (value) => String(value),
+		badge: badgeLabel,
 		...labels
 	});
 
@@ -160,19 +160,21 @@
 </script>
 
 <!-- The link's name is its label alone. Marks, badge, description and meta describe it
-     (aria-describedby); inside the link they are aria-hidden so they stay out of the name. -->
+     (aria-describedby); inside the link they are aria-hidden so they stay out of the name. Each
+     part is spoken as its own sentence: a visible part without closing punctuation gets a zero-size
+     stop (inline, so no space is spoken before it). -->
 {#snippet marks(link: SettingsLink, base: string)}
 	{#if link.dirty}
 		<span class="inline-flex shrink-0 items-center">
 			<span aria-hidden="true" class="size-1.5 rounded-full bg-accent-primary"></span>
-			<span id="{base}-dirty" aria-hidden="true" class="sr-only">{text.unsaved}.</span>
+			<span id="{base}-dirty" aria-hidden="true" class="sr-only">{asSentence(text.unsaved)}</span>
 		</span>
 	{/if}
 	{#if link.lock}
 		{@const LockIcon = LOCK_ICONS[link.lock]}
 		<span class="inline-flex shrink-0 items-center text-fg-light [&_svg]:size-3.5">
 			<span aria-hidden="true" class="inline-flex"><LockIcon /></span>
-			<span id="{base}-lock" aria-hidden="true" class="sr-only">{text.locked}.</span>
+			<span id="{base}-lock" aria-hidden="true" class="sr-only">{asSentence(text.locked)}</span>
 		</span>
 	{/if}
 {/snippet}
@@ -200,15 +202,15 @@
 					{@render marks(link, base)}
 				</span>
 				{#if link.description}
-					<span id="{base}-description" aria-hidden="true" class={cn('mt-0.5 block text-xs leading-4 font-normal text-fg-light', INDEX_ONLY[variant])}>{link.description}</span>
+					<span id="{base}-description" aria-hidden="true" class={cn('mt-0.5 block text-xs leading-4 font-normal text-fg-light', INDEX_ONLY[variant])}>{link.description}{#if sentenceStop(link.description)}<span class="text-[0px]">{sentenceStop(link.description)}</span>{/if}</span>
 				{/if}
 			</span>
 			{#if link.meta}
-				<span id="{base}-meta" aria-hidden="true" class={cn('shrink-0 text-xs font-normal text-fg-light', link.description && '@max-lg/settings:hidden', INDEX_ONLY[variant])}>{link.meta}</span>
+				<span id="{base}-meta" aria-hidden="true" class={cn('shrink-0 text-xs font-normal text-fg-light', link.description && '@max-lg/settings:hidden', INDEX_ONLY[variant])}>{link.meta}{#if sentenceStop(link.meta)}<span class="text-[0px]">{sentenceStop(link.meta)}</span>{/if}</span>
 			{/if}
 			{#if hasBadge}
 				<Badge tone={link.badgeTone ?? 'neutral'} size="sm" aria-hidden="true">{link.badge}</Badge>
-				<span id="{base}-badge" aria-hidden="true" class="sr-only">{text.badge(link.badge!)}</span>
+				<span id="{base}-badge" aria-hidden="true" class="sr-only">{asSentence(text.badge(link.badge!))}</span>
 			{/if}
 			<ChevronRight aria-hidden="true" class={cn('size-4 shrink-0 text-fg-light rtl:-scale-x-100', INDEX_ONLY[variant])} />
 		</a>

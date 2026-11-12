@@ -136,8 +136,10 @@ test.describe('SettingsNav', () => {
 		const general = index.getByRole('link', { name: 'General', exact: true });
 		await expect(general).toHaveAccessibleName('General');
 		await expect(general).toHaveAccessibleDescription('Unsaved changes. Team name and address.');
-		await expect(index.getByRole('link', { name: 'Billing', exact: true })).toHaveAccessibleDescription(/^Locked\./);
-		await expect(index.getByRole('link', { name: 'Notifications', exact: true })).toHaveAccessibleDescription(/^2\b/);
+		await expect(index.getByRole('link', { name: 'Billing', exact: true })).toHaveAccessibleDescription('Locked. Plan, seats and invoices.');
+		// Each part is its own sentence, and a count badge says it is a count.
+		await expect(index.getByRole('link', { name: 'Notifications', exact: true })).toHaveAccessibleDescription('Count: 2. What we tell you about, and where.');
+		await expect(index.getByRole('link', { name: 'Members', exact: true })).toHaveAccessibleDescription('Who has access, and their roles. 6 members.');
 		await expect(index.getByRole('heading', { name: 'Settings', level: 2 })).toBeVisible();
 		await expect(index.getByRole('heading', { name: 'Team', level: 3 })).toBeVisible();
 	});
@@ -250,6 +252,25 @@ test.describe('SettingsPage', () => {
 		const done = locked.getByRole('button', { name: 'Access requested' });
 		await expect(done).toHaveAttribute('aria-disabled', 'true');
 		await expect(done).toHaveAccessibleDescription('An admin has your request and will get back to you.');
+	});
+
+	test('each scope action keeps its own error: another action finishing later does not clear it', async ({ page }) => {
+		const section = await openOnClock(page, 'settings-page');
+		const locked = section.getByTestId('page-locked');
+		await pauseClock(page);
+		// Request access fails at +600 ms; Notify me, started at +300 ms, succeeds at +900 ms.
+		await locked.getByRole('button', { name: 'Request access' }).click();
+		await page.clock.runFor(300);
+		await locked.getByRole('button', { name: 'Notify me' }).click();
+		await page.clock.runFor(400);
+		const alert = locked.getByRole('alert');
+		await expect(alert).toHaveText('Couldn’t send your request: nothing was sent. Try again.');
+		await page.clock.runFor(400);
+		await expect(locked.getByRole('button', { name: 'You’ll be notified' })).toHaveAttribute('aria-disabled', 'true');
+		await expect(alert).toHaveText('Couldn’t send your request: nothing was sent. Try again.');
+		// Running the failed action again clears its own error.
+		await locked.getByRole('button', { name: 'Request access' }).click();
+		await expect(alert).toHaveCount(0);
 	});
 
 	test('without JavaScript an intent scope action posts its intent from the page’s own form', async ({ browser, baseURL }) => {

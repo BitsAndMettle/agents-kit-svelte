@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { countLinks, coveringLock, layoutView, matchesShortcut, parseShortcut, resultMessage, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
+import { badgeLabel, countLinks, coveringLock, layoutView, matchesShortcut, parseShortcut, resultMessage, asSentence, sentenceStop, type ShortcutEvent } from '../src/lib/settings/shell/shell.ts';
 import { pickLock } from '../src/lib/settings/shared/lock.ts';
 import { SAMPLE_SETTINGS_NAV } from '../src/lib/fixtures/settings.ts';
 import { filterSettingsLinks } from '../src/lib/settings/shared/search.ts';
@@ -82,4 +82,20 @@ test('resultMessage shows a returned error, else field errors, else nothing', ()
 	assert.equal(resultMessage({ errors: { name: 'Too long.', email: 'Taken.' } }), 'Too long. Taken.');
 	assert.equal(resultMessage({ errors: { name: undefined } }), undefined);
 	assert.equal(resultMessage({ notice: 'Saved' }), undefined);
+});
+
+test('sentenceStop and asSentence end a spoken part with a full stop unless it has one', () => {
+	assert.equal(sentenceStop('6 members'), '.');
+	assert.equal(sentenceStop('Team name and address.'), '');
+	assert.equal(sentenceStop('Really?'), '');
+	assert.equal(sentenceStop('   '), '');
+	assert.equal(asSentence('Count: 3'), 'Count: 3.');
+	assert.equal(asSentence(' Unsaved changes '), 'Unsaved changes.');
+	assert.equal(asSentence('Done!'), 'Done!');
+});
+
+test('badgeLabel says a number is a count and reads a word as it is', () => {
+	assert.equal(badgeLabel(3), 'Count: 3');
+	assert.equal(badgeLabel(0), 'Count: 0');
+	assert.equal(badgeLabel('Beta'), 'Beta');
 });

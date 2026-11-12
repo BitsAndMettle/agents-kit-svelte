@@ -114,3 +114,22 @@ export function resultMessage(result: unknown): string | undefined {
 	}
 	return undefined;
 }
+
+/**
+ * The full stop a spoken part needs so a screen reader pauses after it: `'.'`, or `''` when the
+ * part is empty or already ends in punctuation.
+ */
+export function sentenceStop(part: string): '' | '.' {
+	const trimmed = part.trim();
+	return trimmed === '' || /[.!?…:;]$/.test(trimmed) ? '' : '.';
+}
+
+/** A spoken part as its own sentence: trimmed, with a full stop unless it already has one. */
+export function asSentence(part: string): string {
+	return `${part.trim()}${sentenceStop(part)}`;
+}
+
+/** Spoken text for a navigation badge: a number is a count, a word is read as it is. */
+export function badgeLabel(value: string | number): string {
+	return typeof value === 'number' ? `Count: ${value}` : value;
+}
