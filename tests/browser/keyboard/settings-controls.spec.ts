@@ -226,7 +226,7 @@ test.describe('NotificationMatrix', () => {
 		await expect(refused).not.toBeChecked();
 		await expect(matrix.getByRole('alert')).toHaveText(message);
 		await expect(refused).toHaveAttribute('aria-invalid', 'true');
-		await expect(refused).toHaveAccessibleDescription(new RegExp(message.replace(/[.']/g, '\\$&')));
+		await expect(refused).toHaveAccessibleDescription(new RegExp(message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
 		await expect(matrix.getByRole('status')).toHaveText('Saving…');
 		await page.clock.runFor(SETTLE);
 		await expect(mentions).toBeChecked();
