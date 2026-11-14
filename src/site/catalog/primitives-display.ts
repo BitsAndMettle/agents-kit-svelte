@@ -2,7 +2,7 @@ import type { CatalogItemMeta } from '../catalog-registry.ts';
 
 const UPSTREAM = 'Agents Kit Svelte · Primitives';
 
-/** Catalogue entries for the Primitives collection. Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, Notice, EmptyState. Category: 'Primitives'. */
+/** Catalogue entries for the Primitives collection. Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, Notice, EmptyState, ListRow, CopyCommand. Category: 'Primitives'. */
 export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 	{
 		slug: 'badge',
@@ -220,5 +220,53 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
   {#snippet icon()}<Inbox />{/snippet}
   {#snippet primaryAction()}<button type="button">Start a run</button>{/snippet}
 </EmptyState>`
+	},
+	{
+		slug: 'list-row',
+		name: 'ListRow',
+		category: 'Primitives',
+		sveltePath: 'src/lib/primitives/display/ListRow.svelte',
+		upstreamSource: UPSTREAM,
+		description:
+			'One row in a list: a title, a quieter line under it, small facts after the title and your buttons at the end, with a hairline between rows. It is a list item, so it goes in your `<ul>`. With href the title is a link.',
+		usageSnippet: `<script lang="ts">
+  import { Badge, Button, Card, ListRow } from 'agents-kit-svelte/primitives';
+
+  let machines = $state([
+    { id: 'build-box', name: 'Build box', online: true, detail: 'Build 4f2a91c · 2 of 3 slots free' },
+    { id: 'laptop', name: 'Laptop', online: false, detail: 'Last seen 3 days ago' }
+  ]);
+</script>
+
+<Card title="Computers">
+  <ul>
+    {#each machines as machine (machine.id)}
+      <ListRow title={machine.name} description={machine.detail}>
+        <Badge tone={machine.online ? 'success' : 'neutral'} dot>{machine.online ? 'Online' : 'Offline'}</Badge>
+        {#snippet actions()}
+          <Button size="sm" aria-label="Revoke {machine.name}" onclick={() => (machines = machines.filter((other) => other.id !== machine.id))}>Revoke</Button>
+        {/snippet}
+      </ListRow>
+    {/each}
+  </ul>
+</Card>`
+	},
+	{
+		slug: 'copy-command',
+		name: 'CopyCommand',
+		category: 'Primitives',
+		sveltePath: 'src/lib/primitives/display/CopyCommand.svelte',
+		upstreamSource: UPSTREAM,
+		description:
+			'A command to run somewhere else, shown in full, with one button that copies it exactly. The copy is announced. Where the clipboard is blocked it falls back to the older copy command, and says so if that fails too.',
+		usageSnippet: `<script lang="ts">
+  import { CopyCommand } from 'agents-kit-svelte/primitives';
+
+  // Your server made the code. The component only shows the command and copies it.
+  let code = $state('7Q4M-2KXD');
+</script>
+
+<p>Run this on the machine you want to connect:</p>
+<CopyCommand command="curl -fsSL https://example.com/install.sh | sh -s -- connect {code}" copyLabel="Copy the connect command" />`
 	}
 ];

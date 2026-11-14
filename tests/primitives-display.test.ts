@@ -9,7 +9,7 @@ import {
 } from '../src/lib/primitives/display/helpers.ts';
 import { ssr } from './ssr.ts';
 
-const { load, html } = ssr();
+const { load, html, snippet } = ssr();
 
 test('Alert: only a dismissible alert has a dismiss button and a busy state', async () => {
 	const Alert = await load('/src/lib/primitives/display/Alert.svelte');
@@ -28,6 +28,35 @@ test('Notice is an Alert: a warning by default, always with a dismiss button nam
 	const other = html(Notice, { title: 'Hors ligne', tone: 'danger', dismissLabel: 'Ignorer', onDismiss: () => {} });
 	assert.match(other, /bg-status-danger-subtle/);
 	assert.match(other, /aria-label="Ignorer: Hors ligne"/);
+});
+
+test('ListRow: a list item with its title, the facts after it, a quieter line under it and the actions at the end', async () => {
+	const ListRow = await load('/src/lib/primitives/display/ListRow.svelte');
+	const out = html(ListRow, {
+		title: 'Build box',
+		description: 'Two slots free',
+		children: snippet(() => '<span>Online</span>'),
+		actions: snippet(() => '<button type="button">Revoke</button>')
+	});
+	assert.match(out, /^<li class="[^"]*"><div[^>]*><div[^>]*><p[^>]*>Build box<\/p>\s*<span>Online<\/span><\/div>\s*<p[^>]*>Two slots free<\/p><\/div>\s*<div[^>]*><button type="button">Revoke<\/button><\/div><\/li>$/);
+
+	// With `href` the title is the link, and attributes and your class reach the list item.
+	const link = html(ListRow, { title: 'example/site', href: 'https://example.com/site', id: 'repo', class: 'px-4' });
+	assert.match(link, /^<li id="repo" class="[^"]* px-4">/);
+	assert.match(link, /<a href="https:\/\/example\.com\/site"[^>]*>example\/site<\/a>/);
+	assert.doesNotMatch(link, /<p|<button/);
+});
+
+test('CopyCommand: the whole command beside a named copy button, and nothing said until something is copied', async () => {
+	const CopyCommand = await load('/src/lib/primitives/display/CopyCommand.svelte');
+	const out = html(CopyCommand, { command: 'npm install <thing> && echo "done"', copyLabel: 'Copy the install command', class: 'mt-2' });
+	assert.match(out, /^<div class="[^"]* mt-2">/);
+	// Every word is its own box, and together they are the command, character for character.
+	const code = out.match(/<code[^>]*>([\s\S]*?)<\/code>/)?.[1] ?? '';
+	assert.equal(code.replace(/<[^>]*>/g, ''), 'npm install &lt;thing> &amp;&amp; echo "done"');
+	assert.equal(code.match(/<span/g)?.length, 6);
+	assert.match(out, /<button type="button" aria-label="Copy the install command"/);
+	assert.match(out, /<p role="status" class="[^"]*sr-only"><\/p>/);
 });
 
 test('initialsFromName takes first and last word, or two letters of one word', () => {
