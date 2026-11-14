@@ -63,6 +63,11 @@
       "svelte": "./dist/entries/board.js",
       "default": "./dist/entries/board.js"
     },
+    "./settings": {
+      "types": "./dist/entries/settings.d.ts",
+      "svelte": "./dist/entries/settings.js",
+      "default": "./dist/entries/settings.js"
+    },
     "./skills": {
       "types": "./dist/entries/skills.d.ts",
       "svelte": "./dist/entries/skills.js",

@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 import { DEMOS_BOARD } from './board.ts';
+import { DEMOS_SETTINGS } from './settings.ts';
 import { DEMOS_ACTIONS } from './primitives-actions.ts';
 import { DEMOS_FORM } from './primitives-form.ts';
 import { DEMOS_DISPLAY } from './primitives-display.ts';
@@ -11,9 +12,10 @@ import { DEMOS_AUTH_ACCOUNT } from './auth-account.ts';
 import { DEMOS_AUTH_SIGNIN } from './auth-signin.ts';
 import { DEMOS_AUTH_RECOVERY } from './auth-recovery.ts';
 
-/** Every Board, Primitives and Auth demo, keyed by catalogue slug. The showcase renders these generically. */
+/** Every Board, Settings, Primitives and Auth demo, keyed by catalogue slug. The showcase renders these generically. */
 export const PRIMITIVE_DEMOS: Record<string, Component> = {
 	...DEMOS_BOARD,
+	...DEMOS_SETTINGS,
 	...DEMOS_ACTIONS,
 	...DEMOS_FORM,
 	...DEMOS_DISPLAY,

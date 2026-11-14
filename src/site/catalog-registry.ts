@@ -9,12 +9,14 @@ import { PRIMITIVES_NAVIGATION } from './catalog/primitives-navigation.ts';
 import { PRIMITIVES_OVERLAYS } from './catalog/primitives-overlays.ts';
 import { PRIMITIVES_MENUS } from './catalog/primitives-menus.ts';
 import { BOARD } from './catalog/board.ts';
+import { SETTINGS } from './catalog/settings.ts';
 
 export type CatalogCategory =
 	| 'beUI Agents'
 	| 'Beautiful UI'
 	| 'GitHub Cards & Layouts'
 	| 'Board'
+	| 'Settings'
 	| 'Intelligent UI & Generative'
 	| 'Agents UI Orchestration'
 	| 'AI Elements & Coding'
@@ -2867,10 +2869,11 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 	}
 ];
 
-/** Every catalogue entry: the original collections, then Board, Primitives and Auth (one file per group). */
+/** Every catalogue entry: the original collections, then Board, Settings, Primitives and Auth (one file per group). */
 export const CATALOG_ITEMS: CatalogItemMeta[] = [
 	...COLLECTION_ITEMS,
 	...BOARD,
+	...SETTINGS,
 	...PRIMITIVES_ACTIONS,
 	...PRIMITIVES_FORM,
 	...PRIMITIVES_DISPLAY,

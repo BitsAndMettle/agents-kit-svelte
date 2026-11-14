@@ -32,12 +32,17 @@ export function ssr() {
 
 	after(() => vite?.close());
 
+	/** A module at a path from the repository root, compiled by Svelte: how a test reaches a `.svelte.ts` file. */
+	async function module<T>(path: string): Promise<T> {
+		await started;
+		return (await vite.ssrLoadModule(path)) as T;
+	}
+
 	return {
+		module,
+
 		/** The component at a path from the repository root, e.g. `/src/lib/board/CardFace.svelte`. */
-		async load(path: string): Promise<AnyComponent> {
-			await started;
-			return (await vite.ssrLoadModule(path)).default;
-		},
+		load: async (path: string): Promise<AnyComponent> => (await module<{ default: AnyComponent }>(path)).default,
 
 		/** Rendered markup without Svelte's hydration comments, removed until none are left. */
 		html(component: AnyComponent, props: Record<string, unknown> = {}): string {
