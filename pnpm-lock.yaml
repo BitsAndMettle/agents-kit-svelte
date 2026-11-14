@@ -11,6 +11,9 @@ importers:
       '@lucide/svelte':
         specifier: ^1.66.0
         version: 1.66.0(svelte@5.57.1)
+      esm-env:
+        specifier: ^1.2.2
+        version: 1.2.2
       tailwind-merge:
         specifier: ^3.7.0
         version: 3.7.0

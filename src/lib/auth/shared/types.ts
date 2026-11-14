@@ -1,33 +1,23 @@
 import type { Component } from 'svelte';
 import type { TimeInput } from '../../core/time';
+import type { FormResult, FormSubmitContext, FormSubmitHandler } from '../../primitives/form/submit.svelte';
 
 /**
- * What an auth handler can hand back after a submit. `error` is shown once, above the form,
- * and announced; `errors` lands on the named fields. Return nothing on success.
+ * What an auth handler can hand back after a submit: the kit-wide `FormResult`. `error` is shown
+ * once, above the form, and announced; `errors` lands on the named fields. Return nothing on success.
+ * An interface, not an alias, so apps can still augment it.
  */
-export interface AuthResult<F extends string = string> {
-	error?: string;
-	errors?: Partial<Record<F, string>>;
-}
+export interface AuthResult<F extends string = string> extends FormResult<F> {}
+
+/** Everything a submit handler gets beside the typed values: the kit-wide `FormSubmitContext`. */
+export interface AuthSubmitContext extends FormSubmitContext {}
 
 /**
- * Everything a submit handler gets beside the typed values: the raw `FormData` (with the
- * submitter's name and value) and the event, for callers that need either.
+ * A component's submit callback: the kit-wide `FormSubmitHandler`. Return (or resolve to) an
+ * `AuthResult` to show errors; while a returned promise is pending the form shows its pending
+ * state and ignores further submits. A rejected promise shows the generic error text.
  */
-export interface AuthSubmitContext {
-	data: FormData;
-	event: SubmitEvent;
-}
-
-/**
- * A component's submit callback. Return (or resolve to) an `AuthResult` to show errors; while a
- * returned promise is pending the form shows its pending state and ignores further submits.
- * A rejected promise shows the component's generic error text, never the thrown message.
- */
-export type AuthSubmitHandler<V, F extends string = string> = (
-	values: V,
-	context: AuthSubmitContext
-) => void | AuthResult<F> | Promise<void | AuthResult<F>>;
+export type AuthSubmitHandler<V, F extends string = string> = FormSubmitHandler<V, F>;
 
 /** A sign-in provider (an OAuth or SSO button). The kit ships no brand logos: pass your own `icon`. */
 export interface AuthProvider {

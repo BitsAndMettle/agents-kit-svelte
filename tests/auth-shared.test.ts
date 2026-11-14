@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { readCheck, readText } from '../src/lib/auth/shared/form-data.ts';
+import { readCheck, readText } from '../src/lib/primitives/form/form-data.ts';
 import { secondsLeft } from '../src/lib/auth/shared/wait.ts';
 
 test('secondsLeft rounds up, never goes negative, and treats missing or invalid times as no wait', () => {

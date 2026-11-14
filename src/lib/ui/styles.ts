@@ -50,6 +50,21 @@ export function buttonClass(
 	return `${BUTTON_BASE} ${BUTTON_VARIANTS[variant]} ${BUTTON_SIZES[size]} ${extra}`.trim();
 }
 
+/**
+ * Touch target extender. On a coarse pointer (touch), an invisible `::after` grows to at least
+ * 44 by 44px, centred on the element, so small controls are easy to hit; the visible face and the
+ * fine-pointer (mouse) layout do not change. The pseudo-elements are positioned against the
+ * nearest positioned ancestor: put the class on a `relative` element, or on a native input whose
+ * wrapper is `relative` and the same size as the face.
+ *
+ * A tap on a visible face always reaches that control: an invisible `::before` covers exactly the
+ * face one layer up (`z-index: 1`), above every neighbour's extender. Where two extenders overlap
+ * outside the faces, the later one in the page takes the tap. A negative z-index would not do:
+ * it puts the extender under every block ancestor, which then takes the tap instead.
+ */
+export const TOUCH_TARGET_CLASS =
+	'pointer-coarse:before:absolute pointer-coarse:before:inset-0 pointer-coarse:before:z-[1] pointer-coarse:after:absolute pointer-coarse:after:top-1/2 pointer-coarse:after:left-1/2 pointer-coarse:after:h-[max(100%,44px)] pointer-coarse:after:w-[max(100%,44px)] pointer-coarse:after:-translate-x-1/2 pointer-coarse:after:-translate-y-1/2';
+
 /** Plain colored text for status labels ("Running", "Failed"), as upstream uses. */
 export const STATUS_TEXT_CLASS: Record<UiTone, string> = {
 	neutral: 'text-fg-light',

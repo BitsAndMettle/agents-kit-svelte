@@ -44,7 +44,8 @@
 	import { Field } from '../../primitives/form';
 	import { AuthCard, OtpInput } from '../fields';
 	import { AuthSubmit, Cooldown, readText } from '../shared';
-	import { LINK_CLASS, isThenable } from './look';
+	import { LINK_CLASS } from './look';
+	import { isThenable } from '../../core/promise';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title' | 'hidden' | 'onsubmit' | 'oninput'> {
 		/** The address the link or code was sent to. */

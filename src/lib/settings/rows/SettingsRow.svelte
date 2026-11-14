@@ -1,0 +1,430 @@
+<script lang="ts" module>
+	/**
+	 * Only a disabled native control (a switch, a checkbox) may hide behind a lock badge: it takes no
+	 * focus. A copy that holds anything focusable (a link, or a button that ignores the field's
+	 * disabled) shows itself again. It is CSS, so it holds before hydration and without
+	 * JavaScript too; a Tab stop is never invisible.
+	 */
+	const HIDDEN_COPY_CLASS =
+		"sr-only [&:has(:is(a[href],button:not(:disabled),input:not(:disabled):not([type=hidden]),select:not(:disabled),textarea:not(:disabled),[tabindex]:not([tabindex^='-'])))]:not-sr-only";
+
+	/** Words of a SettingsRow. */
+	export interface SettingsRowLabels {
+		/** Tag on a row with an unsaved change. */
+		unsaved: string;
+		/** The saved value while the row has an unsaved change ("was 90 days"). */
+		was: (value: string) => string;
+		/** Announced while saving. */
+		saving: string;
+		/** Shown and announced after a save. */
+		saved: string;
+		/** Shown when `status` is `error` and no `error` text is given. Say what happened to the value. */
+		failed: string;
+		/** Shown when `status` is `conflict`. */
+		conflict: string;
+		/** The summary mode's link. */
+		edit: string;
+		/** Name of the button that opens the menu of actions beyond the second; gets the row's label ("More actions for Ada Park"). */
+		moreActions: (label: string) => string;
+		/** Shown when an action's `onSelect` rejects or throws (a returned `{error}` shows its own text). */
+		actionFailed: string;
+	}
+</script>
+
+<script lang="ts">
+	import { Check, Ellipsis } from '@lucide/svelte';
+	import type { Snippet } from 'svelte';
+	import type { HTMLAttributes } from 'svelte/elements';
+	import { Button } from '../../primitives/actions';
+	import { Badge, Spinner } from '../../primitives/display';
+	import { DANGER_TEXT } from '../../primitives/form/classes';
+	import { createFieldState, fieldControlAttrs, setFieldContext, type FieldControlAttrs, type FieldState } from '../../primitives/form/field';
+	import { DropdownMenu } from '../../primitives/menus';
+	import type { MenuEntry } from '../../primitives/menus/types';
+	import { cn } from '../../ui/cn';
+	import { buttonClass, STATUS_TEXT_CLASS, TOUCH_TARGET_CLASS } from '../../ui/styles';
+	import { getSettingsDraft, getSettingsScope, setSettingsScope } from '../shared/context';
+	import { pickLock } from '../shared/lock';
+	import { ReadyGate } from '../shared/ready.svelte';
+	import { actionButtonProps, RECIPES } from '../shared/recipes';
+	import type { SettingLock, SettingsAction, SettingsHandler, SettingStatus } from '../shared/types';
+	import LockReason, { type LockReasonLabels } from './LockReason.svelte';
+	import { splitActions } from './helpers';
+	import { SettingsHandlerRun } from '../shared/run.svelte';
+
+	export interface Props extends Omit<HTMLAttributes<HTMLLIElement>, 'class' | 'children'> {
+		/** Names the setting. With a `control`, it is the control's one `<label>`. */
+		label: string | Snippet;
+		/** Help text under the label; describes the control. */
+		description?: string | Snippet;
+		/** Inside a SettingsForm: the control's form name. The row registers it (`label`, `format`) so its change counts and shows "was X". */
+		name?: string;
+		/** The control. Kit controls inside wire themselves to the label, description, status and lock reason; the argument wires any other element. */
+		control?: Snippet<[FieldControlAttrs]>;
+		/** Id the control takes (default generated). Set it here, not on the control. */
+		controlId?: string;
+		/** The label is the control's `<label for>` (default). Set false for a control a `<label>` cannot name, such as a link: the label is then plain text, and the control spreads only the argument's `aria-describedby` so the description still describes it. */
+		labelFor?: boolean;
+		/** The control is several inputs (a RadioGroup, checkboxes): the right side becomes one group (a `<fieldset>`) named by the label and described by the description, status and lock reason. A lock disables everything in it. A kit RadioGroup inside takes no second name from the row. */
+		group?: boolean;
+		/** A read-only value shown instead of a control. */
+		value?: string | Snippet;
+		/** Shows `value` in the monospace face (ids, versions, paths). */
+		mono?: boolean;
+		/** An icon or avatar before the label, up to 2rem wide (like `RECIPES.iconTile`): the label and the status line start after a 2rem column. */
+		leading?: Snippet;
+		/** One trailing action, or your own snippet. An `onSelect` may return `{error}` or a promise: the button loads, and a failure shows in the row's alert. */
+		action?: SettingsAction | Snippet;
+		/** Trailing actions. More than two collapse into a "More actions" menu once the page is interactive; links and form intents always stay buttons. An action that only calls back (`onSelect`, no `href` or `intent`) is soft-disabled until then, since it can do nothing without JavaScript. */
+		actions?: SettingsAction[];
+		/** Where the row's own change stands (instant controls set it). Saving and Saved show small in the row's bottom padding (at the control's side), taking no room, or on the status line while it shows. Wins over the form's state. */
+		status?: SettingStatus;
+		/** Error text, shown in the row's alert on the status line and describing the control. It marks the control invalid unless `status` is `error` or `conflict` (a failed instant save: nothing the person entered is invalid). Inside a SettingsForm, the form's error for `name` is used when this is not set. */
+		error?: string;
+		/** Polite status text that replaces the default for the current status ("Changed back"). */
+		statusText?: string;
+		/** Marks an unsaved change. Default: from the SettingsForm (`name`). */
+		dirty?: boolean;
+		/** The saved value's text while dirty. Default: from the SettingsForm (`name`). */
+		previous?: string;
+		/** What the change will do, shown only while dirty. */
+		impact?: string | Snippet;
+		/** Locks this row. The strongest of this, its section's and its page's lock applies. A `badge` hides a single disabled switch or checkbox behind it (still there for assistive technology); anything focusable stays visible beside the badge, and a `group` row always does. */
+		lock?: SettingLock;
+		/** Id of a reason shown elsewhere (one LockReason describing several rows), for this row's own `lock`. The row then shows no reason of its own. When a stronger section or page lock wins, the control is described by that lock's reason instead. */
+		reasonId?: string;
+		/** Request flow for the row's own lock reason. */
+		onRequest?: SettingsHandler<[]>;
+		/** No-JavaScript path for that request: LockReason's `requestAction`. */
+		requestAction?: string;
+		required?: boolean;
+		/** Turns a posted value into display text for change summaries ("30" → "30 days"). */
+		format?: (raw: string | string[]) => string;
+		/** `auto` stacks on narrow containers and goes inline from 32rem. `inline` keeps the control beside the label while the label keeps at least 60% of the row (and 14rem), and wraps it under the label otherwise. `stacked` always puts the control under the label. */
+		layout?: 'auto' | 'inline' | 'stacked';
+		/** Narrow summary mode: below 32rem, this summary and an Edit link replace the control. */
+		summary?: Snippet;
+		/** Where the summary's Edit link goes. */
+		editHref?: string;
+		/**
+		 * Extra content on the status line under the row, such as a Retry or Undo button. The line is
+		 * the row's last: it never moves the control. It takes room while `feedback` is passed (or an
+		 * error shows), so pass it only while it has something to show: a row that only saves moves
+		 * nothing below it.
+		 */
+		feedback?: Snippet;
+		labels?: Partial<SettingsRowLabels>;
+		/** Words for the row's own lock reason. */
+		lockLabels?: Partial<LockReasonLabels>;
+		class?: string;
+	}
+
+	let {
+		label,
+		description,
+		name,
+		control,
+		controlId,
+		labelFor = true,
+		group = false,
+		value,
+		mono = false,
+		leading,
+		action,
+		actions,
+		status,
+		error,
+		statusText,
+		dirty,
+		previous,
+		impact,
+		lock,
+		reasonId,
+		onRequest,
+		requestAction,
+		required = false,
+		format,
+		layout = 'auto',
+		summary,
+		editHref,
+		feedback,
+		labels = {},
+		lockLabels,
+		class: className = '',
+		...rest
+	}: Props = $props();
+
+	const uid = $props.id();
+	const draft = getSettingsDraft();
+	const scope = getSettingsScope();
+	const ready = new ReadyGate(() => (scope ? scope.ready() : undefined));
+
+	const words = $derived<SettingsRowLabels>({
+		unsaved: 'Unsaved',
+		was: (v) => `was ${v}`,
+		saving: 'Saving…',
+		saved: 'Saved',
+		failed: "Couldn't save. Changed back.",
+		conflict: 'Changed elsewhere. Review it before saving.',
+		edit: 'Edit',
+		moreActions: (label) => (label ? `More actions for ${label}` : 'More actions'),
+		actionFailed: "Couldn't do that. Try again.",
+		...labels
+	});
+
+	const labelText = $derived(typeof label === 'string' ? label : (name ?? ''));
+
+	$effect(() => {
+		if (!draft || !name) return;
+		return draft.register({ name, label: labelText, format });
+	});
+
+	const effectiveLock = $derived(pickLock(lock, scope?.lock?.lock));
+	/** The row draws its own reason only for its own lock, and only when no shared reason is named. */
+	const ownReason = $derived(Boolean(effectiveLock && effectiveLock === lock && !reasonId));
+	/** The reason of the lock that applies: the row's own (shared `reasonId` or drawn here), else the section's or page's. */
+	const lockReasonId = $derived(
+		effectiveLock ? (effectiveLock === lock ? (reasonId ?? `${uid}-reason`) : scope?.lock?.reasonId) : undefined
+	);
+
+	// What the control sees around it: the lock that applies here and its reason, so a kit control
+	// that shows a covering lock (a ConsequenceDialog) says this row's reason, not a generic one.
+	setSettingsScope({
+		ready: () => ready.current,
+		get lock() {
+			return effectiveLock && lockReasonId ? { lock: effectiveLock, reasonId: lockReasonId } : undefined;
+		}
+	});
+
+	const isDirty = $derived(dirty ?? (draft && name ? draft.isDirty(name) : false));
+	const was = $derived(previous ?? (draft && name ? draft.previous(name) : undefined));
+	const errorText = $derived(
+		error ?? (draft && name ? draft.fieldError(name) : undefined) ?? (status === 'error' ? words.failed : status === 'conflict' ? words.conflict : undefined)
+	);
+	const shownStatus = $derived<SettingStatus>(status ?? (errorText ? 'error' : 'idle'));
+	/** A field error marks the control invalid. A failed instant save (`status` error or conflict) only describes it: nothing the person entered is invalid. */
+	const fieldInvalid = $derived(Boolean(errorText) && status !== 'error' && status !== 'conflict');
+	/** The row's own actions: one runs at a time; its failure shows in the alert, its notice in the status. */
+	const actionRun = new SettingsHandlerRun();
+	let running = $state.raw<SettingsAction | undefined>(undefined);
+	const actionError = $derived(actionRun.status === 'failed' ? (actionRun.error ?? words.actionFailed) : undefined);
+	const liveText = $derived(
+		statusText ??
+			(shownStatus === 'pending' ? words.saving : shownStatus === 'saved' ? words.saved : actionRun.status === 'done' ? (actionRun.notice ?? '') : '')
+	);
+
+	/**
+	 * The `feedback` (Undo, Retry) and the alert show on a status line: the row's last flex line,
+	 * after the control. It takes no room on the label line, so labels wrap as they would anyway,
+	 * and coming or going it never moves the control, beside the label or wrapped under it. With
+	 * nothing to show it is hidden. Saving and Saved join it while it shows; otherwise they show
+	 * small in the row's bottom padding, taking no room, so a tap that only saves moves no row below and the
+	 * next row's switch is where it was.
+	 */
+	const lineHeld = $derived(Boolean(feedback) || Boolean(errorText) || Boolean(actionError));
+	const savedText = $derived(statusText ?? words.saved);
+	/** A save (`status` pending) or a row action is running. */
+	const busy = $derived(shownStatus === 'pending' || actionRun.pending);
+	/** The failure the line showed when nothing was running last. */
+	let lastFailure = $state<string[]>([]);
+	$effect(() => {
+		if (!busy) lastFailure = [errorText, actionError].filter((text): text is string => Boolean(text));
+	});
+	/**
+	 * A retry after a failure (the app passes `status` pending again, a row action runs again, or a
+	 * SettingsToggle retries) keeps an invisible copy of the failure where its alert was until it
+	 * settles, so the line keeps exactly its room and the rows below do not move up and back down,
+	 * as LockReason and RequestedChange do. Saving shows over the copy.
+	 */
+	const heldFailure = $derived(busy && !errorText && !actionError && lastFailure.length > 0 ? lastFailure : undefined);
+
+	const changeId = `${uid}-change`;
+	const impactId = `${uid}-impact`;
+	const statusId = `${uid}-status`;
+	const labelId = `${uid}-label`;
+
+	const field = createFieldState({
+		id: uid,
+		controlId: () => controlId,
+		description: () => Boolean(description),
+		error: () => fieldInvalid,
+		required: () => required,
+		disabled: () => Boolean(effectiveLock),
+		group: () => group,
+		describedBy: () => [
+			isDirty ? changeId : undefined,
+			isDirty && impact ? impactId : undefined,
+			liveText ? statusId : undefined,
+			lockReasonId,
+			errorText && !fieldInvalid ? `${uid}-error` : undefined
+		]
+	});
+	// In a group row the fieldset is the one group the label names, so the control gets no label id:
+	// a RadioGroup would otherwise name itself by it too ("Size, group" then "Size, radio group").
+	// The rest of the field state is the row's own, read through the prototype.
+	setFieldContext(
+		Object.create(field, {
+			labelId: { enumerable: true, get: () => (group ? undefined : field.labelId) }
+		}) as FieldState
+	);
+	const attrs = $derived(fieldControlAttrs(field));
+	const groupDescribedBy = $derived(
+		group ? [field.descriptionId, ...(field.describedBy ?? []), field.errorId].filter(Boolean).join(' ') || undefined : undefined
+	);
+
+	const actionList = $derived(actions ?? (action && typeof action !== 'function' ? [action as SettingsAction] : []));
+	const split = $derived(ready.current ? splitActions(actionList) : { visible: actionList, overflow: [] });
+	const menuItems = $derived<MenuEntry[]>(
+		split.overflow.map((a, index) => ({
+			value: `action-${index}`,
+			// A menu item's text is its name, so the action's fuller name (`ariaLabel`) is shown.
+			label: a.ariaLabel ?? a.label,
+			tone: a.tone === 'danger' ? 'danger' : 'neutral',
+			disabled: Boolean(a.unavailable),
+			// Links and intents never reach the menu (splitActions), so an item only calls back.
+			onSelect: () => void startAction(a)
+		}))
+	);
+
+	/** Runs an action's `onSelect` unless one is pending. True when it returned a promise (now loading). */
+	function startAction(a: SettingsAction): boolean {
+		if (!a.onSelect || actionRun.pending) return false;
+		running = a;
+		void actionRun.run(a.onSelect);
+		return actionRun.pending;
+	}
+
+	function runAction(a: SettingsAction, event: MouseEvent): void {
+		// A promise means the callback handles it: a link with one does not also navigate.
+		if (startAction(a)) event.preventDefault();
+	}
+
+	const layoutClass = $derived(
+		layout === 'inline'
+			? 'flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2 @lg/settings:items-center @lg/settings:gap-x-6 @lg/settings:gap-y-2'
+			: layout === 'stacked'
+				? '@lg/settings:flex-col @lg/settings:items-stretch @lg/settings:justify-start @lg/settings:gap-2'
+				: // Inline from 32rem, the status line wraps onto a line of its own (the label takes any width, so nothing else wraps).
+					// A control that grows a status line of its own (an instant ChoiceCards) top-aligns the row,
+					// so the line coming never re-centres the control under the pointer.
+					'@lg/settings:flex-wrap @lg/settings:gap-y-2 @lg/settings:[&:has([data-instant-status])]:items-start'
+	);
+	/** A lock badge ("Always on") replaces what the row shows. A control stays in the page, visually hidden and disabled, so assistive technology meets the same switch either way. */
+	const badgeOnly = $derived(Boolean(effectiveLock?.badge));
+	/** A group row shows its controls disabled beside the badge; a single control hides (see HIDDEN_COPY_CLASS). */
+	const hideControl = $derived(badgeOnly && !group);
+	const hasControlColumn = $derived(Boolean(control || value !== undefined || badgeOnly || actionList.length || (action && typeof action === 'function')));
+	/** Saving or Saved, small in the row's bottom padding (no room taken) unless the status line shows. */
+	const statusUnder = $derived(!lineHeld && !heldFailure && hasControlColumn);
+	/**
+	 * Where that small status sits in the row's content box: at its end where the control sits at
+	 * the row's end (inline, and `auto` from `CQ.row`), at its start where the control stacks under
+	 * the label. Placed against the row, not the control, so a word wider than the control never
+	 * leaves the row or runs into the label column.
+	 */
+	const underAlign = $derived(layout === 'stacked' ? 'justify-start' : layout === 'inline' ? 'justify-end' : 'justify-start @lg/settings:justify-end');
+</script>
+
+{#snippet text(content: string | Snippet)}
+	{#if typeof content === 'string'}{content}{:else}{@render content()}{/if}
+{/snippet}
+
+{#snippet controlBody(draw: Snippet<[FieldControlAttrs]>)}
+	{#if group}
+		<fieldset aria-labelledby={labelId} aria-describedby={groupDescribedBy} disabled={Boolean(effectiveLock) || undefined} class="m-0 min-w-0 border-0 p-0">{@render draw(attrs)}</fieldset>
+	{:else}
+		{@render draw(attrs)}
+	{/if}
+{/snippet}
+
+{#snippet controlArea()}
+	{#if control && hideControl}
+		<div class={HIDDEN_COPY_CLASS}>{@render controlBody(control)}</div>
+		<!-- Exposed either way: the copy may show itself (HIDDEN_COPY_CLASS), and CSS cannot toggle aria-hidden. -->
+		<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>
+	{:else if control}
+		{@render controlBody(control)}
+		{#if badgeOnly}<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>{/if}
+	{:else if badgeOnly}
+		<Badge tone="neutral" variant="outline" size="lg">{effectiveLock?.badge}</Badge>
+	{:else if value !== undefined}
+		<span class={cn('min-w-0 text-[13px] break-words text-fg-main', mono && 'font-mono text-xs')}>{@render text(value)}</span>
+	{/if}
+{/snippet}
+
+<li {...rest}
+	aria-busy={shownStatus === 'pending' ? 'true' : undefined}
+	data-status={shownStatus}
+	data-dirty={isDirty ? '' : undefined}
+	data-locked={effectiveLock?.kind}
+	class={cn(RECIPES.row, isDirty && RECIPES.rowStaged, layoutClass, className)}
+>
+	<!-- Inline: the label keeps at least 60% of the row (and 14rem, room for a leading icon and a lock reason); a control that needs more wraps under it. -->
+	<div class={cn('flex min-w-0 items-start gap-3', layout === 'inline' ? 'flex-[1_1_max(60%,14rem)]' : 'flex-1')}>
+		{#if leading}<div class="flex min-w-8 shrink-0 justify-center pt-0.5">{@render leading()}</div>{/if}
+		<div class="flex min-w-0 flex-1 flex-col gap-0.5">
+			<div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+				{#if control && !group && labelFor}
+					<label id={labelId} for={field.controlId} class="min-w-0 text-[13px] leading-5 font-medium break-words text-fg-main">{@render text(label)}{#if required}<span aria-hidden="true" class="text-status-danger"> *</span>{/if}</label>
+				{:else}
+					<span id={labelId} class="min-w-0 text-[13px] leading-5 font-medium break-words text-fg-main">{@render text(label)}</span>
+				{/if}
+				{#if isDirty}<Badge tone="accent" size="sm" aria-hidden="true" class="shrink-0">{words.unsaved}</Badge>{/if}
+			</div>
+			{#if description}
+				<p id="{uid}-description" class="m-0 text-xs leading-5 text-fg-light">{@render text(description)}</p>
+			{/if}
+			{#if isDirty}
+				<p id={changeId} class="m-0 text-xs leading-5 font-medium text-[color-mix(in_oklch,var(--ak-color-accent)_55%,var(--ak-color-fg))]">
+					<span class="sr-only">{words.unsaved}{was !== undefined ? ', ' : ''}</span>{#if was !== undefined}{words.was(was)}{/if}
+				</p>
+				{#if impact}
+					<p id={impactId} class="m-0 text-xs leading-5 text-fg-main">{@render text(impact)}</p>
+				{/if}
+			{/if}
+			{#if effectiveLock && ownReason}
+				<LockReason lock={effectiveLock} id={lockReasonId} {onRequest} {requestAction} labels={lockLabels} class="mt-1" />
+			{/if}
+			{#each split.visible as a, index (index)}
+				{#if a.unavailable}<p id="{uid}-action-{index}" class="m-0 text-xs leading-5 text-fg-light">{a.unavailable}</p>{/if}
+			{/each}
+		</div>
+	</div>
+	{#if hasControlColumn}
+		<div class={cn('relative flex min-w-0 flex-wrap items-center gap-2', layout !== 'stacked' && '@lg/settings:shrink-0 @lg/settings:flex-nowrap @lg/settings:justify-end')}>
+			{#if summary}
+				<div class="flex min-w-0 items-center gap-2 @lg/settings:hidden">
+					<span class="min-w-0 text-[13px] text-fg-main">{@render summary()}</span>
+					{#if editHref !== undefined}
+						<Button href={editHref} size="xs" variant="secondary">{words.edit}<span class="sr-only"> {labelText}</span></Button>
+					{/if}
+				</div>
+				<div class="min-w-0 @max-lg/settings:hidden">{@render controlArea()}</div>
+			{:else}
+				{@render controlArea()}
+			{/if}
+			{#if action && typeof action === 'function'}
+				{@render (action as Snippet)()}
+			{/if}
+			{#each split.visible as a, index (index)}
+				<Button {...actionButtonProps(a, a.unavailable ? `${uid}-action-${index}` : undefined, { ready: ready.current })} size="sm" loading={actionRun.pending && running === a} onclick={(event: MouseEvent) => runAction(a, event)}>{a.label}</Button>
+			{/each}
+			{#if split.overflow.length}
+				<DropdownMenu items={menuItems} placement="bottom-end">
+					{#snippet trigger(part)}
+						<button {...part} type="button" aria-label={words.moreActions(labelText)} class={cn(buttonClass('ghost', 'icon-sm'), TOUCH_TARGET_CLASS, 'relative')}><Ellipsis aria-hidden="true" /></button>
+					{/snippet}
+				</DropdownMenu>
+			{/if}
+		</div>
+	{/if}
+	{#if statusUnder && (shownStatus === 'pending' || shownStatus === 'saved')}
+		<!-- In the row's bottom padding, inside its content box (the padding is inherited; see `underAlign`): no room taken, never past the row, and never in the way of a tap. -->
+		<div aria-hidden="true" class={cn('pointer-events-none absolute inset-x-0 bottom-0 flex px-[inherit]', underAlign)}>
+			<span data-row-saving={shownStatus === 'pending' ? '' : undefined} data-row-saved={shownStatus === 'saved' ? '' : undefined} class={cn('inline-flex min-w-0 items-center gap-1 text-[11px] leading-3 font-medium whitespace-nowrap [&_svg]:size-3', shownStatus === 'saved' ? STATUS_TEXT_CLASS.success : 'text-fg-light')}>{#if shownStatus === 'pending'}<Spinner size="xs" decorative />{words.saving}{:else}<Check />{savedText}{/if}</span>
+		</div>
+	{/if}
+	<!-- On one line, so `:empty` meets no whitespace: with nothing in it, the line takes no room (visually hidden, so its alert stays a live region). As tall as a small button whatever it holds, so Saving giving way to Saved and Undo moves nothing. Indented past a leading icon only where the control sits beside the label. While a retry runs after a failure, an invisible copy of the failure holds its room and Saving (on one line) shares its grid cell, so the cell is as wide as the wider of the two and Retry after it never runs under Saving. -->
+	<div data-row-status-line class={cn('flex min-w-0 basis-full flex-wrap items-center gap-x-3 gap-y-1', '[&:has(>:not(:empty))]:min-h-6 [&:not(:has(>:not(:empty)))]:sr-only', '[&:has([data-retry-in-place])_[data-held-failure]_[data-row-saving]]:hidden', leading && '@lg/settings:ps-11')}>{#if heldFailure}<div aria-hidden="true" data-held-failure="" class="grid min-w-0 text-xs leading-5 font-medium *:[grid-area:1/1]"><div class="invisible">{#each heldFailure as held, index (index)}<p class="m-0">{held}</p>{/each}</div>{#if shownStatus === 'pending'}<span data-row-saving class="inline-flex items-center gap-1.5 self-start whitespace-nowrap text-fg-light"><Spinner size="sm" decorative />{words.saving}</span>{/if}</div>{:else if !statusUnder && shownStatus === 'pending'}<span aria-hidden="true" data-row-saving class="inline-flex items-center gap-1.5 text-xs leading-5 font-medium text-fg-light"><Spinner size="sm" decorative />{words.saving}</span>{:else if !statusUnder && shownStatus === 'saved'}<span aria-hidden="true" data-row-saved class={cn('inline-flex items-center gap-1 text-xs leading-5 font-medium', STATUS_TEXT_CLASS.success)}><Check class="size-3.5" />{savedText}</span>{/if}<div id="{uid}-error" role="alert" class={cn('min-w-0 text-xs leading-5 font-medium empty:sr-only', DANGER_TEXT)}>{#if errorText}<p class="m-0">{errorText}</p>{/if}{#if actionError}<p class="m-0">{actionError}</p>{/if}</div>{@render feedback?.()}</div>
+	<span id={statusId} role="status" class="sr-only">{liveText}</span>
+</li>

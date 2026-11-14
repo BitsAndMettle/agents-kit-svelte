@@ -1,0 +1,9 @@
+---
+'agents-kit-svelte': minor
+---
+
+Settings controls: `ChoiceCards` (cards, rows, segmented or auto; instant or staged), `NotificationMatrix` (events by channels with locked cells, unavailable and permission-gated channels, column toggles), `SettingsItemList` (managed lists with trailing controls, confirm-first actions, sub-groups, a filter whose no-JavaScript GET form keeps the page's own query parameters given in `filter.hidden`, selection and bulk actions), `UsageMeter` (`role="meter"` with thresholds in words, segments, marker, projected value, shared scales) and `CopyValue` (copy, masked reveal, show-once secrets). `NativeSelect` gains `variant="pill"`, a compact chip as wide as the chosen option, with a 44px tap area on touch screens. A choice made in a server-rendered `NativeSelect` before hydration (or restored on Back) is kept and reported instead of being reset.
+
+A lock's way forward (`lock.action`) shows wherever a control draws its own lock note: ChoiceCards (group and option locks; an option's goes under the choices, never inside its label), NotificationMatrix and locked SettingsItemList items. It renders through `actionButtonProps` and runs through `SettingsHandlerRun`: a link stays a link, a callback loads, runs once at a time and shows its failure (`labels.lockActionFailed`, the list's `actionFailed`). An instant ChoiceCards' status line is one small button tall, so Saving giving way to Saved and Undo moves nothing below.
+
+SettingsItemList keeps every row in the page and hides the ones its filter does not match, so a staged selection on a hidden row still posts and still counts as unsaved, and clearing the filter cannot turn it into the saved value.

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { LINK_CLASS, isThenable } from '../src/lib/auth/signin/look.ts';
+import { LINK_CLASS } from '../src/lib/auth/signin/look.ts';
+import { isThenable } from '../src/lib/core/promise.ts';
 
 test('isThenable recognises promises and nothing else', () => {
 	assert.equal(isThenable(Promise.resolve()), true);

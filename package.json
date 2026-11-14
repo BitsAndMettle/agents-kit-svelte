@@ -48,6 +48,11 @@
       "svelte": "./dist/entries/auth.js",
       "default": "./dist/entries/auth.js"
     },
+    "./settings": {
+      "types": "./dist/entries/settings.d.ts",
+      "svelte": "./dist/entries/settings.js",
+      "default": "./dist/entries/settings.js"
+    },
     "./chat": {
       "types": "./dist/entries/chat.d.ts",
       "svelte": "./dist/entries/chat.js",
@@ -156,6 +161,7 @@
   ],
   "dependencies": {
     "@lucide/svelte": "^1.66.0",
+    "esm-env": "^1.2.2",
     "tailwind-merge": "^3.7.0"
   },
   "peerDependencies": {

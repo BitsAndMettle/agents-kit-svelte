@@ -3,7 +3,8 @@
 	A modal panel that slides in from an edge of the screen, over the headless `Dialog`: full
 	height on the left and right, full width on the top and bottom, clear of a phone's safe-area
 	insets. Behaves like Dialog (Escape, backdrop press, focus trap and return). Bottom sheets
-	show a drag handle (visual only).
+	show a drag handle (visual only). Supports Dialog's route mode: `closeHref`, `ssrOpen`
+	and `returnFocus`.
 -->
 <script lang="ts" module>
 	import type { Snippet } from 'svelte';
@@ -11,6 +12,7 @@
 	import type { FocusTarget } from '../../headless/runtime/layers.svelte';
 	import type { ChangeReason, Dismiss, Part } from '../../headless/runtime/parts';
 	import type { SheetSide } from './overlay';
+	import type { DialogReturnFocus } from './Dialog.svelte';
 
 	export interface Props extends Omit<HTMLDialogAttributes, 'class' | 'children' | 'open' | 'title' | 'role'> {
 		/** Whether it is open. Bindable. */
@@ -41,6 +43,12 @@
 		/** Dismissal policy; function forms can veto. */
 		dismiss?: Dismiss;
 		onOpenChange?: (open: boolean, reason: ChangeReason) => void;
+		/** Route mode, as on Dialog: the close button links here, and Escape and a backdrop press follow it. */
+		closeHref?: string;
+		/** As on Dialog: server-rendered open when `open` is true, a real modal on mount. */
+		ssrOpen?: boolean;
+		/** As on Dialog: where focus goes after it closes. */
+		returnFocus?: DialogReturnFocus;
 		class?: string;
 	}
 </script>
@@ -48,6 +56,7 @@
 <script lang="ts">
 	import { X } from '@lucide/svelte';
 	import { Dialog } from '../../headless/patterns/dialog.svelte';
+	import { followLink, NOT_MODAL, upgradeServerOpen } from './Dialog.svelte';
 	import { cn } from '../../ui/cn';
 	import { buttonClass } from '../../ui/styles';
 	import {
@@ -77,6 +86,9 @@
 		initialFocus,
 		dismiss,
 		onOpenChange,
+		closeHref,
+		ssrOpen = false,
+		returnFocus,
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -88,6 +100,7 @@
 		onOpenChange: (next, reason) => {
 			open = next;
 			onOpenChange?.(next, reason);
+			if (!next && closeHref !== undefined && (reason === 'escape' || reason === 'outside')) followLink(ref, closeHref);
 		},
 		get initialFocus() {
 			return initialFocus;
@@ -100,6 +113,15 @@
 	const close = () => {
 		dialog.open = false;
 	};
+
+	let hydrated = $state(false);
+	$effect(() => {
+		hydrated = true;
+	});
+	/** The `open` attribute of a server-rendered route: written on the server only. */
+	const serverOpen = $derived(typeof document === 'undefined' && ssrOpen && open ? { open: true } : {});
+	const shownState = $derived(ssrOpen && open && !hydrated ? 'open' : dialog.state);
+	const upgrade = upgradeServerOpen(() => returnFocus);
 
 	/** Edge placement, size, the rounded inner edge and the safe-area insets of the edges it touches. */
 	const SIDES: Record<SheetSide, string> = {
@@ -120,7 +142,7 @@
 
 {@render trigger?.(dialog.trigger)}
 
-<dialog {...rest} bind:this={ref} {...dialog.content} data-side={side} class={cn(MODAL_SURFACE, SIDES[side], SLIDE_MOTION[side], BACKDROP, className)}>
+<dialog {...rest} bind:this={ref} {...serverOpen} {@attach upgrade} {...dialog.content} data-state={shownState} aria-labelledby={dialog.content['aria-labelledby'] ?? (ssrOpen ? dialog.title.id : undefined)} data-side={side} class={cn(MODAL_SURFACE, SIDES[side], ssrOpen && NOT_MODAL, ssrOpen && (side === 'top' || side === 'bottom') && '[&:not(:modal)]:h-fit', SLIDE_MOTION[side], BACKDROP, className)}>
 	{#if side === 'bottom'}
 		<div aria-hidden="true" class="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-card-border"></div>
 	{/if}
@@ -137,7 +159,11 @@
 	{#if footer}
 		<div class={MODAL_FOOTER}>{@render footer(close)}</div>
 	{/if}
-	{#if showClose}
+	{#if showClose && closeHref !== undefined}
+		<a href={closeHref} aria-label={closeLabel} onclick={close} class={buttonClass('ghost', 'icon-sm', CLOSE_POSITION[side])}>
+			<X aria-hidden="true" />
+		</a>
+	{:else if showClose}
 		<button
 			{...dialog.close}
 			aria-label={closeLabel}

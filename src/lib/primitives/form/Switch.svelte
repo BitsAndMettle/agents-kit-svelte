@@ -8,6 +8,7 @@
 	import { untrack, type Snippet } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
+	import { TOUCH_TARGET_CLASS } from '../../ui/styles';
 	import { fieldControlAttrs, getFieldContext, joinIds } from './field';
 
 	export interface Props extends Omit<HTMLInputAttributes, 'class' | 'children' | 'type' | 'checked' | 'defaultChecked' | 'role' | 'size'> {
@@ -97,7 +98,7 @@
 				onCheckedChange?.(event.currentTarget.checked);
 				rest.onchange?.(event);
 			}}
-			class={['peer col-start-1 row-start-1 m-0 cursor-pointer appearance-none rounded-full border border-transparent bg-fg-light/45 motion-safe:transition-colors checked:bg-accent-primary aria-invalid:border-status-danger disabled:cursor-not-allowed', TRACK[size]]}
+			class={['peer col-start-1 row-start-1 m-0 cursor-pointer appearance-none rounded-full border border-transparent bg-fg-light/45 motion-safe:transition-colors checked:bg-accent-primary aria-invalid:border-status-danger disabled:cursor-not-allowed', TOUCH_TARGET_CLASS, TRACK[size]]}
 		/>
 		<span aria-hidden="true" class={['pointer-events-none col-start-1 row-start-1 ml-0.5 rounded-full bg-white ak-shadow-btn motion-safe:transition-transform motion-safe:duration-200', THUMB[size]]}></span>
 	</span>

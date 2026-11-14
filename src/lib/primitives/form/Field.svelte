@@ -3,7 +3,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '../../ui/cn';
 	import { DANGER_TEXT } from './classes';
-	import { fieldControlAttrs, setFieldContext, type FieldControlAttrs, type FieldState } from './field';
+	import { createFieldState, fieldControlAttrs, setFieldContext, type FieldControlAttrs, type FieldState } from './field';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children'> {
 		/** Visible label. In a plain field it is a `<label for>` the control; in a group field, the `<legend>`. */
@@ -49,34 +49,16 @@
 
 	const uid = $props.id();
 
-	const hasError = $derived(Boolean(error));
-	const field: FieldState = {
-		get controlId() {
-			return controlId ?? `${uid}-control`;
-		},
-		labelId: `${uid}-label`,
-		get descriptionId() {
-			return description ? `${uid}-description` : undefined;
-		},
-		get hintId() {
-			return this.descriptionId;
-		},
-		get errorId() {
-			return hasError ? `${uid}-error` : undefined;
-		},
-		get invalid() {
-			return invalid || hasError;
-		},
-		get required() {
-			return required;
-		},
-		get disabled() {
-			return disabled;
-		},
-		get group() {
-			return group;
-		}
-	};
+	const field: FieldState = createFieldState({
+		id: uid,
+		controlId: () => controlId,
+		description: () => Boolean(description),
+		error: () => Boolean(error),
+		invalid: () => invalid,
+		required: () => required,
+		disabled: () => disabled,
+		group: () => group
+	});
 	setFieldContext(field);
 
 	const control = $derived(fieldControlAttrs(field));
