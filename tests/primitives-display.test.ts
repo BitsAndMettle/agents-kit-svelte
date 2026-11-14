@@ -51,10 +51,12 @@ test('CopyCommand: the whole command beside a named copy button, and nothing sai
 	const CopyCommand = await load('/src/lib/primitives/display/CopyCommand.svelte');
 	const out = html(CopyCommand, { command: 'npm install <thing> && echo "done"', copyLabel: 'Copy the install command', class: 'mt-2' });
 	assert.match(out, /^<div class="[^"]* mt-2">/);
-	// Every word is its own box, and together they are the command, character for character.
+	// Every word is its own box. The boxes and the spaces between them are the command, character for character.
 	const code = out.match(/<code[^>]*>([\s\S]*?)<\/code>/)?.[1] ?? '';
-	assert.equal(code.replace(/<[^>]*>/g, ''), 'npm install &lt;thing> &amp;&amp; echo "done"');
-	assert.equal(code.match(/<span/g)?.length, 6);
+	const boxes = [...code.matchAll(/<span[^>]*>([^<]*)<\/span>([^<]*)/g)];
+	assert.equal(boxes.map(([box]) => box).join(''), code);
+	assert.deepEqual(boxes.map(([, word]) => word), ['npm', 'install', '&lt;thing>', '&amp;&amp;', 'echo', '"done"']);
+	assert.equal(boxes.map(([, word, gap]) => word + gap).join(''), 'npm install &lt;thing> &amp;&amp; echo "done"');
 	assert.match(out, /<button type="button" aria-label="Copy the install command"/);
 	assert.match(out, /<p role="status" class="[^"]*sr-only"><\/p>/);
 });
