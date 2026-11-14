@@ -1,22 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openSection, press } from './helpers';
-
-/**
- * Opens a section on a clock the test owns. The install comes before the page loads; `hold` then stops time, so the
- * demos' "server" delays and the cooldown only move when the test calls `page.clock.runFor`.
- */
-async function openOnClock(page: Page, slug: string): Promise<Locator> {
-	await page.clock.install();
-	return openSection(page, slug);
-}
-
-/** Stops the page's clock a moment ahead. */
-async function hold(page: Page): Promise<void> {
-	// Measured on the page clock, which may be ahead of the test process.
-	const now = await page.evaluate(() => Date.now());
-	await page.clock.pauseAt(new Date(now + 1000));
-}
+import { hold, openOnClock, openSection, press } from './helpers';
 
 /** Starts recording every text the element shows from now on, in order, under `key`. */
 async function recordText(target: Locator, key: string): Promise<void> {

@@ -1,25 +1,9 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openSection, press } from './helpers';
+import { hold, openOnClock, openSection, press } from './helpers';
 
 /** Answers the demo's native post, so a form with no handler can be seen leaving without a real server. */
 async function stubNativePost(page: Page): Promise<void> {
 	await page.route('**/demo-native-post', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<p>posted</p>' }));
-}
-
-/**
- * Opens a section on a clock the test owns. The install comes before the page loads; `hold` then stops time, so the
- * demo's 800 ms "server" and the cooldowns only move when the test calls `page.clock.runFor`.
- */
-async function openOnClock(page: Page, slug: string): Promise<Locator> {
-	await page.clock.install();
-	return openSection(page, slug);
-}
-
-/** Stops the page's clock a moment ahead. Call it before the action whose in-flight state is under test. */
-async function hold(page: Page): Promise<void> {
-	// Measured on the page clock, which may be ahead of the test process.
-	const now = await page.evaluate(() => Date.now());
-	await page.clock.pauseAt(new Date(now + 1000));
 }
 
 const alertText = (section: Locator) => section.getByRole('alert').filter({ hasText: /\S/ });

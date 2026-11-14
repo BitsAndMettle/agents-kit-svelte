@@ -31,3 +31,19 @@ export async function openSection(page: Page, slug: string): Promise<Locator> {
 	await section.scrollIntoViewIfNeeded();
 	return section;
 }
+
+/**
+ * Opens a section on a clock the test owns. The install comes before the page loads; `hold` then stops time, so a
+ * demo's "server" delay or a cooldown only moves when the test calls `page.clock.runFor`.
+ */
+export async function openOnClock(page: Page, slug: string): Promise<Locator> {
+	await page.clock.install();
+	return openSection(page, slug);
+}
+
+/** Stops the page's clock a moment ahead. Call it before the action whose in-flight state is under test. */
+export async function hold(page: Page): Promise<void> {
+	// Measured on the page clock, which may be ahead of the test process.
+	const now = await page.evaluate(() => Date.now());
+	await page.clock.pauseAt(new Date(now + 1000));
+}
