@@ -48,8 +48,8 @@
 
 	let { title = '', items, path, actions, children, 'aria-label': ariaLabel = 'Main', class: className = '', ...rest }: Props = $props();
 
-	/** A path ending in one slash, so `/board` is above `/board/42` and `/board/`, and not above `/boardroom`. */
-	const slashed = (at: string) => `${at.replace(/\/+$/, '')}/`;
+	/** A path ending in a slash, so `/board` is above `/board/42` and `/board/`, and not above `/boardroom`. */
+	const slashed = (at: string) => (at.endsWith('/') ? at : `${at}/`);
 
 	/** The item for the page on screen: the nearest one at or above the path. */
 	let here = $derived(items.filter((item) => slashed(path).startsWith(slashed(item.href))).sort((a, b) => b.href.length - a.href.length)[0]);
