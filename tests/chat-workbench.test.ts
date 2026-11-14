@@ -71,19 +71,23 @@ test('conversations: a sidebar from 1024px and tabs below, or tabs only in panel
 	assert.doesNotMatch(none, /<aside|role="tablist"/);
 });
 
-test('message status, empty state, footer and header action snippets', () => {
+test('message status, empty state, footer, trailing and header action snippets', () => {
 	const out = html(ChatWorkbench, {
 		messages: [
 			{ id: 's', role: 'assistant', status: 'streaming' },
 			{ id: 'e', role: 'system', status: 'error', statusText: 'Not delivered, send again.' }
 		],
+		busy: true,
+		busyLabel: 'Working on it',
 		messageFooter: snippet((message: ChatWorkbenchMessage) => `<span>footer:${message.id}</span>`),
+		trailing: snippet(() => '<button type="button">Approve the plan</button>'),
 		headerActions: snippet(() => '<button type="button">Pause</button>')
 	});
 	assert.match(out, /Thinking…/);
 	assert.match(out, /aria-busy="true"/);
 	assert.match(out, /text-status-danger[^>]*>Not delivered, send again\./);
-	assert.match(out, /footer:s[\s\S]*footer:e/);
+	// What waits for the person sits after the last message, before the busy line and the composer.
+	assert.match(out, /footer:s[\s\S]*footer:e[\s\S]*Approve the plan[\s\S]*Working on it[\s\S]*<textarea/);
 	assert.match(out, /Pause/);
 	const empty = html(ChatWorkbench, { empty: snippet(() => '<p>Ask me anything</p>') });
 	assert.match(empty, /Ask me anything/);

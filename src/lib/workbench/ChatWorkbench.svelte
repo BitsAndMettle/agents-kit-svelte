@@ -52,6 +52,8 @@
 		empty?: Snippet;
 		/** Drawn at the end of each message, e.g. feedback or retry buttons. */
 		messageFooter?: Snippet<[ChatWorkbenchMessage]>;
+		/** Drawn after the last message, e.g. a decision that waits for the person. */
+		trailing?: Snippet;
 
 		/** Past conversations. Without them there is no list, sidebar or tabs. */
 		conversations?: ChatWorkbenchConversation[];
@@ -105,6 +107,7 @@
 		presence,
 		empty,
 		messageFooter,
+		trailing,
 		conversations,
 		conversationsNotice = '',
 		onSelectConversation,
@@ -313,6 +316,7 @@
 								{@render messageFooter?.(message)}
 							</Message>
 						{/each}
+						{@render trailing?.()}
 						{#if busy}
 							<ThinkingShimmer spark label={busyLabel} />
 						{/if}
