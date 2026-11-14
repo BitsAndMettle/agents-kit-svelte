@@ -21,12 +21,12 @@
 		children?: Snippet;
 		/** Buttons at the bottom. They stay separately clickable. */
 		actions?: Snippet;
-		/** Heading level of the title. */
+		/** Heading level of the title. The default is two below `BoardLanes`' own, so a card sits under its lane and group labels. */
 		headingLevel?: 2 | 3 | 4 | 5 | 6;
 		class?: string;
 	}
 
-	let { title, reference = '', status = '', tone = 'neutral', href, onSelect, children, actions, headingLevel = 3, class: className = '', ...rest }: Props = $props();
+	let { title, reference = '', status = '', tone = 'neutral', href, onSelect, children, actions, headingLevel = 4, class: className = '', ...rest }: Props = $props();
 
 	let interactive = $derived(Boolean(href) || Boolean(onSelect));
 </script>

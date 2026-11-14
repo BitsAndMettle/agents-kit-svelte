@@ -24,7 +24,7 @@ export interface BoardLanesProps<T> {
 	lanes: BoardLane<T>[];
 	/** Draws one card. The board places the cards; what a card shows is yours. */
 	card: Snippet<[T]>;
-	/** Heading level of the lane labels. Group labels are one level below. */
+	/** Heading level of the lane labels. Group labels are one level below, and card titles belong one below those. */
 	headingLevel?: 2 | 3 | 4 | 5;
 	class?: string;
 }

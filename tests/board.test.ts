@@ -41,7 +41,7 @@ test('CardFace: the title alone opens the card, with the reference, status and a
 	const CardFace = await load('/src/lib/board/CardFace.svelte');
 
 	const still = html(CardFace, { title: 'Rotate the key', reference: 'KIT-221', status: 'Waiting for you', tone: 'warning' });
-	assert.match(still, /<p[^>]*>KIT-221<\/p>\s*<h3[^>]*>Rotate the key<\/h3>/);
+	assert.match(still, /<p[^>]*>KIT-221<\/p>\s*<h4[^>]*>Rotate the key<\/h4>/);
 	assert.match(still, /bg-status-warning[^>]*><\/span>Waiting for you/);
 	assert.doesNotMatch(still, /data-card-main/);
 
@@ -57,7 +57,7 @@ test('CardFace: the title alone opens the card, with the reference, status and a
 	// Actions sit above the stretched title, so they stay separately clickable.
 	assert.match(link, /<div class="relative z-10[^"]*"><button type="button">Merge<\/button><\/div>/);
 
-	assert.match(html(CardFace, { title: 'Rotate the key', onSelect: () => {} }), /<h3[^>]*><button type="button" data-card-main[^>]*>Rotate the key<\/button><\/h3>/);
+	assert.match(html(CardFace, { title: 'Rotate the key', onSelect: () => {} }), /<h4[^>]*><button type="button" data-card-main[^>]*>Rotate the key<\/button><\/h4>/);
 });
 
 test('StatusStrip: the status with its tone, numbers formatted like metrics, then the actions', async () => {
