@@ -48,6 +48,7 @@ test('every component forwards rest props to its root element', () => {
 const NO_DEMO_DEFAULTS = [
 	'src/lib/github/',
 	'src/lib/board/',
+	'src/lib/settings/',
 	'src/lib/agents/',
 	'src/lib/ai-elements/',
 	'src/lib/runtime/',

@@ -192,6 +192,7 @@
 		'Beautiful UI',
 		'GitHub Cards & Layouts',
 		'Board',
+		'Settings',
 		'Intelligent UI & Generative',
 		'Agents UI Orchestration',
 		'AI Elements & Coding',

@@ -7,6 +7,7 @@
 export * from './entries/chat';
 export * from './entries/github';
 export * from './entries/board';
+export * from './entries/settings';
 export * from './entries/skills';
 export * from './entries/workflows';
 export * from './entries/generative';

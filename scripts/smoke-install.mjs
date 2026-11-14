@@ -101,6 +101,7 @@ mount(App, { target: document.getElementById('app')! });
 	import { ChatWorkbench, Markdown, TrailsideClaudeChat, type ChatWorkbenchMessage, type PromptAttachment } from 'agents-kit-svelte/chat';
 	import { GitHubIssueCard } from 'agents-kit-svelte/github';
 	import { StatusStrip } from 'agents-kit-svelte/board';
+	import { SettingsForm } from 'agents-kit-svelte/settings';
 	import { SkillCard } from 'agents-kit-svelte/skills';
 	import { AgentOrchestrator } from 'agents-kit-svelte/workflows';
 	import { IntelligentUIRenderer } from 'agents-kit-svelte/generative';
@@ -128,6 +129,7 @@ mount(App, { target: document.getElementById('app')! });
 	<CodeBlock code="pnpm add agents-kit-svelte" language="bash" />
 	<GitHubIssueCard issue={SAMPLE_ISSUE} compact />
 	<StatusStrip status="Running" tone="success" stats={[{ id: 'slots', label: 'Slots', value: 4, max: 6 }]} />
+	<SettingsForm settings={[{ id: 'holds', label: 'Hold protected changes', value: true }]} onChange={() => undefined} />
 	<div class="h-[600px]">
 		<ChatWorkbench
 			title="Referee"

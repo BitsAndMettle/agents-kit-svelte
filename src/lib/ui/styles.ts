@@ -128,6 +128,16 @@ export const STRETCHED = {
 	lift: '[&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10 [&_input]:relative [&_input]:z-10 [&_select]:relative [&_select]:z-10 [&_textarea]:relative [&_textarea]:z-10 [&_[tabindex]]:relative [&_[tabindex]]:z-10'
 } as const;
 
+/**
+ * One row in a list of rows: its text on the left, a control or buttons on the right. A hairline
+ * sits between rows. The space around the list belongs to the box that holds it.
+ */
+export const ROW = {
+	root: 'flex items-center gap-4 border-b border-canvas-border py-3 first:pt-0 last:border-b-0 last:pb-0',
+	title: 'm-0 block text-[13px] leading-5 font-medium [overflow-wrap:anywhere] text-fg-main',
+	description: 'm-0 text-xs leading-5 text-fg-light'
+} as const;
+
 /** Text input / select / textarea recipe. */
 export const INPUT_CLASS =
 	'h-8 w-full rounded-control border border-card-border bg-card-bg px-3 text-[13px] text-fg-main placeholder:text-fg-light transition-[border-color,box-shadow] focus:border-accent-primary/50 focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-accent-primary)_14%,transparent)] focus:outline-none';

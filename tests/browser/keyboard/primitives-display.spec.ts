@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from '@playwright/test';
-import { openSection, press } from './helpers';
+import { hold, openOnClock, openSection, press } from './helpers';
 
 /** The card root around a control: the nearest ancestor that is positioned (`relative`). */
 function cardOf(control: Locator): Locator {
@@ -106,6 +106,55 @@ test('Notice: stays, busy, until the dismissal is stored, and each dismiss butto
 	await expect(notice).toHaveAttribute('aria-busy', 'true');
 	await expect(dismiss).toHaveCount(0);
 	await expect(section.getByRole('button', { name: 'Dismiss: A label could not be written' })).toBeVisible();
+});
+
+test('ListRow: a row is a list item whose action acts on that row, and a long title wraps inside it', async ({ page }) => {
+	const section = await openSection(page, 'list-row');
+	const computers = section.getByRole('list').first();
+	await expect(computers.getByRole('listitem')).toHaveCount(3);
+	const laptop = computers.getByRole('listitem').filter({ hasText: 'Laptop' });
+	await expect(laptop).toContainText('Agent signed out');
+	await laptop.getByRole('button', { name: 'Revoke Laptop' }).click();
+	await expect(computers.getByRole('listitem')).toHaveCount(2);
+	await expect(laptop).toHaveCount(0);
+
+	// With `href` the title is the link. A title too long for a phone wraps instead of making the list wider.
+	const repositories = section.getByRole('list').nth(1);
+	await expect(repositories.getByRole('link', { name: 'example/site' })).toHaveAttribute('href', '#list-row');
+	await page.setViewportSize({ width: 390, height: 800 });
+	await repositories.getByRole('link', { name: /unusually-long/ }).scrollIntoViewIfNeeded();
+	expect(await repositories.evaluate((list) => list.scrollWidth <= list.clientWidth)).toBe(true);
+});
+
+test('CopyCommand: the button copies the command exactly and says so, and one click selects all of it', async ({ page, context }) => {
+	await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+	const section = await openOnClock(page, 'copy-command');
+	const command = 'agent mcp add --transport http example https://example.com/mcp --header "Authorization: Bearer $EXAMPLE_TOKEN"';
+	const copied = section.getByRole('status').filter({ hasText: 'Copied' });
+	await hold(page);
+	await section.getByRole('button', { name: 'Copy the server command' }).click();
+	await expect(copied).toHaveCount(1);
+	expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(command);
+	// The confirmation clears itself.
+	await page.clock.runFor(2500);
+	await expect(copied).toHaveCount(0);
+
+	// The command wraps between its words, yet selecting it by hand gives the same text.
+	await section.getByText('--header', { exact: true }).click();
+	expect(await page.evaluate(() => getSelection()?.toString())).toBe(command);
+});
+
+test('CopyCommand: when nothing can copy, it says so in view', async ({ page }) => {
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('blocked')) }, configurable: true });
+		document.execCommand = () => false;
+	});
+	const section = await openSection(page, 'copy-command');
+	await section.getByRole('button', { name: 'Copy the connect command' }).click();
+	// A success is only announced; a failure is also shown.
+	const failed = section.getByRole('status').filter({ hasText: 'Could not copy. Select the command and copy it by hand.' });
+	await expect(failed).toBeVisible();
+	await expect(failed).not.toHaveClass(/sr-only/);
 });
 
 test('Progress: value, range and text are exposed to assistive technology', async ({ page }) => {

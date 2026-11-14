@@ -1,16 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openSection, press } from './helpers';
+import { openOnClock, openSection, press } from './helpers';
 
 /**
  * The demos answer after 800 ms and count a resend wait in real seconds. A test that looks at an in-flight state
- * owns that time: the clock is installed before the page loads, paused once the form is filled, and advanced by hand.
+ * owns that time: it opens the section with `openOnClock`, stops time here once the form is filled, and advances it
+ * by hand. No demo timer fires until `page.clock.runFor`.
  */
-async function openOnClock(page: Page, slug: string): Promise<Locator> {
-	await page.clock.install();
-	return openSection(page, slug);
-}
-
-/** Stops time, so no demo timer fires until `page.clock.runFor`. */
 async function pauseClock(page: Page): Promise<void> {
 	// The installed clock runs with real time until now, so a moment a little ahead of it is never in its past.
 	await page.clock.pauseAt(new Date(Date.now() + 5000));

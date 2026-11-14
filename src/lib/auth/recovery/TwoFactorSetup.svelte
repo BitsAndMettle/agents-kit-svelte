@@ -58,7 +58,7 @@
 	import { BackupCodes, type BackupCodesLabels, type BackupCodesProps } from '../account';
 	import { AuthSubmit, readText, type AuthSubmitHandler } from '../shared';
 	import { groupSecret, plainSecret } from './secret';
-	import { copyText } from './clipboard';
+	import { copyText } from '../../ui/clipboard';
 
 	export interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'title' | 'hidden' | 'onsubmit' | 'oninput' | 'method'> {
 		/** The current step. Bindable, so your app can set it (for example after a native post comes back). */
