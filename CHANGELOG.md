@@ -1,5 +1,50 @@
 # agents-kit-svelte
 
+## 0.4.0
+
+### Minor Changes
+
+- e959fdd: **AppShell**, a new primitive: the frame of an app. One bar with the app's name, the places to go and your controls, over the page.
+  
+  - The item the current `path` is under is marked as the current page: `/board/42` is under `/board`.
+  - A `count` after a label shows a number, and `countLabel` says what it counts to a screen reader. Nothing shows for 0.
+  - The page scrolls with the document and the bar stays in view. A place marked `fill` gives its page exactly the space under the bar instead, for a page that does its own scrolling, such as a chat: that page takes `h-full`.
+  - On a phone the places are a row of their own under the name and the controls.
+  
+  **CardSheet**, in `agents-kit-svelte/board`: one card in full, in a `Sheet`.
+  
+  - The card's title names the sheet, with its `reference` and `status` under it.
+  - `facts` are what is known about the card, as a list of labelled values. A value can be a link and can carry a tone.
+  - A `question` shows its text as written and one button per option. Return a promise from `onAnswer` and the question waits for it, marked busy, and takes no other answer meanwhile.
+  - Your own content follows, and your `actions` are the foot of the sheet. They are given the function that closes it.
+  - Focus starts on what the sheet says, not on its first control, so a key pressed twice on a card answers nothing and presses nothing.
+- 90d07f5: **Board**, a new collection at `agents-kit-svelte/board`, for a board of work whose lanes and cards are yours:
+  
+  - `StatusStrip`: the one line above a board. What is going on right now (with a tone), the numbers that matter (formatted like `MetricTiles` metrics) and your actions. In a narrow container the numbers wrap under the status.
+  - `BoardLanes`: lanes as data, cards as your snippet. Each lane shows its label and count, with its cards under group headings. As many lanes sit side by side as fit; the rest wrap, down to one column on a phone.
+  - `CardFace`: a card in a lane. A reference, the title, one status line with a tone, your badges and your actions. With `href` or `onSelect` the whole card opens through its title, the single tab stop, and the actions stay separately clickable.
+  
+  **Notice**, a new primitive: a warning the person can always dismiss. It is an `Alert` whose dismiss button is not optional and is named after the notice.
+  
+  **Alert**: `onDismiss` may return a promise. The alert waits for it, marked busy, and ignores a second press.
+  
+  `STRETCHED`, a new style recipe: the one-tab-stop clickable surface that `Card` and `CardFace` share.
+- 0c57c0c: **Settings**, a new collection at `agents-kit-svelte/settings`, for settings that are saved as they are changed:
+  
+  - `SettingsForm`: a form generated from a list of settings. Each row gets the control its value calls for: a switch for a boolean, a number box for a number, a select or a text box for a string. There is nothing to submit: each change is reported at once.
+  - `TierMatrix`: one choice per tier, with presets. Every tier picks one of the same options; a preset sets several tiers in one press and stays pressed while they match. A locked tier shows its choice and cannot be changed.
+  
+  Both show a change at once and wait for the promise your `onChange` returns. Once it settles they show the value you pass in again, so a change you refuse snaps back.
+  
+  Two new primitives:
+  
+  - `ListRow`: one row in a list. A title (a link with `href`), a quieter line under it, small facts after the title and your buttons at the end. It is a list item, for your `<ul>`.
+  - `CopyCommand`: a command shown in full, with one button that copies it exactly and announces the copy. A long command wraps between its words.
+  
+  **ChatWorkbench**: `trailing`, a snippet drawn after the last message, for a decision that waits for the person.
+  
+  `ROW`, a new style recipe: the row that `ListRow`, `SettingsForm` and `TierMatrix` share.
+
 ## 0.3.0
 
 ### Minor Changes
