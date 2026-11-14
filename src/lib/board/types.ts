@@ -1,5 +1,6 @@
 import type { Snippet } from 'svelte';
 import type { Metric } from '../charts/types';
+import type { UiTone } from '../ui/styles';
 
 /**
  * Cards that belong together inside a lane, such as the cards of one feature. A `label` is drawn as
@@ -31,3 +32,22 @@ export interface BoardLanesProps<T> {
 
 /** One number on a `StatusStrip`, formatted like a `MetricTiles` metric. With `max` it reads "value/max", e.g. busy slots. */
 export type StatusStat = Pick<Metric, 'id' | 'label' | 'value' | 'format' | 'unit' | 'max'>;
+
+/** One thing known about a card, on a `CardSheet`: what it is and what it reads. */
+export interface CardFact {
+	/** Unique among the card's facts. */
+	label: string;
+	value: string;
+	/** Makes the value a link, e.g. to the pull request it names. */
+	href?: string;
+	/** Colour meaning of the value, e.g. `danger` for checks that failed. */
+	tone?: UiTone;
+}
+
+/** A question a card waits on, on a `CardSheet`. */
+export interface CardQuestion {
+	/** Shown as written, line breaks included. */
+	text: string;
+	/** The answers to choose from, in order. */
+	options: readonly string[];
+}

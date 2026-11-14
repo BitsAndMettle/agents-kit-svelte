@@ -2,10 +2,12 @@ import type { Component } from 'svelte';
 import StatusStripDemo from './board/StatusStripDemo.svelte';
 import BoardLanesDemo from './board/BoardLanesDemo.svelte';
 import CardFaceDemo from './board/CardFaceDemo.svelte';
+import CardSheetDemo from './board/CardSheetDemo.svelte';
 
-/** Showcase demos for the Board collection, keyed by catalogue slug: StatusStrip, BoardLanes, CardFace. */
+/** Showcase demos for the Board collection, keyed by catalogue slug: StatusStrip, BoardLanes, CardFace, CardSheet. */
 export const DEMOS_BOARD: Record<string, Component> = {
 	'status-strip': StatusStripDemo,
 	'board-lanes': BoardLanesDemo,
-	'card-face': CardFaceDemo
+	'card-face': CardFaceDemo,
+	'card-sheet': CardSheetDemo
 };

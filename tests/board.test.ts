@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { BoardLane, StatusStat } from '../src/lib/board/types.ts';
+import type { BoardLane, CardFact, CardQuestion, StatusStat } from '../src/lib/board/types.ts';
 import { ssr } from './ssr.ts';
 
 const { load, html, snippet } = ssr();
@@ -58,6 +58,58 @@ test('CardFace: the title alone opens the card, with the reference, status and a
 	assert.match(link, /<div class="relative z-10[^"]*"><button type="button">Merge<\/button><\/div>/);
 
 	assert.match(html(CardFace, { title: 'Rotate the key', onSelect: () => {} }), /<h4[^>]*><button type="button" data-card-main[^>]*>Rotate the key<\/button><\/h4>/);
+});
+
+test('CardSheet: a sheet named by the card, with its reference and status, its facts as a list and the actions at the foot', async () => {
+	const CardSheet = await load('/src/lib/board/CardSheet.svelte');
+	const facts: CardFact[] = [
+		{ label: 'Pull request', value: '#57', href: 'https://example.com/pull/57' },
+		{ label: 'Checks', value: 'Passed', tone: 'success' },
+		{ label: 'Head', value: '9f2c1ab' }
+	];
+	const out = html(CardSheet, {
+		title: 'Rotate the key',
+		reference: 'KIT-221',
+		status: 'Waiting for you',
+		tone: 'warning',
+		facts,
+		children: snippet(() => '<p>More about the card</p>'),
+		actions: snippet(() => '<button type="button">Merge</button>'),
+		'data-card': '221',
+		class: 'w-[min(32rem,100vw)]'
+	});
+
+	// It is a Sheet: your attributes and class reach the dialog, and the card's title is its heading.
+	assert.match(out, /^\s*<dialog data-card="221"[^>]*class="(?![^"]*24rem)[^"]* w-\[min\(32rem,100vw\)\]">/);
+	assert.match(out, /<h2[^>]*>Rotate the key<\/h2>\s*<p[^>]*><span[^>]*>KIT-221<\/span>\s*<span[^>]*><span aria-hidden="true"[^>]*bg-status-warning[^>]*><\/span>\s*Waiting for you<\/span><\/p>/);
+	// A fact is its label and its value: a link with `href`, and marked with its tone.
+	assert.deepEqual([...out.matchAll(/<dt[^>]*>([^<]*)<\/dt>/g)].map(([, label]) => label), ['Pull request', 'Checks', 'Head']);
+	assert.match(out, /<dt[^>]*>Pull request<\/dt>\s*<dd[^>]*><a href="https:\/\/example\.com\/pull\/57"[^>]*>#57<\/a><\/dd>/);
+	assert.match(out, /<dt[^>]*>Checks<\/dt>\s*<dd[^>]*><span[^>]*><span aria-hidden="true"[^>]*bg-status-success[^>]*><\/span>\s*Passed<\/span><\/dd>/);
+	assert.match(out, /<dt[^>]*>Head<\/dt>\s*<dd[^>]*>9f2c1ab<\/dd>/);
+	// What the sheet says can take focus, so focus need not start on a control.
+	assert.match(out, /<div tabindex="-1" class="[^"]*"><dl/);
+	// Your content follows the facts, and the actions are the sheet's foot.
+	assert.ok(out.indexOf('</dl>') < out.indexOf('<p>More about the card</p>'));
+	assert.match(out, /<p>More about the card<\/p>[\s\S]*<div class="[^"]*border-t[^"]*"><button type="button">Merge<\/button><\/div>/);
+
+	// A card with a title alone has no list, no question and no foot.
+	assert.doesNotMatch(html(CardSheet, { title: 'Rotate the key' }), /<dl|<ul|<li|border-t|aria-busy/);
+});
+
+test('CardSheet: a question keeps its line breaks and offers each option as a button, busy only while an answer is on its way', async () => {
+	const CardSheet = await load('/src/lib/board/CardSheet.svelte');
+	// Options are data: two that read the same are still two buttons.
+	const question: CardQuestion = { text: 'Which key?\nThe plan names two.', options: ['The signing key', 'Both', 'Both'] };
+	const out = html(CardSheet, { title: 'Rotate the key', question, onAnswer: () => {} });
+
+	assert.match(out, /aria-busy="false"[^>]*>[\s\S]*<p[^>]*>Question<\/p>[\s\S]*<p class="[^"]*whitespace-pre-line[^"]*">Which key\?\nThe plan names two\.<\/p>\s*<ul/);
+	assert.deepEqual([...out.matchAll(/<li><button type="button"[^>]*><span[^>]*>\s*([^<]*?)\s*<\/span>/g)].map(([, option]) => option), ['The signing key', 'Both', 'Both']);
+
+	// Its name is yours to give, and with nobody to tell, the options cannot be pressed.
+	const looking = html(CardSheet, { title: 'Rotate the key', question, questionLabel: 'Open question' });
+	assert.match(looking, /<p[^>]*>Open question<\/p>/);
+	assert.equal(looking.match(/<li><button disabled=""/g)?.length, 3);
 });
 
 test('StatusStrip: the status with its tone, numbers formatted like metrics, then the actions', async () => {
