@@ -33,15 +33,21 @@ test('every component forwards rest props to its root element', () => {
 	for (const { rel, source } of files) {
 		if (NO_SINGLE_ROOT.has(rel)) continue;
 		assert.match(source, /\.\.\.rest\s*\n?\s*\}: Props = \$props\(\)/, `${rel} does not collect ...rest`);
+		// A component whose root is another component hands it rest, `class` included; the contract is met there.
+		if (/<\/script>\s*<[A-Z]\w* \{\.\.\.rest\}/.test(source)) {
+			assert.doesNotMatch(source, /class: className/, `${rel} keeps your class from the component at its root`);
+			continue;
+		}
 		assert.match(source, /<[a-z]+ \{\.\.\.rest\}/, `${rel} does not spread {...rest} on its root`);
 		assert.match(source, /interface Props extends Omit<HTML\w*Attributes/, `${rel} Props do not extend HTML attributes`);
 		assert.match(source, /class=\{cn\([\s\S]*?, className\)\}/, `${rel} does not merge its class prop with cn()`);
 	}
 });
 
-/** Collections whose demo data lives in src/lib/fixtures. */
+/** Collections that ship no demo data: samples live in src/lib/fixtures or with the site's demos. */
 const NO_DEMO_DEFAULTS = [
 	'src/lib/github/',
+	'src/lib/board/',
 	'src/lib/agents/',
 	'src/lib/ai-elements/',
 	'src/lib/runtime/',

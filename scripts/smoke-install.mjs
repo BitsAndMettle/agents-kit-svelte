@@ -100,6 +100,7 @@ mount(App, { target: document.getElementById('app')! });
 	import { CodeBlock, ThinkingShimmer, TodoList, type TodoItem } from 'agents-kit-svelte';
 	import { ChatWorkbench, Markdown, TrailsideClaudeChat, type ChatWorkbenchMessage, type PromptAttachment } from 'agents-kit-svelte/chat';
 	import { GitHubIssueCard } from 'agents-kit-svelte/github';
+	import { StatusStrip } from 'agents-kit-svelte/board';
 	import { SkillCard } from 'agents-kit-svelte/skills';
 	import { AgentOrchestrator } from 'agents-kit-svelte/workflows';
 	import { IntelligentUIRenderer } from 'agents-kit-svelte/generative';
@@ -129,6 +130,7 @@ mount(App, { target: document.getElementById('app')! });
 	<TodoList {items} data-testid="plan" aria-label="Plan" />
 	<CodeBlock code="pnpm add agents-kit-svelte" language="bash" />
 	<GitHubIssueCard issue={SAMPLE_ISSUE} compact />
+	<StatusStrip status="Running" tone="success" stats={[{ id: 'slots', label: 'Slots', value: 4, max: 6 }]} />
 	<div class="h-[600px]">
 		<ChatWorkbench
 			title="Referee"

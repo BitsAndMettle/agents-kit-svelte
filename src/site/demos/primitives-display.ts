@@ -9,9 +9,10 @@ import SkeletonDemo from './display/SkeletonDemo.svelte';
 import SpinnerDemo from './display/SpinnerDemo.svelte';
 import ProgressDemo from './display/ProgressDemo.svelte';
 import AlertDemo from './display/AlertDemo.svelte';
+import NoticeDemo from './display/NoticeDemo.svelte';
 import EmptyStateDemo from './display/EmptyStateDemo.svelte';
 
-/** Showcase demos for the Primitives collection (display), keyed by catalogue slug. Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, EmptyState. */
+/** Showcase demos for the Primitives collection (display), keyed by catalogue slug. Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, Notice, EmptyState. */
 export const DEMOS_DISPLAY: Record<string, Component> = {
 	'badge': BadgeDemo,
 	'avatar': AvatarDemo,
@@ -23,5 +24,6 @@ export const DEMOS_DISPLAY: Record<string, Component> = {
 	'spinner': SpinnerDemo,
 	'progress': ProgressDemo,
 	'alert': AlertDemo,
+	'notice': NoticeDemo,
 	'empty-state': EmptyStateDemo
 };
