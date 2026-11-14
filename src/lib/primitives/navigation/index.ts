@@ -1,4 +1,4 @@
-/** Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination. */
+/** Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination, AppShell. */
 
 export { default as Tabs } from './Tabs.svelte';
 export type { TabItem, TabsProps } from './Tabs.svelte';
@@ -9,3 +9,5 @@ export type { BreadcrumbItem, BreadcrumbProps } from './Breadcrumb.svelte';
 export { default as Pagination } from './Pagination.svelte';
 export type { PaginationProps } from './Pagination.svelte';
 export { paginationRange, type PageToken, type PaginationRangeOptions } from './pagination-range';
+export { default as AppShell } from './AppShell.svelte';
+export type { AppShellItem, Props as AppShellProps } from './AppShell.svelte';

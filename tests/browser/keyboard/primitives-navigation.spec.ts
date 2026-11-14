@@ -270,3 +270,80 @@ test.describe('Pagination edge cases', () => {
 		await expect(many.getByRole('listitem')).toHaveCount(7);
 	});
 });
+
+test.describe('AppShell', () => {
+	test('the place on screen is the current page, and a count is part of its link until it reaches 0', async ({ page }) => {
+		const section = await openSection(page, 'app-shell');
+		const nav = section.getByRole('navigation', { name: 'Main' });
+		const board = nav.getByRole('link', { name: 'Board' });
+		const settings = nav.getByRole('link', { name: /^Settings/ });
+		await expect(board).toHaveAttribute('aria-current', 'page');
+		await expect(nav.locator('[aria-current]')).toHaveCount(1);
+		await expect(settings).toHaveAccessibleName('Settings 2 open notices');
+
+		// The places are links, one tab stop each.
+		await board.focus();
+		await press(page, 'Tab', 'Tab');
+		await expect(settings).toBeFocused();
+		await press(page, 'Enter');
+		await expect(settings).toHaveAttribute('aria-current', 'page');
+		await expect(nav.locator('[aria-current]')).toHaveCount(1);
+
+		// The count follows what it counts, and is gone at 0.
+		await section.getByRole('button', { name: 'Dismiss: Build box is offline' }).click();
+		await expect(settings).toHaveAccessibleName('Settings 1 open notices');
+		await section.getByRole('button', { name: 'Dismiss: A label could not be written' }).click();
+		await expect(settings).toHaveAccessibleName('Settings');
+	});
+
+	test('a page scrolls under a bar that stays in view, and a place that fills gives its page exactly the space under the bar', async ({ page }) => {
+		const section = await openSection(page, 'app-shell');
+		const nav = section.getByRole('navigation', { name: 'Main' });
+		const main = section.getByRole('main');
+		// The demo's box stands in for the browser window: it is what scrolls.
+		const frame = main.locator('xpath=../..');
+		const fromTop = () =>
+			frame.evaluate((box) => {
+				const top = box.getBoundingClientRect().y;
+				return { bar: box.querySelector('header')!.getBoundingClientRect().y - top, page: box.querySelector('main')!.getBoundingClientRect().y - top };
+			});
+		const before = await fromTop();
+
+		await frame.evaluate((box) => box.scrollTo(0, box.scrollHeight));
+		const scrolled = await fromTop();
+		expect(scrolled.page).toBeLessThan(before.page - 20);
+		expect(scrolled.bar).toBeCloseTo(before.bar, 0);
+
+		await nav.getByRole('link', { name: 'Chat' }).click();
+		await expect(main.getByText('Message…')).toBeVisible();
+		const fill = await frame.evaluate((box) => ({
+			scrolls: box.scrollHeight > box.clientHeight,
+			page: box.querySelector('main')!.firstElementChild!.getBoundingClientRect().height,
+			underBar: box.clientHeight - box.querySelector('header')!.getBoundingClientRect().height
+		}));
+		expect(fill.scrolls).toBe(false);
+		expect(Math.abs(fill.page - fill.underBar)).toBeLessThan(1);
+	});
+
+	test('on a phone the places are a row of their own, from edge to edge, under the name and the controls', async ({ page }) => {
+		const section = await openSection(page, 'app-shell');
+		await page.setViewportSize({ width: 390, height: 800 });
+		const nav = section.getByRole('navigation', { name: 'Main' });
+		await nav.scrollIntoViewIfNeeded();
+		const name = (await section.getByText('Acme', { exact: true }).boundingBox())!;
+		const controls = (await section.getByRole('button', { name: 'Sign out' }).boundingBox())!;
+		const row = (await nav.boundingBox())!;
+		expect(row.y).toBeGreaterThanOrEqual(Math.max(name.y + name.height, controls.y + controls.height));
+		const links = await Promise.all((await nav.getByRole('link').all()).map(async (link) => (await link.boundingBox())!));
+		expect(links).toHaveLength(3);
+		// One row that the places fill between them, each tall enough for a thumb.
+		for (const link of links) {
+			expect(link.y).toBe(links[0].y);
+			expect(link.height).toBeGreaterThanOrEqual(40);
+		}
+		expect(links[0].x - row.x).toBeLessThanOrEqual(4);
+		expect(row.x + row.width - (links[2].x + links[2].width)).toBeLessThanOrEqual(4);
+		const shell = section.getByRole('main').locator('xpath=..');
+		expect(await shell.evaluate((root) => root.scrollWidth <= root.clientWidth)).toBe(true);
+	});
+});

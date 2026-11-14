@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { AppShellItem } from '../src/lib/primitives/navigation/AppShell.svelte';
 import { paginationRange } from '../src/lib/primitives/navigation/pagination-range.ts';
+import { ssr } from './ssr.ts';
+
+const { load, html, snippet } = ssr();
 
 const S = 'start-ellipsis';
 const E = 'end-ellipsis';
@@ -43,4 +47,68 @@ test('paginationRange keeps a constant slot count and honours siblings and bound
 test('paginationRange clamps an out-of-range page', () => {
 	assert.deepEqual(paginationRange({ page: 99, pageCount: 12 }), paginationRange({ page: 12, pageCount: 12 }));
 	assert.deepEqual(paginationRange({ page: -3, pageCount: 12 }), paginationRange({ page: 1, pageCount: 12 }));
+});
+
+const PLACES: AppShellItem[] = [
+	{ label: 'Home', href: '/' },
+	{ label: 'Board', href: '/acme/board' },
+	{ label: 'Chat', href: '/acme/chat', fill: true },
+	{ label: 'Settings', href: '/acme/settings/', count: 2, countLabel: 'open notices' },
+	{ label: 'Activity', href: '/acme/activity', count: 0 }
+];
+
+test('AppShell: one bar over the page, with the name, the places inside a named navigation and your controls', async () => {
+	const AppShell = await load('/src/lib/primitives/navigation/AppShell.svelte');
+	const out = html(AppShell, {
+		title: 'Acme',
+		items: PLACES,
+		path: '/acme/board',
+		'aria-label': 'Workspace',
+		actions: snippet(() => '<button type="button">Sign out</button>'),
+		children: snippet(() => '<p>The page</p>'),
+		'data-app': 'acme',
+		class: 'min-h-full'
+	});
+
+	// Your attributes reach the root, and your class replaces the kit's: here, how tall the shell is at least.
+	assert.match(out, /^<div data-app="acme" class="(?![^"]*min-h-dvh)[^"]* min-h-full">/);
+	// The bar, then the page as the one main region.
+	assert.match(out, /<header[^>]*><p[^>]*>Acme<\/p>\s*<nav aria-label="Workspace"[^>]*>[\s\S]*<\/nav>\s*<div[^>]*><button type="button">Sign out<\/button><\/div><\/header>\s*<main[^>]*><p>The page<\/p><\/main><\/div>$/);
+	assert.deepEqual([...out.matchAll(/<a href="([^"]*)"/g)].map(([, href]) => href), PLACES.map((item) => item.href));
+	// A count shows after its label, with what it counts for a screen reader. A count of 0 does not show.
+	assert.match(out, />Settings\s*<span[^>]*>\s*2<span class="sr-only"> open notices<\/span><\/span>\s*<\/a>/);
+	assert.match(out, />Activity\s*<\/a>/);
+
+	// Without a name or controls the bar is the navigation alone, and it still has a name.
+	const bare = html(AppShell, { items: PLACES, path: '/' });
+	assert.match(bare, /<header[^>]*>\s*<nav aria-label="Main"[^>]*>[\s\S]*<\/nav>\s*<\/header>/);
+});
+
+test('AppShell: a page scrolls with the document under a bar that stays, and a place that fills gets exactly the viewport', async () => {
+	const AppShell = await load('/src/lib/primitives/navigation/AppShell.svelte');
+	const heights = (path: string) => (html(AppShell, { items: PLACES, path }).match(/^<div class="([^"]*)"/)?.[1] ?? '').split(' ').filter((name) => name.endsWith('h-dvh'));
+
+	// At least the viewport, and as tall as the page: the document scrolls it.
+	assert.deepEqual(heights('/acme/board'), ['min-h-dvh']);
+	assert.deepEqual(heights('/elsewhere'), ['min-h-dvh']);
+	// Exactly the viewport, so the page gets the space under the bar. A page under that place gets it too.
+	assert.deepEqual(heights('/acme/chat'), ['h-dvh']);
+	assert.deepEqual(heights('/acme/chat/earlier'), ['h-dvh']);
+	// The bar stays in view while the document scrolls.
+	assert.match(html(AppShell, { items: PLACES, path: '/acme/board' }), /<header class="sticky top-0 /);
+});
+
+test('AppShell: the item the path is under is the current page', async () => {
+	const AppShell = await load('/src/lib/primitives/navigation/AppShell.svelte');
+	const currentAt = (path: string, items = PLACES) => [...html(AppShell, { items, path }).matchAll(/<a href="([^"]*)" aria-current="page"/g)].map(([, href]) => href);
+
+	assert.deepEqual(currentAt('/acme/board'), ['/acme/board']);
+	// A page under an item belongs to it, and slashes at the end do not count.
+	assert.deepEqual(currentAt('/acme/board/42/'), ['/acme/board']);
+	assert.deepEqual(currentAt('/acme/settings'), ['/acme/settings/']);
+	// A longer name is another place: only the root is above it.
+	assert.deepEqual(currentAt('/acme/boardroom'), ['/']);
+	assert.deepEqual(currentAt('/'), ['/']);
+	// With no item above the path, no page is current.
+	assert.deepEqual(currentAt('/elsewhere', PLACES.slice(1)), []);
 });

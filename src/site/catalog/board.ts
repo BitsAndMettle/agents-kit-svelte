@@ -2,7 +2,7 @@ import type { CatalogItemMeta } from '../catalog-registry.ts';
 
 const UPSTREAM = 'Agents Kit Svelte · Board';
 
-/** Catalogue entries for the Board collection: StatusStrip, BoardLanes, CardFace. Category: 'Board'. */
+/** Catalogue entries for the Board collection: StatusStrip, BoardLanes, CardFace, CardSheet. Category: 'Board'. */
 export const BOARD: CatalogItemMeta[] = [
 	{
 		slug: 'status-strip',
@@ -93,5 +93,40 @@ export const BOARD: CatalogItemMeta[] = [
     <Button size="sm" variant="primary" onclick={() => console.log('merge 221')}>Merge</Button>
   {/snippet}
 </CardFace>`
+	},
+	{
+		slug: 'card-sheet',
+		name: 'CardSheet',
+		category: 'Board',
+		sveltePath: 'src/lib/board/CardSheet.svelte',
+		upstreamSource: UPSTREAM,
+		description:
+			'One card in full, in a Sheet: the title names it, with its reference and status under it, then what is known about it as a list of labelled values, a question with one button per option, your own content, and your actions at the foot. The question waits for the promise your onAnswer returns and takes no other answer meanwhile.',
+		usageSnippet: `<script lang="ts">
+  import { CardFace, CardSheet, type CardFact, type CardQuestion } from 'agents-kit-svelte/board';
+  import { Button } from 'agents-kit-svelte/primitives';
+
+  let open = $state(false);
+
+  const facts: CardFact[] = [
+    { label: 'Pull request', value: '#57', href: 'https://example.com/pull/57' },
+    { label: 'Checks', value: 'Passed', tone: 'success' }
+  ];
+  let question = $state<CardQuestion | undefined>({ text: 'Which key should this card rotate?', options: ['The signing key', 'Both'] });
+
+  // Return the promise that stores the answer; the question is busy until it settles.
+  async function answer(option: string) {
+    console.log('answer 221:', option);
+    question = undefined;
+  }
+</script>
+
+<CardFace reference="#221" title="Rotate the signing key" status="Needs your answer" tone="warning" onSelect={() => (open = true)} />
+
+<CardSheet bind:open reference="#221" title="Rotate the signing key" status="Needs your answer" tone="warning" {facts} {question} onAnswer={answer}>
+  {#snippet actions(close)}
+    <Button variant="ghost" onclick={close}>Done</Button>
+  {/snippet}
+</CardSheet>`
 	}
 ];

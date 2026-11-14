@@ -2,7 +2,7 @@ import type { CatalogItemMeta } from '../catalog-registry.ts';
 
 const SOURCE = 'Agents Kit Svelte · Primitives';
 
-/** Catalogue entries for the Primitives collection. Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination. Category: 'Primitives'. */
+/** Catalogue entries for the Primitives collection. Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination, AppShell. Category: 'Primitives'. */
 export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
 	{
 		slug: 'tabs',
@@ -101,5 +101,35 @@ export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
   aria-label="Run pages"
   onValueChange={(next) => console.log('page', next)}
 />`
+	},
+	{
+		slug: 'app-shell',
+		name: 'AppShell',
+		category: 'Primitives',
+		sveltePath: 'src/lib/primitives/navigation/AppShell.svelte',
+		upstreamSource: SOURCE,
+		description:
+			'The frame of an app: one bar with its name, the places to go and your controls, over the page. The item the current path is under is marked as the current page, and a count after a label says what it counts. The page scrolls with the document and the bar stays in view; a place marked fill gives its page exactly the space under the bar instead, for a chat that does its own scrolling. On a phone the places are a row of their own.',
+		usageSnippet: `<script lang="ts">
+  import { AppShell, Button, type AppShellItem } from 'agents-kit-svelte/primitives';
+
+  // From your router, e.g. page.url.pathname in SvelteKit.
+  let path = $state('/acme/board');
+  let notices = $state(2);
+
+  let items = $derived<AppShellItem[]>([
+    { label: 'Board', href: '/acme/board' },
+    // The chat's page takes h-full and gets exactly the space under the bar.
+    { label: 'Chat', href: '/acme/chat', fill: true },
+    { label: 'Settings', href: '/acme/settings', count: notices, countLabel: 'open notices' }
+  ]);
+</script>
+
+<AppShell title="Acme" {items} {path}>
+  {#snippet actions()}
+    <Button size="sm" variant="ghost" onclick={() => console.log('sign out')}>Sign out</Button>
+  {/snippet}
+  <p class="p-6">The page for {path}</p>
+</AppShell>`
 	}
 ];
