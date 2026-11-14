@@ -7,6 +7,21 @@ import {
 	resolveKey,
 	toneIndexFromName
 } from '../src/lib/primitives/display/helpers.ts';
+import { ssr } from './ssr.ts';
+
+const { load, html } = ssr();
+
+test('Notice is a warning by default and always has a dismiss button, named after it', async () => {
+	const Notice = await load('/src/lib/primitives/display/Notice.svelte');
+	const out = html(Notice, { title: 'Build box is offline', description: 'Nothing can run.', onDismiss: () => {} });
+	assert.match(out, /^<div aria-busy="false"/);
+	assert.match(out, /bg-status-warning-subtle/);
+	assert.match(out, /<button[^>]*aria-label="Dismiss: Build box is offline"/);
+
+	const other = html(Notice, { title: 'Hors ligne', tone: 'danger', dismissLabel: 'Ignorer', onDismiss: () => {} });
+	assert.match(other, /bg-status-danger-subtle/);
+	assert.match(other, /aria-label="Ignorer: Hors ligne"/);
+});
 
 test('initialsFromName takes first and last word, or two letters of one word', () => {
 	assert.equal(initialsFromName('Ada Lovelace'), 'AL');
