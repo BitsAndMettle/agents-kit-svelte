@@ -99,7 +99,7 @@ test('Alert: the dismiss button works from the keyboard', async ({ page }) => {
 test('Notice: stays, busy, until the dismissal is stored, and each dismiss button names its notice', async ({ page }) => {
 	const section = await openSection(page, 'notice');
 	const dismiss = section.getByRole('button', { name: 'Dismiss: Build box is offline' });
-	const notice = section.locator('[aria-busy]').filter({ has: dismiss });
+	const notice = dismiss.locator('xpath=ancestor::*[@aria-busy][1]');
 	await expect(notice).toHaveAttribute('aria-busy', 'false');
 
 	await dismiss.click();

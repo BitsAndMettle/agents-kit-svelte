@@ -17,8 +17,12 @@
 		hideIcon?: boolean;
 		/** Buttons or links under the text. */
 		actions?: Snippet;
-		/** Shows a dismiss button that calls this. The alert does not remove itself: stop rendering it. */
-		onDismiss?: () => void;
+		/**
+		 * Shows a dismiss button that calls this. The alert does not remove itself: stop rendering it.
+		 * Return a promise and the alert waits for it, marked busy, and ignores a second press. If it
+		 * rejects, the alert stays; the rejection is yours to handle.
+		 */
+		onDismiss?: () => unknown;
 		dismissLabel?: string;
 		/**
 		 * Announces the alert when it appears. `true` and `'assertive'` use `role="alert"`, `'polite'` uses `role="status"`.
@@ -67,9 +71,24 @@
 
 	let role = $derived(live === false ? undefined : live === 'polite' ? 'status' : 'alert');
 	let Glyph = $derived(ICONS[tone]);
+
+	let pending = $state(false);
+
+	async function dismiss(): Promise<void> {
+		if (pending) return;
+		pending = true;
+		try {
+			await onDismiss?.();
+		} finally {
+			pending = false;
+		}
+	}
 </script>
 
-<div {...rest} {role} class={cn('flex w-full items-start gap-3 rounded-card border px-4 py-3 text-[13px] leading-5 text-fg-main', TONES[tone], className)}>
+<div {...rest} {role}
+	aria-busy={onDismiss ? pending : rest['aria-busy']}
+	class={cn('flex w-full items-start gap-3 rounded-card border px-4 py-3 text-[13px] leading-5 text-fg-main transition-opacity', TONES[tone], pending && 'opacity-60', className)}
+>
 	{#if !hideIcon}
 		<span aria-hidden="true" class={cn('mt-0.5 inline-flex shrink-0 [&_svg]:size-4', ICON_TONES[tone])}>
 			{#if icon}{@render icon()}{:else}<Glyph />{/if}
@@ -85,7 +104,7 @@
 		<button
 			type="button"
 			aria-label={dismissLabel}
-			onclick={() => onDismiss?.()}
+			onclick={dismiss}
 			class="-mt-1 -mr-1.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full text-fg-light transition-colors hover:bg-fg-main/10 hover:text-fg-main"
 		>
 			<X aria-hidden="true" class="size-4" />

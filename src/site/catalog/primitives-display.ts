@@ -167,7 +167,7 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/display/Alert.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Inline callout in five tones with title, description, icon, actions and a dismiss button. It is announced only when you set live; otherwise it is a quiet block.',
+			'Inline callout in five tones with title, description, icon, actions and a dismiss button. It is announced only when you set live; otherwise it is a quiet block. Return a promise from onDismiss and the alert waits for it, marked busy, and ignores a second press.',
 		usageSnippet: `<script lang="ts">
   import { Alert } from 'agents-kit-svelte/primitives';
 
@@ -186,7 +186,7 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/display/Notice.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A warning the person can always dismiss: an Alert whose dismiss button is not optional and is named after the notice, so a list of them reads clearly. Return a promise from onDismiss and the notice waits for it, marked busy, and ignores a second press.',
+			'A warning the person can always dismiss: an Alert whose dismiss button is not optional and is named after the notice, so a list of them reads clearly. Like any Alert, it waits, marked busy, for a promise returned from onDismiss.',
 		usageSnippet: `<script lang="ts">
   import { Notice } from 'agents-kit-svelte/primitives';
 
