@@ -191,6 +191,7 @@
 		'beUI Agents',
 		'Beautiful UI',
 		'GitHub Cards & Layouts',
+		'Board',
 		'Intelligent UI & Generative',
 		'Agents UI Orchestration',
 		'AI Elements & Coding',

@@ -39,9 +39,10 @@ test('every component forwards rest props to its root element', () => {
 	}
 });
 
-/** Collections whose demo data lives in src/lib/fixtures. */
+/** Collections that ship no demo data: samples live in src/lib/fixtures or with the site's demos. */
 const NO_DEMO_DEFAULTS = [
 	'src/lib/github/',
+	'src/lib/board/',
 	'src/lib/agents/',
 	'src/lib/ai-elements/',
 	'src/lib/runtime/',
