@@ -96,6 +96,18 @@ test('Alert: the dismiss button works from the keyboard', async ({ page }) => {
 	await expect(section.getByText('Dismissible')).toHaveCount(0);
 });
 
+test('Notice: stays, busy, until the dismissal is stored, and each dismiss button names its notice', async ({ page }) => {
+	const section = await openSection(page, 'notice');
+	const dismiss = section.getByRole('button', { name: 'Dismiss: Build box is offline' });
+	const notice = dismiss.locator('xpath=ancestor::*[@aria-busy][1]');
+	await expect(notice).toHaveAttribute('aria-busy', 'false');
+
+	await dismiss.click();
+	await expect(notice).toHaveAttribute('aria-busy', 'true');
+	await expect(dismiss).toHaveCount(0);
+	await expect(section.getByRole('button', { name: 'Dismiss: A label could not be written' })).toBeVisible();
+});
+
 test('Progress: value, range and text are exposed to assistive technology', async ({ page }) => {
 	const section = await openSection(page, 'progress');
 	const upload = section.getByRole('progressbar', { name: 'Upload' });

@@ -2,7 +2,7 @@ import type { CatalogItemMeta } from '../catalog-registry.ts';
 
 const UPSTREAM = 'Agents Kit Svelte · Primitives';
 
-/** Catalogue entries for the Primitives collection. Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, EmptyState. Category: 'Primitives'. */
+/** Catalogue entries for the Primitives collection. Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, Notice, EmptyState. Category: 'Primitives'. */
 export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 	{
 		slug: 'badge',
@@ -167,7 +167,7 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/display/Alert.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Inline callout in five tones with title, description, icon, actions and a dismiss button. It is announced only when you set live; otherwise it is a quiet block.',
+			'Inline callout in five tones with title, description, icon, actions and a dismiss button. It is announced only when you set live; otherwise it is a quiet block. Return a promise from onDismiss and the alert waits for it, marked busy, and ignores a second press.',
 		usageSnippet: `<script lang="ts">
   import { Alert } from 'agents-kit-svelte/primitives';
 
@@ -178,6 +178,30 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
   <Alert tone="warning" title="Disk almost full" description="Free some space before the next run."
     live onDismiss={() => (open = false)} />
 {/if}`
+	},
+	{
+		slug: 'notice',
+		name: 'Notice',
+		category: 'Primitives',
+		sveltePath: 'src/lib/primitives/display/Notice.svelte',
+		upstreamSource: UPSTREAM,
+		description:
+			'A warning the person can always dismiss: an Alert whose dismiss button is not optional and is named after the notice, so a list of them reads clearly. Like any Alert, it waits, marked busy, for a promise returned from onDismiss.',
+		usageSnippet: `<script lang="ts">
+  import { Notice } from 'agents-kit-svelte/primitives';
+
+  let notices = $state([{ key: 'offline:build-box', title: 'Build box is offline', description: 'Nothing can run until it reconnects.' }]);
+
+  // Store the dismissal, then stop rendering the notice. It waits, busy, until this settles.
+  async function dismiss(key: string) {
+    await fetch('/notices/dismiss', { method: 'POST', body: key });
+    notices = notices.filter((notice) => notice.key !== key);
+  }
+</script>
+
+{#each notices as notice (notice.key)}
+  <Notice title={notice.title} description={notice.description} onDismiss={() => dismiss(notice.key)} />
+{/each}`
 	},
 	{
 		slug: 'empty-state',

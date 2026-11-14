@@ -113,6 +113,21 @@ export const SURFACE = {
 	description: 'text-xs leading-5 text-fg-light'
 } as const;
 
+/**
+ * A surface that is one link or button with a single tab stop. `surface` goes on the `relative` box
+ * and `main` on its title link or button, marked `data-card-main`: a pseudo-element stretches the
+ * title over the whole box, so nothing interactive is nested. A `<button>` title also takes `button`,
+ * which strips the button look. Controls inside a `lift` box sit above the stretched title and stay
+ * clickable; empty space still reaches it.
+ */
+export const STRETCHED = {
+	surface:
+		'ak-hover-soft hover:border-fg-light/50 has-[[data-card-main]:focus-visible]:outline-2 has-[[data-card-main]:focus-visible]:outline-offset-2 has-[[data-card-main]:focus-visible]:outline-accent-primary/70',
+	main: 'rounded-sm after:absolute after:inset-0 after:content-[""] focus-visible:outline-none',
+	button: 'm-0 block cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit',
+	lift: '[&_a]:relative [&_a]:z-10 [&_button]:relative [&_button]:z-10 [&_input]:relative [&_input]:z-10 [&_select]:relative [&_select]:z-10 [&_textarea]:relative [&_textarea]:z-10 [&_[tabindex]]:relative [&_[tabindex]]:z-10'
+} as const;
+
 /** Text input / select / textarea recipe. */
 export const INPUT_CLASS =
 	'h-8 w-full rounded-control border border-card-border bg-card-bg px-3 text-[13px] text-fg-main placeholder:text-fg-light transition-[border-color,box-shadow] focus:border-accent-primary/50 focus:shadow-[0_0_0_3px_color-mix(in_oklch,var(--color-accent-primary)_14%,transparent)] focus:outline-none';

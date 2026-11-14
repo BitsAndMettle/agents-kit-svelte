@@ -58,6 +58,11 @@
       "svelte": "./dist/entries/github.js",
       "default": "./dist/entries/github.js"
     },
+    "./board": {
+      "types": "./dist/entries/board.d.ts",
+      "svelte": "./dist/entries/board.js",
+      "default": "./dist/entries/board.js"
+    },
     "./skills": {
       "types": "./dist/entries/skills.d.ts",
       "svelte": "./dist/entries/skills.js",

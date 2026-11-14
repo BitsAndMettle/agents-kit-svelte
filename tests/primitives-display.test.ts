@@ -7,6 +7,28 @@ import {
 	resolveKey,
 	toneIndexFromName
 } from '../src/lib/primitives/display/helpers.ts';
+import { ssr } from './ssr.ts';
+
+const { load, html } = ssr();
+
+test('Alert: only a dismissible alert has a dismiss button and a busy state', async () => {
+	const Alert = await load('/src/lib/primitives/display/Alert.svelte');
+	assert.doesNotMatch(html(Alert, { title: 'Saved' }), /aria-busy|<button/);
+	assert.match(html(Alert, { title: 'Saving', 'aria-busy': 'true' }), /^<div aria-busy="true"/, 'your own aria-busy still reaches it');
+	assert.match(html(Alert, { title: 'Saved', onDismiss: () => {} }), /^<div[^>]*aria-busy="false"[^>]*>[\s\S]*<button[^>]*aria-label="Dismiss"/);
+});
+
+test('Notice is an Alert: a warning by default, always with a dismiss button named after it', async () => {
+	const Notice = await load('/src/lib/primitives/display/Notice.svelte');
+	const out = html(Notice, { title: 'Build box is offline', description: 'Nothing can run.', class: 'mt-4', onDismiss: () => {} });
+	// One element: the alert itself carries the busy state, the tone and the caller's class.
+	assert.match(out, /^<div aria-busy="false" class="[^"]*bg-status-warning-subtle[^"]* mt-4"/);
+	assert.match(out, /<button[^>]*aria-label="Dismiss: Build box is offline"/);
+
+	const other = html(Notice, { title: 'Hors ligne', tone: 'danger', dismissLabel: 'Ignorer', onDismiss: () => {} });
+	assert.match(other, /bg-status-danger-subtle/);
+	assert.match(other, /aria-label="Ignorer: Hors ligne"/);
+});
 
 test('initialsFromName takes first and last word, or two letters of one word', () => {
 	assert.equal(initialsFromName('Ada Lovelace'), 'AL');
