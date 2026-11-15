@@ -68,11 +68,7 @@
 				<prState.icon aria-hidden="true" class="size-3" />
 				<span>{prState.label}</span>
 			</span>
-			{#if pr.href}
-				<a href={pr.href} class="rounded-sm font-mono font-medium text-fg-main underline decoration-fg-light/50 underline-offset-4 hover:decoration-fg-main">PR #{pr.number}</a>
-			{:else}
-				<span class="font-mono font-medium text-fg-main">PR #{pr.number}</span>
-			{/if}
+			<svelte:element this={pr.href ? 'a' : 'span'} href={pr.href} class={cn('font-mono font-medium text-fg-main', pr.href && 'rounded-sm underline decoration-fg-light/50 underline-offset-4 hover:decoration-fg-main')}>PR #{pr.number}</svelte:element>
 			{#if pr.linkedIssueNumber}
 				<span class="rounded bg-canvas-secondary px-1.5 py-0.5 font-mono text-[11px] text-fg-light">
 					Fixes #{pr.linkedIssueNumber}
