@@ -18,8 +18,15 @@ test('GitHubIssueCard: an issue is its number, title, repository and state, and 
 	assert.equal(says({}), 'Open ada/shop · #11 Checkout Approve');
 	assert.doesNotMatch(html(GitHubIssueCard, { issue: { ...issue, labels: [] }, actions }), /class="truncate"|class="mt-2\.5 /);
 	assert.doesNotMatch(html(GitHubIssueCard, { issue }), /border-t|<button/);
-	// A worktree without an agent is not "Unassigned".
+	// A worktree without an agent is not "Unassigned", and has no dot for one.
 	assert.equal(says({ worktreeBranch: 'fix/cart' }), 'Open ada/shop · #11 Checkout fix/cart Approve');
+	assert.doesNotMatch(html(GitHubIssueCard, { issue: { ...issue, worktreeBranch: 'fix/cart' } }), /size-2 rounded-full bg-accent-primary/);
+
+	// The number is a link only where the issue has an address, in either size.
+	const href = 'https://github.com/ada/shop/issues/11';
+	assert.doesNotMatch(html(GitHubIssueCard, { issue }), /<a /);
+	assert.match(html(GitHubIssueCard, { issue: { ...issue, href } }), /<a href="https:\/\/github\.com\/ada\/shop\/issues\/11"[^>]*>\s*ada\/shop · #11\s*<\/a>/);
+	assert.match(html(GitHubIssueCard, { issue: { ...issue, href }, compact: true }), /<a href="https:\/\/github\.com\/ada\/shop\/issues\/11"[^>]*>\s*#11\s*<\/a>/);
 
 	// Who filed it and when are each said alone, and joined only where both are known.
 	assert.equal(says({ author: 'mira' }), 'Open ada/shop · #11 Checkout Filed by mira Approve');
@@ -55,29 +62,30 @@ test('GitHubPullRequestCard: a pull request is its number and state, and nothing
 	const drawn = (more: Partial<GitHubPullRequestData>, props: Record<string, unknown> = {}) => html(GitHubPullRequestCard, { pr: { ...pr, ...more }, ...props });
 	const says = (more: Partial<GitHubPullRequestData>) => said(drawn(more));
 
-	// No nought for a count nobody gave, no arrow between branches, no byline, no checks and no button.
+	// No nought for a count nobody gave, no arrow between branches, no byline, no checks, no button and no footer.
 	const bare = drawn({});
-	assert.equal(said(bare), 'Open PR PR #57');
+	assert.equal(said(bare), 'Open PR #57');
 	assert.match(bare, /^\s*<article aria-label="GitHub Pull Request 57" /);
-	assert.doesNotMatch(bare, /<a |<h\d|<code|<button|<p |arrow-right/);
+	assert.doesNotMatch(bare, /<a |<h\d|<code|<button|<p |arrow-right|border-t/);
 
-	// Every state has its word: a closed pull request is not an open one.
-	const states: Record<GitHubPRState, string> = { open: 'Open PR', draft: 'Draft', merged: 'Merged', closed: 'Closed' };
+	// Every state has its word and GitHub's icon: a closed pull request is not an open one.
+	const states: Record<GitHubPRState, string> = { open: 'Open', draft: 'Draft', merged: 'Merged', closed: 'Closed' };
 	for (const [state, word] of Object.entries(states)) assert.equal(says({ state: state as GitHubPRState }), `${word} PR #57`);
+	assert.deepEqual(Object.keys(states).map((state) => /lucide-(git-[a-z-]+)[ "]/.exec(drawn({ state: state as GitHubPRState }))?.[1]), ['git-pull-request', 'git-pull-request-draft', 'git-merge', 'git-pull-request-closed']);
 
 	// The number is a link where the pull request has an address.
 	assert.match(drawn({ href: 'https://github.com/ada/shop/pull/57' }), /<a href="https:\/\/github\.com\/ada\/shop\/pull\/57"[^>]*>PR #57<\/a>/);
 
 	// Each fact stands alone. A nought that was given is drawn: it is what GitHub said.
-	assert.equal(says({ additions: 0 }), 'Open PR PR #57 +0');
-	assert.equal(says({ linkedIssueNumber: 41, deletions: 3, changedFilesCount: 2, riskTier: 'T2' }), 'Open PR PR #57 Fixes #41 −3 (2 files) T2');
-	assert.equal(says({ headBranch: 'fix/cart' }), 'Open PR PR #57 fix/cart');
+	assert.equal(says({ additions: 0 }), 'Open PR #57 +0');
+	assert.equal(says({ linkedIssueNumber: 41, deletions: 3, changedFilesCount: 2, riskTier: 'T2' }), 'Open PR #57 Fixes #41 −3 (2 files) T2');
+	assert.equal(says({ headBranch: 'fix/cart' }), 'Open PR #57 fix/cart');
 	// One branch alone points nowhere.
 	for (const one of [{ headBranch: 'fix/cart' }, { baseBranch: 'main' }]) assert.doesNotMatch(drawn(one), /arrow-right/);
 	assert.match(drawn({ headBranch: 'fix/cart', baseBranch: 'main' }), /fix\/cart\s*<\/code>\s*<svg[^>]*arrow-right[\s\S]*<code[^>]*>\s*main\s*<\/code>/);
-	assert.equal(says({ author: 'mira' }), 'Open PR PR #57 by mira');
-	assert.equal(says({ updatedAt: '5m ago' }), 'Open PR PR #57 5m ago');
-	assert.equal(says({ author: 'mira', updatedAt: '5m ago' }), 'Open PR PR #57 by mira · 5m ago');
+	assert.equal(says({ author: 'mira' }), 'Open PR #57 by mira');
+	assert.equal(says({ updatedAt: '5m ago' }), 'Open PR #57 5m ago');
+	assert.equal(says({ author: 'mira', updatedAt: '5m ago' }), 'Open PR #57 by mira · 5m ago');
 
 	// The title is a heading at the level its page gives it, and names the card.
 	assert.match(drawn({ title: 'Fix the cart' }), /^\s*<article aria-label="GitHub Pull Request 57: Fix the cart" [\s\S]*<h3[^>]*>Fix the cart<\/h3>/);
@@ -86,27 +94,85 @@ test('GitHubPullRequestCard: a pull request is its number and state, and nothing
 
 test('GitHubPullRequestCard: checks are a list that opens where the runs are held, and one line where only their summary is', async () => {
 	const GitHubPullRequestCard = await load('/src/lib/github/GitHubPullRequestCard.svelte');
-	const run = (id: string, status: GitHubCheckItem['status']): GitHubCheckItem => ({ id, name: `check ${id}`, workflow: 'CI', status, duration: '' });
+	const run = (id: string, status: GitHubCheckItem['status']): GitHubCheckItem => ({ id, name: `check ${id}`, status });
 	const drawn = (more: Partial<GitHubPullRequestData>) => html(GitHubPullRequestCard, { pr: { number: 57, state: 'open', ...more } });
-	/** The colour of the mark beside the checks' one line or heading. */
-	const mark = (markup: string) => /<span class="[^"]* (text-[a-z-]+)">(?:<svg[\s\S]*?<\/svg>|<span[^>]*><\/span>)<\/span>\s*<span>Checks /.exec(markup)?.[1];
+	/** The colour of the first check mark: the one beside the checks' one line or heading. */
+	const mark = (markup: string) => /justify-center (text-[a-z-]+)"/.exec(markup)?.[1];
 
-	// A summary alone is one line in its colour: nothing opens, because nothing is held.
+	// A summary alone is one line in its colour, its status said once: nothing opens, because nothing is held.
 	for (const [status, colour] of [['passed', 'text-status-success'], ['failed', 'text-status-danger'], ['running', 'text-accent-primary']] as const) {
 		const line = drawn({ checksStatus: status });
-		assert.equal(said(line), `Open PR PR #57 Checks ${status}`);
+		assert.equal(said(line), `Open PR #57 Checks ${status}`);
 		assert.equal(mark(line), colour);
 		assert.doesNotMatch(line, /<button|<ul/);
 	}
 	// An empty list of runs is no checks at all.
-	assert.equal(said(drawn({ checks: [] })), 'Open PR PR #57');
+	assert.equal(said(drawn({ checks: [] })), 'Open PR #57');
 
 	// Runs are counted and listed, and their heading is marked by what they add up to: one failure fails them, and one still running keeps them running.
 	const rollup = (...statuses: GitHubCheckItem['status'][]) => drawn({ checks: statuses.map((status, at) => run(String(at), status)) });
-	assert.match(rollup('passed', 'failed', 'running'), /<button type="button" aria-expanded="true" aria-controls="gh-pr-checks-57"[\s\S]*Checks \(1\/3 passed\)[\s\S]*check 0[\s\S]*check 1[\s\S]*check 2/);
+	assert.match(rollup('passed', 'failed', 'running'), /<button type="button" aria-expanded="true" aria-controls="[^"]+"[\s\S]*Checks \(1\/3 passed\)[\s\S]*check 0[\s\S]*check 1[\s\S]*check 2/);
 	assert.deepEqual([rollup('passed', 'failed', 'running'), rollup('passed', 'running'), rollup('passed', 'skipped')].map(mark), ['text-status-danger', 'text-accent-primary', 'text-status-success']);
+	// Each run and the heading say their status, which is not only a colour.
+	assert.equal(said(rollup('failed', 'skipped')), 'Open PR #57 failed Checks (0/2 passed) failed check 0 skipped check 1');
 	// A summary that was given is the one shown, beside the runs.
 	assert.equal(mark(drawn({ checks: [run('0', 'passed')], checksStatus: 'running' })), 'text-accent-primary');
+
+	// A run without its workflow or time has no empty pill or column for them.
+	const PILL = /font-mono text-\[10px\]|tabular-nums text-fg-light/;
+	assert.doesNotMatch(rollup('passed'), PILL);
+	assert.match(drawn({ checks: [{ ...run('0', 'passed'), workflow: 'CI', duration: '14s' }] }), /font-mono text-\[10px\][^>]*>\s*CI\s*<[\s\S]*tabular-nums text-fg-light">14s</);
+});
+
+test('GitHubPullRequestCard: two cards for one pull request open two different panels', async () => {
+	const TwoCards = await load('/tests/TwoPullRequestCards.svelte');
+	const markup = html(TwoCards, { pr: { number: 57, state: 'open', checks: [{ id: '0', name: 'lint', status: 'passed' }] } });
+	const ids = [...markup.matchAll(/aria-controls="([^"]+)"/g)].map(([, id]) => id);
+	assert.equal(new Set(ids).size, 2);
+	for (const id of ids) assert.match(markup, new RegExp(`id="${id}"`));
+});
+
+test('CheckMark: each status has a glyph of its own, and says its word unless told not to', async () => {
+	const CheckMark = await load('/src/lib/github/CheckMark.svelte');
+	const statuses: GitHubCheckItem['status'][] = ['passed', 'failed', 'running', 'skipped'];
+	const glyphs = statuses.map((status) => {
+		const markup = html(CheckMark, { status });
+		assert.match(markup, new RegExp(`<span class="sr-only">${status}</span>`));
+		assert.doesNotMatch(html(CheckMark, { status, spoken: false }), /sr-only/);
+		// The mark without its colour or its word.
+		return markup.replace(/^\s*<span [^>]*>/, '').replace(/<span class="sr-only">[^<]*<\/span>/, '');
+	});
+	assert.equal(new Set(glyphs).size, statuses.length);
+});
+
+test('GitHubChecksPanel: a run without its workflow or time has no empty pill for them', async () => {
+	const GitHubChecksPanel = await load('/src/lib/github/GitHubChecksPanel.svelte');
+	assert.doesNotMatch(html(GitHubChecksPanel, { checks: [{ id: '0', name: 'lint', status: 'passed' }] }), /font-mono text-\[10px\]|font-mono text-\[11px\] tabular-nums/);
+});
+
+test('GitHubPullRequestBadge: GitHub\'s icon for the state with its word, the number, and a mark only for checks it is given', async () => {
+	const GitHubPullRequestBadge = await load('/src/lib/github/GitHubPullRequestBadge.svelte');
+	const drawn = (more: Partial<GitHubPullRequestData>) => html(GitHubPullRequestBadge, { pr: { number: 57, state: 'open', ...more } });
+
+	// No link without an address, no mark without checks, and nothing to press or head.
+	const bare = drawn({});
+	assert.equal(said(bare), 'Open #57');
+	assert.doesNotMatch(bare, /<a |<button|<h\d|justify-center/);
+
+	// Each state is its icon in its tone, and its word for screen readers.
+	const states: Record<GitHubPRState, [string, string, string]> = {
+		open: ['Open', 'git-pull-request', 'text-status-success'],
+		draft: ['Draft', 'git-pull-request-draft', 'text-fg-light'],
+		merged: ['Merged', 'git-merge', 'text-accent-primary'],
+		closed: ['Closed', 'git-pull-request-closed', 'text-status-danger']
+	};
+	for (const [state, [word, icon, tone]] of Object.entries(states)) {
+		const markup = drawn({ state: state as GitHubPRState });
+		assert.match(markup, new RegExp(`<span class="[^"]*${tone}">\\s*<svg[^>]*lucide-${icon}[ "][\\s\\S]*?<span class="sr-only">${word}</span>`));
+	}
+
+	assert.match(drawn({ href: 'https://github.com/ada/shop/pull/57' }), /<a href="https:\/\/github\.com\/ada\/shop\/pull\/57"[^>]*>#57<\/a>/);
+	assert.equal(said(drawn({ checksStatus: 'failed' })), 'Open #57 failed');
 });
 
 test('GitHubPullRequestCard: a button for each handler it is given, and no word of its own about what a press did', async () => {
@@ -118,7 +184,7 @@ test('GitHubPullRequestCard: a button for each handler it is given, and no word 
 	assert.deepEqual(buttons({ onApproveMerge: () => {} }), ['Approve &amp; Queue Merge']);
 	assert.deepEqual(buttons({ onRequestChanges: () => {}, onApproveMerge: () => {} }), ['Send back', 'Approve &amp; Queue Merge']);
 	// Whether a merge was queued or a pull request sent back is the caller's to know: the card says neither.
-	assert.equal(said(html(GitHubPullRequestCard, { pr: { number: 57, state: 'open' }, onApproveMerge: () => {} })), 'Open PR PR #57 Approve &amp; Queue Merge');
+	assert.equal(said(html(GitHubPullRequestCard, { pr: { number: 57, state: 'open' }, onApproveMerge: () => {} })), 'Open PR #57 Approve &amp; Queue Merge');
 	// Your controls take the place of the card's buttons.
 	assert.deepEqual(buttons({ onApproveMerge: () => {}, actions: snippet(() => '<button type="button">Merge</button>') }), ['Merge']);
 });
@@ -179,5 +245,6 @@ test('GitHubLifecycleTimeline: stages are drawn as given, under a header only of
 
 	// The stage in focus says who and what only where it is told.
 	assert.match(midway, /In review<\/span>\s*<span class="text-fg-light">by <strong[^>]*>mira<\/strong><\/span>\s*<span[^>]*>PR 57<\/span>/);
+	assert.doesNotMatch(html(GitHubLifecycleTimeline, { stages: [stages[0], { id: 'pull-request', label: 'In review', detail: 'PR 57' }], current: 1 }), />by </);
 	assert.doesNotMatch(drawn({ current: 0 }), /rounded-control bg-canvas-secondary px-3\.5/);
 });

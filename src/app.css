@@ -43,13 +43,13 @@
 		--ak-color-scrim: oklch(0.18 0.01 60 / 0.45);
 
 		/* Accent and status */
-		--ak-color-accent: oklch(0.575 0.145 40);
+		--ak-color-accent: oklch(0.54 0.145 40);
 		--ak-color-accent-subtle: oklch(0.95 0.025 50);
 		--ak-color-success: oklch(0.51 0.162 149.579);
 		--ak-color-success-subtle: oklch(0.955 0.032 152.2);
-		--ak-color-warning: oklch(0.625 0.162 68.4);
+		--ak-color-warning: oklch(0.54 0.162 68.4);
 		--ak-color-warning-subtle: oklch(0.962 0.034 78.2);
-		--ak-color-danger: oklch(0.577 0.215 27.325);
+		--ak-color-danger: oklch(0.552 0.215 27.325);
 		--ak-color-danger-subtle: oklch(0.956 0.028 25.4);
 		--ak-color-info: oklch(0.546 0.215 262.881);
 		--ak-color-info-subtle: oklch(0.955 0.024 256.802);

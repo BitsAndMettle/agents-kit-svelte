@@ -2,10 +2,12 @@
 	import { cn } from '../ui/cn';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { buttonClass } from '../ui/styles';
-	import { ArrowRight, Check, ChevronDown, GitPullRequest, ShieldCheck } from '@lucide/svelte';
+	import { ArrowRight, ChevronDown, ShieldCheck } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import AgentDisclosure from '../agents/AgentDisclosure.svelte';
-	import type { GitHubCheckItem, GitHubPRState, GitHubPullRequestData } from '../types';
+	import CheckMark from './CheckMark.svelte';
+	import { PR_STATES } from './pr-state';
+	import type { GitHubPullRequestData } from '../types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'pr' | 'defaultChecksOpen' | 'headingLevel' | 'actions' | 'onApproveMerge' | 'onRequestChanges'> {
 		pr: GitHubPullRequestData;
@@ -20,13 +22,6 @@
 		actions?: Snippet;
 		class?: string;
 	}
-
-	const STATES: Record<GitHubPRState, { label: string; class: string }> = {
-		open: { label: 'Open PR', class: 'bg-status-success-subtle text-status-success' },
-		draft: { label: 'Draft', class: 'bg-canvas-secondary text-fg-light' },
-		merged: { label: 'Merged', class: 'bg-accent-subtle text-accent-primary' },
-		closed: { label: 'Closed', class: 'bg-status-danger-subtle text-status-danger' }
-	};
 
 	let {
 		pr,
@@ -58,7 +53,8 @@
 		pr.checksStatus ??
 			(checks.some((c) => c.status === 'failed') ? 'failed' : checks.some((c) => c.status === 'running') ? 'running' : 'passed')
 	);
-	let panelId = $derived(`gh-pr-checks-${pr.number}`);
+	let prState = $derived(PR_STATES[pr.state]);
+	const panelId = $props.id();
 </script>
 
 <article {...rest}
@@ -68,9 +64,9 @@
 	<!-- Header Row -->
 	<div class="flex flex-wrap items-center justify-between gap-2 text-xs">
 		<div class="flex flex-wrap items-center gap-2">
-			<span class="inline-flex items-center gap-1.5 rounded-chip px-1.5 py-px text-[11px] font-medium {STATES[pr.state].class}">
-				<GitPullRequest aria-hidden="true" class="size-3" />
-				<span>{STATES[pr.state].label}</span>
+			<span class="inline-flex items-center gap-1.5 rounded-chip px-1.5 py-px text-[11px] font-medium {prState.class}">
+				<prState.icon aria-hidden="true" class="size-3" />
+				<span>{prState.label}</span>
 			</span>
 			{#if pr.href}
 				<a href={pr.href} class="rounded-sm font-mono font-medium text-fg-main underline decoration-fg-light/50 underline-offset-4 hover:decoration-fg-main">PR #{pr.number}</a>
@@ -144,7 +140,7 @@
 				class="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium text-fg-main transition-colors hover:bg-canvas-secondary"
 			>
 				<span class="flex items-center gap-2">
-					{@render mark(checksStatus)}
+					<CheckMark status={checksStatus} />
 					<span>Checks ({passedCount}/{checks.length} passed)</span>
 				</span>
 				<ChevronDown aria-hidden="true" class="size-3.5 text-fg-light transition-transform duration-150 {checksOpen
@@ -158,17 +154,19 @@
 						<li class="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
 							<div class="min-w-0">
 								<div class="flex items-center gap-2">
-									{@render mark(check.status)}
+									<CheckMark status={check.status} />
 									<span class="font-medium text-fg-main">{check.name}</span>
-									<span class="rounded bg-canvas-secondary px-1.5 py-0.5 font-mono text-[10px] text-fg-light">
-										{check.workflow}
-									</span>
+									{#if check.workflow}
+										<span class="rounded bg-canvas-secondary px-1.5 py-0.5 font-mono text-[10px] text-fg-light">
+											{check.workflow}
+										</span>
+									{/if}
 								</div>
 								{#if check.summary}
 									<p class="mt-0.5 pl-5.5 text-[11px] text-fg-light">{check.summary}</p>
 								{/if}
 							</div>
-							<span class="font-mono text-[11px] tabular-nums text-fg-light">{check.duration}</span>
+							{#if check.duration}<span class="font-mono text-[11px] tabular-nums text-fg-light">{check.duration}</span>{/if}
 						</li>
 					{/each}
 				</ul>
@@ -176,7 +174,7 @@
 		</div>
 	{:else if pr.checksStatus}
 		<p class="mt-3 flex items-center gap-2 rounded-lg border border-card-border bg-canvas-secondary/30 px-3 py-2 text-xs font-medium text-fg-main">
-			{@render mark(pr.checksStatus)}
+			<CheckMark status={pr.checksStatus} spoken={false} />
 			<span>Checks {pr.checksStatus}</span>
 		</p>
 	{/if}
@@ -201,19 +199,3 @@
 		</div>
 	{/if}
 </article>
-
-{#snippet mark(status: GitHubCheckItem['status'])}
-	<span
-		class="inline-flex size-3.5 items-center justify-center {status === 'passed'
-			? 'text-status-success'
-			: status === 'failed'
-				? 'text-status-danger'
-				: 'text-accent-primary'}"
-	>
-		{#if status === 'passed'}
-			<Check aria-hidden="true" class="size-3.5" />
-		{:else}
-			<span class="size-2 rounded-full bg-current"></span>
-		{/if}
-	</span>
-{/snippet}

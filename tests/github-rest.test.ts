@@ -33,6 +33,7 @@ test('issue mapper reads a REST issue', () => {
 			number: 42,
 			title: 'Redirect loop on deep links',
 			state: 'open',
+			html_url: 'https://github.com/acme/web/issues/42',
 			user: { login: 'mira' },
 			created_at: at(28),
 			labels: [{ name: 'bug', color: 'd73a4a' }, 'area:auth'],
@@ -46,6 +47,7 @@ test('issue mapper reads a REST issue', () => {
 		title: 'Redirect loop on deep links',
 		repo: 'acme/web',
 		state: 'open',
+		href: 'https://github.com/acme/web/issues/42',
 		author: 'mira',
 		createdAt: '28m ago',
 		labels: [
@@ -85,8 +87,8 @@ test('pull request mapper derives state and maps check runs', () => {
 		pr.checks?.map((c) => [c.id, c.status, c.duration, c.workflow, c.summary]),
 		[
 			['1', 'passed', '2m 00s', 'GitHub Actions', undefined],
-			['2', 'running', '', '', undefined],
-			['3', 'failed', '', '', '2 tests failed']
+			['2', 'running', undefined, undefined, undefined],
+			['3', 'failed', undefined, undefined, '2 tests failed']
 		]
 	);
 	assert.equal(fromGitHubRest.pullRequest({ ...base, draft: true }).state, 'draft');
@@ -123,4 +125,5 @@ test('commit mapper shortens the sha and maps file statuses', () => {
 	// A commit that says less maps to less: no author, time, branch, counts or files are made up.
 	const bare = fromGitHubRest.commit({ sha: 'cdb5ea5f00ba4', commit: { message: 'fix' } });
 	assert.deepEqual([bare.author, bare.timestamp, bare.branch, bare.additions, bare.deletions, bare.files], [undefined, undefined, undefined, undefined, undefined, undefined]);
+	assert.equal(fromGitHubRest.commit({ sha: 'cdb5ea5f00ba4', html_url: 'https://github.com/acme/web/commit/cdb5ea5', commit: { message: 'fix' } }).href, 'https://github.com/acme/web/commit/cdb5ea5');
 });

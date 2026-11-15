@@ -192,6 +192,8 @@ export interface GitHubIssueData {
 	title: string;
 	repo: string;
 	state: GitHubIssueState;
+	/** Makes the issue's number a link. */
+	href?: string;
 	author?: string;
 	createdAt?: string;
 	labels?: GitHubLabel[];
@@ -211,9 +213,9 @@ export type GitHubPRState = 'open' | 'draft' | 'merged' | 'closed';
 export interface GitHubCheckItem {
 	id: string;
 	name: string;
-	workflow: string;
+	workflow?: string;
 	status: 'passed' | 'failed' | 'running' | 'skipped';
-	duration: string;
+	duration?: string;
 	summary?: string;
 }
 

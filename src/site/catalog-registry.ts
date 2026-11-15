@@ -1051,7 +1051,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 3. GitHub Cards & Layouts (18 components)
+	// 3. GitHub Cards & Layouts (19 components)
 	{
 		slug: 'github-issue-card',
 		name: 'GitHubIssueCard',
@@ -1121,6 +1121,28 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 </script>
 
 <GitHubPullRequestCard {pr} />`
+	},
+	{
+		slug: 'github-pr-badge',
+		name: 'GitHubPullRequestBadge',
+		category: 'GitHub Cards & Layouts',
+		sveltePath: 'src/lib/github/GitHubPullRequestBadge.svelte',
+		upstreamSource: 'Agents Kit Svelte · GitHub Suite',
+		description: 'A pull request in a line: GitHub\'s icon for its state, its number, and a mark for how its checks stand.',
+		usageSnippet: `<script lang="ts">
+  import { GitHubPullRequestBadge, type GitHubPullRequestData } from 'agents-kit-svelte';
+
+  const prs: GitHubPullRequestData[] = [
+    { number: 2153, state: 'open', checksStatus: 'running', href: 'https://github.com/RSynapse/trailside/pull/2153' },
+    { number: 2149, state: 'draft' },
+    { number: 2140, state: 'merged', checksStatus: 'passed' },
+    { number: 2137, state: 'closed', checksStatus: 'failed' }
+  ];
+</script>
+
+{#each prs as pr (pr.number)}
+  <GitHubPullRequestBadge {pr} />
+{/each}`
 	},
 	{
 		slug: 'github-commit-card',

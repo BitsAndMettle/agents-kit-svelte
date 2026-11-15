@@ -70,12 +70,15 @@ test('library deeply integrates Svelte 5 motion, transitions, flip animations, r
 	assert.match(combined, /\{@render\s+\w+/, 'Expected Svelte 5 {@render} calls');
 });
 
+/** Parts that other components draw and the package does not export: each is shown through the components that use it. */
+const INTERNAL = new Set(['src/lib/github/CheckMark.svelte']);
+
 test('every single .svelte component in src/lib/ has a dedicated 1-to-1 showcase entry in CATALOG_ITEMS and +page.svelte', () => {
 	const rootDir = process.cwd();
 	const libDir = join(rootDir, 'src', 'lib');
-	const libSvelteFiles = collectFilesByExtension(libDir, '.svelte').map((f) =>
-		relative(rootDir, f).replace(/\\/g, '/')
-	);
+	const libSvelteFiles = collectFilesByExtension(libDir, '.svelte')
+		.map((f) => relative(rootDir, f).replace(/\\/g, '/'))
+		.filter((rel) => !INTERNAL.has(rel));
 
 	assert.equal(
 		CATALOG_ITEMS.length,
