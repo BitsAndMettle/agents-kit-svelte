@@ -1,14 +1,4 @@
 {
-	"action-receipt": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-artifact": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"agent-context-meter": {
 		"light": [
 			"label-content-name-mismatch"
@@ -17,47 +7,12 @@
 			"label-content-name-mismatch"
 		]
 	},
-	"agent-evaluator": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"agent-form-generator": {
 		"light": [
 			"scrollable-region-focusable"
 		],
 		"dark": [
 			"scrollable-region-focusable"
-		]
-	},
-	"agent-ops-monitor": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-orchestrator": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-parallel-processor": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-routing-hub": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-sequential-workflow": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"agent-task-queue": {
-		"light": [
-			"color-contrast"
 		]
 	},
 	"agent-tool-palette": {
@@ -69,21 +24,6 @@
 		]
 	},
 	"agent-work-trace": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"approval-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"blocked-work-list": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"chain-of-thought": {
 		"light": [
 			"color-contrast"
 		]
@@ -102,21 +42,6 @@
 			"scrollable-region-focusable"
 		]
 	},
-	"cited-answer": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"context-cards": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"device-approval": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"diff-table": {
 		"light": [
 			"color-contrast"
@@ -127,7 +52,6 @@
 	},
 	"environment-variables": {
 		"light": [
-			"color-contrast",
 			"label-content-name-mismatch"
 		],
 		"dark": [
@@ -136,21 +60,14 @@
 	},
 	"feature-card": {
 		"light": [
-			"color-contrast",
 			"definition-list"
 		],
 		"dark": [
 			"definition-list"
 		]
 	},
-	"feature-proposal": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"feature-timeline": {
 		"light": [
-			"color-contrast",
 			"label-content-name-mismatch",
 			"target-size"
 		],
@@ -175,46 +92,11 @@
 			"aria-required-parent"
 		]
 	},
-	"filter-table": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"fleet-status": {
 		"light": [
 			"color-contrast"
 		],
 		"dark": [
-			"color-contrast"
-		]
-	},
-	"github-bento-layout": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-incident-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-issue-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-issue-triage": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-kanban-board": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-merge-queue": {
-		"light": [
 			"color-contrast"
 		]
 	},
@@ -239,34 +121,8 @@
 			"color-contrast"
 		]
 	},
-	"github-release-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-review-thread": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"insight-cards": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"level-dial": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"message-bubble": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"message-scroller": {
 		"light": [
-			"color-contrast",
 			"scrollable-region-focusable",
 			"target-size"
 		],
@@ -283,21 +139,6 @@
 			"target-size"
 		]
 	},
-	"package-info": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"plan-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"presence-banner": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"prompt-input": {
 		"light": [
 			"color-contrast",
@@ -308,11 +149,6 @@
 			"label-content-name-mismatch"
 		]
 	},
-	"records-table": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"run-replay-scrubber": {
 		"light": [
 			"color-contrast",
@@ -320,11 +156,6 @@
 		],
 		"dark": [
 			"nested-interactive"
-		]
-	},
-	"schema-display": {
-		"light": [
-			"color-contrast"
 		]
 	},
 	"skill-editor": {
@@ -346,7 +177,6 @@
 	},
 	"skill-proposal-card": {
 		"light": [
-			"color-contrast",
 			"scrollable-region-focusable"
 		],
 		"dark": [
@@ -354,17 +184,7 @@
 			"scrollable-region-focusable"
 		]
 	},
-	"skill-router": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"stack-trace": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"svelte5-motion-lab": {
 		"light": [
 			"color-contrast"
 		]

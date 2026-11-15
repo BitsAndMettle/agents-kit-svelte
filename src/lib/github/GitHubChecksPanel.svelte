@@ -88,10 +88,12 @@
 							{/if}
 						</span>
 						<span class="font-medium text-fg-main">{check.name}</span>
-						<span class="rounded bg-canvas-secondary px-1.5 py-0.5 font-mono text-[10px] text-fg-light">
-							{check.workflow}
-						</span>
-						<span class="font-mono text-[11px] tabular-nums text-fg-light">{check.duration}</span>
+						{#if check.workflow}
+							<span class="rounded bg-canvas-secondary px-1.5 py-0.5 font-mono text-[10px] text-fg-light">
+								{check.workflow}
+							</span>
+						{/if}
+						{#if check.duration}<span class="font-mono text-[11px] tabular-nums text-fg-light">{check.duration}</span>{/if}
 					</div>
 					{#if check.summary}
 						<p class="mt-1 pl-6 text-fg-light">{check.summary}</p>

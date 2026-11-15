@@ -6,6 +6,7 @@ export { default as GitHubCommitCard } from '../github/GitHubCommitCard.svelte';
 export { default as GitHubIssueCard } from '../github/GitHubIssueCard.svelte';
 export { default as GitHubKanbanBoard } from '../github/GitHubKanbanBoard.svelte';
 export { default as GitHubPullRequestCard } from '../github/GitHubPullRequestCard.svelte';
+export { default as GitHubPullRequestBadge } from '../github/GitHubPullRequestBadge.svelte';
 export { default as GitHubReviewThreadCard } from '../github/GitHubReviewThreadCard.svelte';
 export { default as GitHubLifecycleTimeline } from '../github/GitHubLifecycleTimeline.svelte';
 export { default as GitHubIssueTriage } from '../github/GitHubIssueTriage.svelte';

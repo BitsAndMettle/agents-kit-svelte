@@ -119,15 +119,17 @@
 					</span>
 				{/key}
 
-				{#if compact}
-					<span class="shrink-0 whitespace-nowrap font-mono text-xs font-medium text-fg-light">
-						#{issue.number}
-					</span>
-				{:else}
-					<span class="min-w-0 truncate font-mono text-xs text-fg-light">
-						{issue.repo} · #{issue.number}
-					</span>
-				{/if}
+				<svelte:element
+					this={issue.href ? 'a' : 'span'}
+					href={issue.href}
+					class={cn(
+						'font-mono text-xs text-fg-light',
+						compact ? 'shrink-0 whitespace-nowrap font-medium' : 'min-w-0 truncate',
+						issue.href && 'rounded-sm underline decoration-fg-light/50 underline-offset-4 hover:decoration-fg-main'
+					)}
+				>
+					{compact ? `#${issue.number}` : `${issue.repo} · #${issue.number}`}
+				</svelte:element>
 			</div>
 
 			<div class="flex shrink-0 items-center gap-1 text-xs text-fg-light">

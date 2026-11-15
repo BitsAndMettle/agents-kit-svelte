@@ -32,6 +32,7 @@ export interface RestIssue {
 	number: number;
 	title: string;
 	state: string;
+	html_url?: string;
 	user?: RestUser | null;
 	created_at: string;
 	labels?: RestLabel[];
@@ -172,6 +173,7 @@ function issue(json: RestIssue, options: GitHubMapOptions = {}): GitHubIssueData
 		title: json.title,
 		repo: options.repo ?? repoFromUrl(json.repository_url) ?? '',
 		state: json.state === 'closed' ? 'closed' : 'open',
+		href: json.html_url,
 		author: json.user?.login,
 		createdAt: format(json.created_at),
 		labels: toLabels(json.labels, options),
@@ -194,9 +196,9 @@ function checkRun(json: RestCheckRun, options: { workflow?: string } = {}): GitH
 	return {
 		id: String(json.id),
 		name: json.name,
-		workflow: options.workflow ?? json.app?.name ?? '',
+		workflow: options.workflow ?? json.app?.name ?? undefined,
 		status,
-		duration: Number.isFinite(start) && Number.isFinite(end) ? formatDuration((end - start) / 1000) : '',
+		duration: Number.isFinite(start) && Number.isFinite(end) ? formatDuration((end - start) / 1000) : undefined,
 		summary: json.output?.title ?? undefined
 	};
 }

@@ -66,11 +66,7 @@
 					Verified
 				</span>
 			{/if}
-			{#if commit.href}
-				<a href={commit.href} class="rounded-sm font-medium text-fg-main underline decoration-fg-light/50 underline-offset-4 hover:decoration-fg-main">{commit.sha.slice(0, 7)}</a>
-			{:else}
-				<span class="font-medium text-fg-main">{commit.sha.slice(0, 7)}</span>
-			{/if}
+			<svelte:element this={commit.href ? 'a' : 'span'} href={commit.href} class={cn('font-medium text-fg-main', commit.href && 'rounded-sm underline decoration-fg-light/50 underline-offset-4 hover:decoration-fg-main')}>{commit.sha.slice(0, 7)}</svelte:element>
 			<button type="button" onclick={copySha} aria-label="Copy commit SHA" title="Copy commit SHA" class={buttonClass('ghost', 'icon-xs')}>
 				{#if copied}<Check aria-hidden="true" class="text-status-success" />{:else}<Copy aria-hidden="true" />{/if}
 			</button>

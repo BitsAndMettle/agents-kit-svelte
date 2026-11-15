@@ -95,6 +95,7 @@
 		GitHubCommitCard,
 		GitHubIssueCard,
 		GitHubKanbanBoard,
+		GitHubPullRequestBadge,
 		GitHubPullRequestCard,
 		GitHubReviewThreadCard,
 		ImageGeneration,
@@ -604,6 +605,13 @@
 		refereeStatus: 'pass',
 		checks: sampleChecks
 	};
+
+	const samplePRBadges: GitHubPullRequestData[] = [
+		{ number: 2153, state: 'open', checksStatus: 'running', href: 'https://github.com/RSynapse/trailside/pull/2153' },
+		{ number: 2149, state: 'draft' },
+		{ number: 2140, state: 'merged', checksStatus: 'passed' },
+		{ number: 2137, state: 'closed', checksStatus: 'failed' }
+	];
 
 	const sampleCommit: GitHubCommitData = {
 		sha: '9f8e7d6c5b4a3210fedcba9876543210abcdef12',
@@ -1626,6 +1634,10 @@
 								<GitHubIssueCard issue={sampleIssue} onClaimToggle={() => {}} onDispatchRun={() => {}} />
 							{:else if item.slug === 'github-pr-card'}
 								<GitHubPullRequestCard pr={samplePR} onRequestChanges={() => {}} onApproveMerge={() => {}} />
+							{:else if item.slug === 'github-pr-badge'}
+								<div class="flex flex-wrap items-center gap-4">
+									{#each samplePRBadges as pr (pr.number)}<GitHubPullRequestBadge {pr} />{/each}
+								</div>
 							{:else if item.slug === 'github-commit-card'}
 								<GitHubCommitCard commit={sampleCommit} onRestore={() => {}} />
 							{:else if item.slug === 'github-checks-panel'}
