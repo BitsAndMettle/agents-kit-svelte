@@ -61,7 +61,7 @@
 				item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
 				String(item.number).includes(searchQuery);
 			const matchesArea =
-				selectedArea === 'all' || item.labels.some((lbl) => lbl.name === selectedArea);
+				selectedArea === 'all' || item.labels?.some((lbl) => lbl.name === selectedArea);
 			return matchesQuery && matchesArea;
 		})
 	);

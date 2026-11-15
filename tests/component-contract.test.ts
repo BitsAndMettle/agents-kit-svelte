@@ -72,6 +72,18 @@ test('migrated collections have no demo-data defaults', () => {
 	}
 });
 
+/** GitHub components that draw only what they are given; the rest of the set joins as it is fixed. */
+const DRAW_WHAT_THEY_ARE_GIVEN = ['GitHubCommitCard', 'GitHubIssueCard', 'GitHubLifecycleTimeline', 'GitHubPullRequestCard'].map(
+	(name) => `src/lib/github/${name}.svelte`
+);
+
+test('GitHub components take their heading level from the page', () => {
+	for (const rel of DRAW_WHAT_THEY_ARE_GIVEN) {
+		const { source } = files.find((file) => file.rel === rel)!;
+		assert.doesNotMatch(source, /<h[1-6][\s>]/, `${rel} fixes its heading level; take headingLevel`);
+	}
+});
+
 test('library components default demo loops to off', () => {
 	for (const { rel, source } of files) {
 		assert.doesNotMatch(source, /\blive = true\b/, `${rel} plays a demo loop by default`);

@@ -69,7 +69,7 @@
 			case 'github-issue':
 				return { primary: item.issue.title, secondary: item.issue.summary ?? '' };
 			case 'github-pr':
-				return { primary: item.pr.title, secondary: item.pr.refereeSummary ?? '' };
+				return { primary: item.pr.title ?? `PR #${item.pr.number}`, secondary: item.pr.refereeSummary ?? '' };
 		}
 	}
 

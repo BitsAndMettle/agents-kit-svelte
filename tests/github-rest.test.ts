@@ -82,7 +82,7 @@ test('pull request mapper derives state and maps check runs', () => {
 	assert.equal(pr.updatedAt, '5m ago');
 	assert.equal(pr.riskTier, undefined);
 	assert.deepEqual(
-		pr.checks.map((c) => [c.id, c.status, c.duration, c.workflow, c.summary]),
+		pr.checks?.map((c) => [c.id, c.status, c.duration, c.workflow, c.summary]),
 		[
 			['1', 'passed', '2m 00s', 'GitHub Actions', undefined],
 			['2', 'running', '', '', undefined],
@@ -92,6 +92,10 @@ test('pull request mapper derives state and maps check runs', () => {
 	assert.equal(fromGitHubRest.pullRequest({ ...base, draft: true }).state, 'draft');
 	assert.equal(fromGitHubRest.pullRequest({ ...base, state: 'closed', merged_at: at(1) }).state, 'merged');
 	assert.equal(fromGitHubRest.pullRequest({ ...base, state: 'closed' }).state, 'closed');
+	assert.equal(fromGitHubRest.pullRequest({ ...base, html_url: 'https://github.com/acme/web/pull/7' }).href, 'https://github.com/acme/web/pull/7');
+	// The list endpoint has no counts, and runs are only what you pass: nothing is made up for them.
+	const listed = fromGitHubRest.pullRequest({ ...base, user: null, additions: undefined, deletions: undefined, changed_files: undefined });
+	assert.deepEqual([listed.author, listed.additions, listed.deletions, listed.changedFilesCount, listed.checks], [undefined, undefined, undefined, undefined, undefined]);
 });
 
 test('commit mapper shortens the sha and maps file statuses', () => {
@@ -115,5 +119,8 @@ test('commit mapper shortens the sha and maps file statuses', () => {
 	assert.equal(commit.timestamp, '12m ago');
 	assert.equal(commit.branch, 'fix/contrast');
 	assert.equal(commit.verified, true);
-	assert.deepEqual(commit.files.map((f) => f.status), ['modified', 'added', 'deleted', 'modified']);
+	assert.deepEqual(commit.files?.map((f) => f.status), ['modified', 'added', 'deleted', 'modified']);
+	// A commit that says less maps to less: no author, time, branch, counts or files are made up.
+	const bare = fromGitHubRest.commit({ sha: 'cdb5ea5f00ba4', commit: { message: 'fix' } });
+	assert.deepEqual([bare.author, bare.timestamp, bare.branch, bare.additions, bare.deletions, bare.files], [undefined, undefined, undefined, undefined, undefined, undefined]);
 });

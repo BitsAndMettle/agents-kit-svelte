@@ -125,7 +125,7 @@
 		<div class="space-y-10">
 			<div class="relative">
 				{#key replays.timeline ?? 0}
-					<GitHubLifecycleTimeline stages={SAMPLE_LIFECYCLE_STAGES} live onSelectStage={(stage) => recordEvent(`Inspected lifecycle stage: ${stage.label}`)} />
+					<GitHubLifecycleTimeline title="From issue to release" description="Every hand-off between people, agents and GitHub, in order." doneLabel="Shipped" stages={SAMPLE_LIFECYCLE_STAGES} live onSelectStage={(stage) => recordEvent(`Inspected lifecycle stage: ${stage.label}`)} />
 				{/key}
 			</div>
 

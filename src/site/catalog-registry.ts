@@ -1267,6 +1267,8 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 
 <!-- live plays a demo loop; leave it off for real data -->
 <GitHubLifecycleTimeline
+  title="From issue to release"
+  doneLabel="Shipped"
   stages={SAMPLE_LIFECYCLE_STAGES}
   live
   onSelectStage={(stage) => (pinned = stage)}
