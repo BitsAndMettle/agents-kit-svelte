@@ -24,16 +24,10 @@
 	},
 	"agent-form-generator": {
 		"light": [
-			"color-contrast",
 			"scrollable-region-focusable"
 		],
 		"dark": [
 			"scrollable-region-focusable"
-		]
-	},
-	"agent-generative-surface": {
-		"light": [
-			"color-contrast"
 		]
 	},
 	"agent-ops-monitor": {
@@ -149,11 +143,6 @@
 			"definition-list"
 		]
 	},
-	"feature-lineage": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"feature-proposal": {
 		"light": [
 			"color-contrast"
@@ -204,21 +193,6 @@
 			"color-contrast"
 		]
 	},
-	"github-branch-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-commit-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"github-deployment-pipeline": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"github-incident-card": {
 		"light": [
 			"color-contrast"
@@ -239,11 +213,6 @@
 			"color-contrast"
 		]
 	},
-	"github-lifecycle-timeline": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"github-merge-queue": {
 		"light": [
 			"color-contrast"
@@ -255,11 +224,6 @@
 		],
 		"dark": [
 			"label-content-name-mismatch"
-		]
-	},
-	"github-pr-card": {
-		"light": [
-			"color-contrast"
 		]
 	},
 	"github-pr-graph": {
@@ -290,11 +254,6 @@
 			"color-contrast"
 		]
 	},
-	"intelligent-ui-renderer": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"level-dial": {
 		"light": [
 			"color-contrast"
@@ -314,11 +273,6 @@
 		"dark": [
 			"scrollable-region-focusable",
 			"target-size"
-		]
-	},
-	"metric-tiles": {
-		"light": [
-			"color-contrast"
 		]
 	},
 	"model-phase-stream": {
@@ -354,11 +308,6 @@
 			"label-content-name-mismatch"
 		]
 	},
-	"recommendation-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"records-table": {
 		"light": [
 			"color-contrast"
@@ -378,24 +327,13 @@
 			"color-contrast"
 		]
 	},
-	"skill-card": {
-		"light": [
-			"color-contrast"
-		]
-	},
 	"skill-editor": {
 		"light": [
-			"color-contrast",
 			"scrollable-region-focusable"
 		],
 		"dark": [
 			"color-contrast",
 			"scrollable-region-focusable"
-		]
-	},
-	"skill-invocation": {
-		"light": [
-			"color-contrast"
 		]
 	},
 	"skill-library": {
@@ -427,11 +365,6 @@
 		]
 	},
 	"svelte5-motion-lab": {
-		"light": [
-			"color-contrast"
-		]
-	},
-	"test-results": {
 		"light": [
 			"color-contrast"
 		]

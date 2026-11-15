@@ -45,7 +45,7 @@
 		/* Accent and status */
 		--ak-color-accent: oklch(0.575 0.145 40);
 		--ak-color-accent-subtle: oklch(0.95 0.025 50);
-		--ak-color-success: oklch(0.552 0.162 149.579);
+		--ak-color-success: oklch(0.51 0.162 149.579);
 		--ak-color-success-subtle: oklch(0.955 0.032 152.2);
 		--ak-color-warning: oklch(0.625 0.162 68.4);
 		--ak-color-warning-subtle: oklch(0.962 0.034 78.2);

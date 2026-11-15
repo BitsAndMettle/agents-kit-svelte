@@ -7,45 +7,54 @@
 	import { Spring, prefersReducedMotion } from 'svelte/motion';
 	import { fade } from 'svelte/transition';
 	import { motionDuration, rise } from '../state/motion.svelte';
-	import type { GitHubIssueData } from '../types';
+	import type { GitHubIssueData, GitHubLabel } from '../types';
 
-	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'issue' | 'compact' | 'onDispatchRun' | 'onOpenChat' | 'onClaimToggle' | 'footerActions'> {
+	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'issue' | 'compact' | 'headingLevel' | 'onDispatchRun' | 'onOpenChat' | 'onClaimToggle' | 'actions'> {
 		issue: GitHubIssueData;
 		compact?: boolean;
+		/** The title's heading level. */
+		headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+		/** Gives the card its "Dispatch Agent" button. */
 		onDispatchRun?: (issueNumber: number) => void;
+		/** Gives the card its "Chat" button. */
 		onOpenChat?: (issueNumber: number) => void;
+		/** Gives the card its "Claim issue" button, which reads "Claimed" while the issue is in progress. */
 		onClaimToggle?: (issueNumber: number, claimed: boolean) => void;
-		footerActions?: Snippet<[GitHubIssueData]>;
+		/** Your own controls for the footer, in place of the card's buttons. */
+		actions?: Snippet;
 		class?: string;
 	}
 
 	let {
 		issue,
 		compact = false,
+		headingLevel = 3,
 		onDispatchRun,
 		onOpenChat,
 		onClaimToggle,
-		footerActions,
+		actions,
 		class: className = '',
 		...rest
 	}: Props = $props();
 
-	let claimed = $state(true);
-	let dispatched = $state(false);
 	let ready = $state(false);
 
 	$effect(() => {
 		ready = true;
 	});
 
-	$effect(() => {
-		claimed = issue.state === 'in-progress';
-	});
+	let claimed = $derived(issue.state === 'in-progress');
+	let buttons = $derived(Boolean(onClaimToggle || onDispatchRun || onOpenChat));
 
 	let criteriaPercent = $derived(
 		issue.criteriaTotal && issue.criteriaTotal > 0
 			? Math.round(((issue.criteriaCompleted ?? 0) / issue.criteriaTotal) * 100)
 			: 0
+	);
+
+	/** Who filed the issue and when, as far as it says. */
+	let filed = $derived(
+		[issue.author && (compact ? issue.author : `Filed by ${issue.author}`), issue.createdAt].filter(Boolean).join(' · ')
 	);
 
 	const criteriaSpring = new Spring(0, { stiffness: 0.16, damping: 0.78 });
@@ -60,7 +69,7 @@
 	 * @param tone - Semantic tone of the label.
 	 * @returns Tailwind class string.
 	 */
-	function labelClasses(tone: GitHubIssueData['labels'][number]['tone']): string {
+	function labelClasses(tone: GitHubLabel['tone']): string {
 		switch (tone) {
 			case 'accent':
 				return 'bg-accent-subtle text-accent-primary border-card-border';
@@ -73,22 +82,6 @@
 			default:
 				return 'bg-canvas-secondary text-fg-light border-card-border';
 		}
-	}
-
-	/**
-	 * Toggles the claim state on this GitHub issue card.
-	 */
-	function handleClaim(): void {
-		claimed = !claimed;
-		onClaimToggle?.(issue.number, claimed);
-	}
-
-	/**
-	 * Dispatches a new agent workflow run for this issue.
-	 */
-	function handleDispatch(): void {
-		dispatched = true;
-		onDispatchRun?.(issue.number);
 	}
 </script>
 
@@ -152,9 +145,9 @@
 		</div>
 
 		<!-- Title & Summary -->
-		<h3 class="mt-2 font-medium leading-snug text-fg-main">
+		<svelte:element this={`h${headingLevel}`} class="mt-2 font-medium leading-snug text-fg-main">
 			{issue.title}
-		</h3>
+		</svelte:element>
 
 		{#if issue.summary && !compact}
 			<p class="mt-1.5 text-xs leading-relaxed text-fg-light">
@@ -163,17 +156,19 @@
 		{/if}
 
 		<!-- Labels -->
-		<div class="mt-2.5 flex flex-wrap gap-1">
-			{#each issue.labels as label (label.name)}
-				<span
-					class="whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium {labelClasses(
-						label.tone
-					)}"
-				>
-					{label.name}
-				</span>
-			{/each}
-		</div>
+		{#if issue.labels?.length}
+			<div class="mt-2.5 flex flex-wrap gap-1">
+				{#each issue.labels as label (label.name)}
+					<span
+						class="whitespace-nowrap rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium {labelClasses(
+							label.tone
+						)}"
+					>
+						{label.name}
+					</span>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- Active Worktree & Agent Run Strip -->
 		{#if (issue.assignedAgent || issue.worktreeBranch) && !compact}
@@ -181,10 +176,12 @@
 				in:rise
 				class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-card-border bg-canvas-secondary/60 px-3 py-2 text-xs"
 			>
-				<div class="flex items-center gap-2">
-					<span class="inline-block size-2 rounded-full bg-accent-primary"></span>
-					<span class="font-medium text-fg-main">{issue.assignedAgent ?? 'Unassigned'}</span>
-				</div>
+				{#if issue.assignedAgent}
+					<div class="flex items-center gap-2">
+						<span class="inline-block size-2 rounded-full bg-accent-primary"></span>
+						<span class="font-medium text-fg-main">{issue.assignedAgent}</span>
+					</div>
+				{/if}
 				{#if issue.worktreeBranch}
 					<code class="inline-flex min-w-0 items-center gap-1 truncate rounded bg-card-bg px-1.5 py-0.5 text-xs text-fg-light">
 						<GitBranch aria-hidden="true" class="size-3 shrink-0" />
@@ -213,68 +210,66 @@
 		{/if}
 	</div>
 
-	<!-- Card Footer Actions -->
-	<div
-		class="mt-3 border-t border-canvas-border pt-2.5 text-xs {compact
-			? 'space-y-2'
-			: 'flex flex-wrap items-center justify-between gap-2'}"
-	>
-		<div class="flex flex-wrap items-center justify-between gap-1 text-xs text-fg-light">
-			<span class="truncate">
-				{compact ? issue.author : `Filed by ${issue.author}`} · {issue.createdAt}
-			</span>
-			{#if issue.linkedPrNumber}
-				<strong class="shrink-0 whitespace-nowrap font-medium text-accent-primary">
-					PR #{issue.linkedPrNumber}
-				</strong>
+	<!-- Card Footer: who filed it, its pull request, and your controls or a button for each handler -->
+	{#if filed || issue.linkedPrNumber || actions || buttons}
+		<div
+			class="mt-3 border-t border-canvas-border pt-2.5 text-xs {compact
+				? 'space-y-2'
+				: 'flex flex-wrap items-center justify-between gap-2'}"
+		>
+			{#if filed || issue.linkedPrNumber}
+				<div class="flex flex-wrap items-center justify-between gap-1 text-xs text-fg-light">
+					{#if filed}<span class="truncate">{filed}</span>{/if}
+					{#if issue.linkedPrNumber}
+						<strong class="shrink-0 whitespace-nowrap font-medium text-accent-primary">
+							PR #{issue.linkedPrNumber}
+						</strong>
+					{/if}
+				</div>
+			{/if}
+
+			{#if actions}
+				{@render actions()}
+			{:else if buttons}
+				<div class="flex flex-wrap items-center gap-1.5">
+					{#if onClaimToggle}
+						<button
+							type="button"
+							disabled={!ready}
+							onclick={() => onClaimToggle(issue.number, !claimed)}
+							class={buttonClass('secondary', 'sm')}
+						>
+							{#if claimed}
+								<Check aria-hidden="true" class="size-3 shrink-0 text-status-success" />
+								<span>Claimed</span>
+							{:else}
+								<span>{compact ? 'Claim' : 'Claim issue'}</span>
+							{/if}
+						</button>
+					{/if}
+					{#if onDispatchRun}
+						<button
+							type="button"
+							disabled={!ready}
+							onclick={() => onDispatchRun(issue.number)}
+							class={buttonClass('primary', 'sm')}
+						>
+							<Play aria-hidden="true" class="size-2.5 shrink-0" />
+							<span>{compact ? 'Dispatch' : 'Dispatch Agent'}</span>
+						</button>
+					{/if}
+					{#if onOpenChat}
+						<button
+							type="button"
+							disabled={!ready}
+							onclick={() => onOpenChat(issue.number)}
+							class={buttonClass('secondary', 'sm')}
+						>
+							Chat
+						</button>
+					{/if}
+				</div>
 			{/if}
 		</div>
-
-		{#if footerActions}
-			{@render footerActions(issue)}
-		{:else}
-			<div class="flex flex-wrap items-center gap-1.5">
-				<button
-					type="button"
-					disabled={!ready}
-					onclick={handleClaim}
-					class={buttonClass('secondary', 'sm')}
-				>
-					{#if claimed}
-						<Check aria-hidden="true" class="size-3 shrink-0 text-status-success" />
-						<span>Claimed</span>
-					{:else}
-						<span>{compact ? 'Claim' : 'Claim issue'}</span>
-					{/if}
-				</button>
-				<button
-					type="button"
-					disabled={!ready}
-					onclick={handleDispatch}
-					class={buttonClass('primary', 'sm')}
-				>
-					<Play aria-hidden="true" class="size-2.5 shrink-0" />
-					<span>
-						{dispatched
-							? compact
-								? 'Dispatched'
-								: 'Run Dispatched'
-							: compact
-								? 'Dispatch'
-								: 'Dispatch Agent'}
-					</span>
-				</button>
-				{#if onOpenChat}
-					<button
-						type="button"
-						disabled={!ready}
-						onclick={() => onOpenChat(issue.number)}
-						class={buttonClass('secondary', 'sm')}
-					>
-						Chat
-					</button>
-				{/if}
-			</div>
-		{/if}
-	</div>
+	{/if}
 </article>

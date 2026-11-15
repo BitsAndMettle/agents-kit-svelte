@@ -1623,11 +1623,11 @@
 							{:else if item.slug === 'search-list'}
 								<SearchList items={SAMPLE_SEARCH_ITEMS} placeholder="Search issues, files, runs, and ADRs…" />
 							{:else if item.slug === 'github-issue-card'}
-								<GitHubIssueCard issue={sampleIssue} />
+								<GitHubIssueCard issue={sampleIssue} onClaimToggle={() => {}} onDispatchRun={() => {}} />
 							{:else if item.slug === 'github-pr-card'}
-								<GitHubPullRequestCard pr={samplePR} />
+								<GitHubPullRequestCard pr={samplePR} onRequestChanges={() => {}} onApproveMerge={() => {}} />
 							{:else if item.slug === 'github-commit-card'}
-								<GitHubCommitCard commit={sampleCommit} />
+								<GitHubCommitCard commit={sampleCommit} onRestore={() => {}} />
 							{:else if item.slug === 'github-checks-panel'}
 								<GitHubChecksPanel checks={sampleChecks} />
 							{:else if item.slug === 'github-review-thread'}
@@ -1637,7 +1637,7 @@
 							{:else if item.slug === 'github-bento-layout'}
 								<GitHubBentoLayout repoName="RSynapse/trailside" repoDetail="GitHub App installation active" branchDetail="Protected · Referee merge queue" stats={SAMPLE_BENTO_STATS} pullRequest={SAMPLE_PULL_REQUEST} checks={SAMPLE_CHECKS} issue={SAMPLE_ISSUE} commit={SAMPLE_COMMIT} thread={SAMPLE_REVIEW_THREAD} />
 							{:else if item.slug === 'github-lifecycle-timeline'}
-								<GitHubLifecycleTimeline stages={SAMPLE_LIFECYCLE_STAGES} live={visibleSlugs.has(item.slug)} />
+								<GitHubLifecycleTimeline title="From issue to release" description="Every hand-off between people, agents and GitHub, in order." doneLabel="Shipped" stages={SAMPLE_LIFECYCLE_STAGES} live={visibleSlugs.has(item.slug)} />
 							{:else if item.slug === 'github-issue-triage'}
 								<GitHubIssueTriage issue={SAMPLE_TRIAGE_ISSUE} live={visibleSlugs.has(item.slug)} />
 							{:else if item.slug === 'github-branch-card'}

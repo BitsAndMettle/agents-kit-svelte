@@ -186,14 +186,15 @@ export interface GitHubLabel {
 	tone: 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 }
 
+/** An issue as `GitHubIssueCard` draws it. The card draws nothing for a field that is left out. */
 export interface GitHubIssueData {
 	number: number;
 	title: string;
 	repo: string;
 	state: GitHubIssueState;
-	author: string;
-	createdAt: string;
-	labels: GitHubLabel[];
+	author?: string;
+	createdAt?: string;
+	labels?: GitHubLabel[];
 	riskTier?: RiskTier;
 	size?: 'XS' | 'S' | 'M' | 'L';
 	assignedAgent?: string;
@@ -224,36 +225,44 @@ export interface GitHubBentoStat {
 	tone?: 'neutral' | 'success';
 }
 
+/** A pull request as `GitHubPullRequestCard` draws it. The card draws nothing for a field that is left out. */
 export interface GitHubPullRequestData {
 	number: number;
-	title: string;
-	repo: string;
 	state: GitHubPRState;
-	author: string;
-	headBranch: string;
-	baseBranch: string;
-	additions: number;
-	deletions: number;
-	changedFilesCount: number;
-	/** Optional review-gate fields. The card shows them only when present. */
+	/** Makes the number a link. */
+	href?: string;
+	title?: string;
+	repo?: string;
+	author?: string;
+	headBranch?: string;
+	baseBranch?: string;
+	additions?: number;
+	deletions?: number;
+	changedFilesCount?: number;
 	riskTier?: RiskTier;
 	refereeStatus?: 'pass' | 'send-back' | 'pending';
 	refereeSummary?: string;
-	checks: GitHubCheckItem[];
-	updatedAt: string;
+	/** The check runs, as a list that opens. */
+	checks?: GitHubCheckItem[];
+	/** How the checks stand as a whole. Left out, it is what the runs add up to. */
+	checksStatus?: 'passed' | 'failed' | 'running';
+	updatedAt?: string;
 	linkedIssueNumber?: number;
 }
 
+/** A commit as `GitHubCommitCard` draws it. The card draws nothing for a field that is left out. */
 export interface GitHubCommitData {
 	sha: string;
-	message: string;
-	author: string;
-	timestamp: string;
-	branch: string;
+	/** Makes the short SHA a link. */
+	href?: string;
+	message?: string;
+	author?: string;
+	timestamp?: string;
+	branch?: string;
 	verified?: boolean;
-	additions: number;
-	deletions: number;
-	files: { path: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number }[];
+	additions?: number;
+	deletions?: number;
+	files?: { path: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number }[];
 }
 
 export interface GitHubReviewComment {
@@ -288,12 +297,13 @@ export type GitHubLifecycleStageId =
 	| 'deploy'
 	| 'release';
 
+/** A stage as `GitHubLifecycleTimeline` draws it. The timeline draws nothing for a field that is left out. */
 export interface GitHubLifecycleStage {
 	id: GitHubLifecycleStageId;
 	label: string;
-	actor: string;
-	detail: string;
-	timestamp: string;
+	actor?: string;
+	detail?: string;
+	timestamp?: string;
 }
 
 export interface GitHubTriageSuggestion {

@@ -242,6 +242,8 @@ const pr = fromGitHubRest.pullRequest(data, { checks: runs.data.check_runs });
 
 There are mappers for `issue`, `pullRequest`, `checkRun` and `commit`. Times come out as `12m ago` by default; pass `formatTime` to change that, and `labelTone` to choose label colours.
 
+The GitHub cards also take less than GitHub returns, and draw nothing for what is left out. An issue is its `number`, `title`, `repo` and `state`; a pull request is its `number` and `state`; a commit is its `sha`; a `GitHubLifecycleTimeline` stage is its `id` and `label`. `href` makes a pull request's number or a commit's SHA a link, and `checksStatus` says how a pull request's checks stand where you do not hold the runs. A card has a button for each handler you pass and none without, or your own controls through `actions`; it keeps no record of what a press did. Each takes `headingLevel` for its title.
+
 ## Rendering model output with your own components
 
 `IntelligentUIRenderer` turns a list of `{ id, component, props }` nodes into components. Add your own node types, or replace ours, with a registry:

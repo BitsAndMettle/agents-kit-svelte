@@ -47,6 +47,7 @@ export interface RestPullRequest {
 	draft?: boolean;
 	merged_at?: string | null;
 	user?: RestUser | null;
+	html_url?: string;
 	head: { ref: string };
 	base: { ref: string; repo?: { full_name: string } | null };
 	additions?: number;
@@ -74,6 +75,7 @@ export interface RestCommit {
 		verification?: { verified?: boolean } | null;
 	};
 	author?: RestUser | null;
+	html_url?: string;
 	stats?: { additions?: number; deletions?: number };
 	files?: { filename: string; status: string; additions?: number; deletions?: number }[];
 }
@@ -170,7 +172,7 @@ function issue(json: RestIssue, options: GitHubMapOptions = {}): GitHubIssueData
 		title: json.title,
 		repo: options.repo ?? repoFromUrl(json.repository_url) ?? '',
 		state: json.state === 'closed' ? 'closed' : 'open',
-		author: json.user?.login ?? 'ghost',
+		author: json.user?.login,
 		createdAt: format(json.created_at),
 		labels: toLabels(json.labels, options),
 		summary: json.body?.trim().split(/\n\s*\n/)[0] || undefined
@@ -209,13 +211,14 @@ function pullRequest(
 		title: json.title,
 		repo: options.repo ?? json.base.repo?.full_name ?? '',
 		state: json.merged_at ? 'merged' : json.state === 'closed' ? 'closed' : json.draft ? 'draft' : 'open',
-		author: json.user?.login ?? 'ghost',
+		author: json.user?.login,
+		href: json.html_url,
 		headBranch: json.head.ref,
 		baseBranch: json.base.ref,
-		additions: json.additions ?? 0,
-		deletions: json.deletions ?? 0,
-		changedFilesCount: json.changed_files ?? 0,
-		checks: (options.checks ?? []).map((run) => checkRun(run)),
+		additions: json.additions,
+		deletions: json.deletions,
+		changedFilesCount: json.changed_files,
+		checks: options.checks?.map((run) => checkRun(run)),
 		updatedAt: format(json.updated_at)
 	};
 }
@@ -225,14 +228,15 @@ function commit(json: RestCommit, options: GitHubMapOptions & { branch?: string 
 	const date = json.commit.author?.date;
 	return {
 		sha: json.sha.slice(0, 7),
-		message: json.commit.message.split('\n')[0] ?? '',
-		author: json.author?.login ?? json.commit.author?.name ?? 'unknown',
-		timestamp: date ? format(date) : '',
-		branch: options.branch ?? '',
+		href: json.html_url,
+		message: json.commit.message.split('\n')[0],
+		author: json.author?.login ?? json.commit.author?.name ?? undefined,
+		timestamp: date ? format(date) : undefined,
+		branch: options.branch,
 		verified: json.commit.verification?.verified ?? undefined,
-		additions: json.stats?.additions ?? 0,
-		deletions: json.stats?.deletions ?? 0,
-		files: (json.files ?? []).map((file) => ({
+		additions: json.stats?.additions,
+		deletions: json.stats?.deletions,
+		files: json.files?.map((file) => ({
 			path: file.filename,
 			status: file.status === 'added' ? 'added' : file.status === 'removed' ? 'deleted' : 'modified',
 			additions: file.additions ?? 0,
