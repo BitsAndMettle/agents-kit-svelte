@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cn } from '../ui/cn';
+	import { STATUS_TEXT_CLASS, type UiTone } from '../ui/styles';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { Check, Minus, X } from '@lucide/svelte';
 	import type { GitHubCheckItem } from '../types';
@@ -13,16 +14,11 @@
 
 	let { status, spoken = true, class: className = '', ...rest }: Props = $props();
 
-	const TONES: Record<GitHubCheckItem['status'], string> = {
-		passed: 'text-status-success',
-		failed: 'text-status-danger',
-		running: 'text-accent-primary',
-		skipped: 'text-fg-light'
-	};
+	const TONES: Record<GitHubCheckItem['status'], UiTone> = { passed: 'success', failed: 'danger', running: 'accent', skipped: 'neutral' };
 </script>
 
 <!-- A check's status as a glyph of its own, so no two differ by colour alone. -->
-<span {...rest} class={cn('inline-flex size-3.5 shrink-0 items-center justify-center', TONES[status], className)}>
+<span {...rest} class={cn('inline-flex size-3.5 shrink-0 items-center justify-center', STATUS_TEXT_CLASS[TONES[status]], className)}>
 	{#if status === 'passed'}
 		<Check aria-hidden="true" class="size-3.5" />
 	{:else if status === 'failed'}
