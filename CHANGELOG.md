@@ -14,7 +14,7 @@
   
   **Breaking:**
   
-  - `ApprovalCard` no longer marks itself decided when Submit is pressed. Pass the decision you recorded as `decided` (the answers, shown as "Decision recorded"), and `pending` while it is on its way, which holds the options and the button. A card that reads "Decision recorded" before your app has recorded anything was saying something untrue when the answer failed to send.
+  - `ApprovalCard` no longer marks itself decided when Submit is pressed. Pass the decision you recorded as `decided` (the answers, shown as "Decision recorded"), and `pending` while it is on its way, which holds the options and the button. A card that reads "Decision recorded" before your app has recorded anything was saying something untrue when the answer failed to send. An `approval-card` node in `IntelligentUIRenderer` takes `decided` and `pending` among its props; its submit event no longer closes the card.
 
 ## 0.6.1
 
