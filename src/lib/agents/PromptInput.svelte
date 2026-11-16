@@ -244,7 +244,7 @@
 			disabled={!ready || disabled}
 			aria-label={placeholder}
 			onkeydown={handleKeyDown}
-			class="field-sizing-content max-h-60 min-h-10 w-full sm:min-h-12 resize-none bg-transparent px-1.5 py-1 text-[15px] leading-6 text-fg-main placeholder:text-fg-light/80 focus:outline-none disabled:opacity-50"
+			class="field-sizing-content max-h-60 min-h-10 w-full sm:min-h-12 resize-none bg-transparent px-1.5 py-1 text-base leading-6 sm:pointer-fine:text-[15px] text-fg-main placeholder:text-fg-light/80 focus:outline-none disabled:opacity-50"
 		></textarea>
 	</label>
 
@@ -399,16 +399,18 @@
 					type="button"
 					onclick={onStop}
 					aria-label="Stop run"
-					class={pillClass('primary', 'icon')}
+					class={pillClass('primary', 'icon', 'max-sm:size-11')}
 				>
 					<Square aria-hidden="true" class="size-3 fill-current" />
 				</button>
 			{:else}
+				<!-- Keeps focus, and the phone keyboard, in the text field: the click still sends. -->
 				<button
 					type="submit"
 					disabled={!canSend}
 					aria-label="Send prompt"
-					class="inline-flex size-8 items-center justify-center rounded-full transition-colors duration-200 {canSend
+					onpointerdown={(event) => event.preventDefault()}
+					class="inline-flex size-8 max-sm:size-11 items-center justify-center rounded-full transition-colors duration-200 {canSend
 						? 'bg-chat-accent text-white hover:bg-chat-accent/90'
 						: 'bg-chat-user text-fg-light'}"
 				>

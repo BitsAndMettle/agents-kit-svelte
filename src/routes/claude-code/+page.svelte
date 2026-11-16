@@ -1,5 +1,5 @@
 <script lang="ts">
-	import ChatWorkbench from '$lib/workbench/ChatWorkbench.svelte';
+	import ChatWorkbenchDemo from '$lib/workbench/ChatWorkbenchDemo.svelte';
 </script>
 
-<ChatWorkbench demo />
+<ChatWorkbenchDemo />
