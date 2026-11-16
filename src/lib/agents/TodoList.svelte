@@ -1,28 +1,39 @@
 <script lang="ts">
 	import { cn } from '../ui/cn';
 	import type { HTMLAttributes } from 'svelte/elements';
+	import { tick } from 'svelte';
 	import { flip } from 'svelte/animate';
 	import { cubicOut } from 'svelte/easing';
-	import { ChevronDown, CircleCheck, ListTodo } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, CircleCheck, ListTodo, X } from '@lucide/svelte';
 	import { Tween, prefersReducedMotion } from 'svelte/motion';
 	import { fade, scale } from 'svelte/transition';
 	import AgentDisclosure from './AgentDisclosure.svelte';
 	import ThinkingShimmer from './ThinkingShimmer.svelte';
-	import { summarizeTodos } from '../state/chat-helpers';
+	import { isImeComposing, summarizeTodos } from '../state/chat-helpers';
 	import { motionDuration, rise } from '../state/motion.svelte';
+	import { pillClass } from '../ui/styles';
 	import type { TodoItem } from '../types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'title' | 'items' | 'defaultOpen'> {
 		title?: string;
+		/** The rows. Bindable: an editable list writes its rows here as they stand. */
 		items: TodoItem[];
 		defaultOpen?: boolean;
+		/** Rows can be removed, moved and added by a title, and a row's `detail` opens on a press. */
+		editable?: boolean;
+		/** The primary button under an editable list, given the rows as they stand. No handler, no button. */
+		onSubmit?: (items: TodoItem[]) => void;
+		submitLabel?: string;
 		class?: string;
 	}
 
 	let {
 		title = 'Implementation plan',
-		items,
+		items = $bindable(),
 		defaultOpen = true,
+		editable = false,
+		onSubmit,
+		submitLabel = 'Done',
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -38,6 +49,39 @@
 	let completionRatio = $derived(
 		summary.totalCount > 0 ? Math.round((summary.completedCount / summary.totalCount) * 100) : 0
 	);
+
+	const uid = $props.id();
+	let added = 0;
+	let draft = $state('');
+	let listEl: HTMLOListElement | undefined = $state();
+	let addField: HTMLInputElement | undefined = $state();
+
+	/** Once the list has redrawn, focuses `control` on row `index`, or the add field when there is no such row. */
+	async function focusRow(control: string, index: number): Promise<void> {
+		await tick();
+		(listEl?.querySelectorAll<HTMLElement>(`[data-control="${control}"]`)[index] ?? addField)?.focus();
+	}
+
+	function move(index: number, by: -1 | 1): void {
+		const to = index + by;
+		if (to < 0 || to >= items.length) return;
+		const next = [...items];
+		[next[index], next[to]] = [next[to]!, next[index]!];
+		items = next;
+		void focusRow(by < 0 ? 'up' : 'down', to);
+	}
+
+	function remove(index: number): void {
+		items = items.filter((_, at) => at !== index);
+		void focusRow('remove', Math.min(index, items.length - 1));
+	}
+
+	function add(): void {
+		const label = draft.trim();
+		if (!label) return;
+		items = [...items, { id: `${uid}-added-${++added}`, label, status: 'pending' }];
+		draft = '';
+	}
 
 	const progressTween = new Tween(0, { duration: 280, easing: cubicOut });
 
@@ -106,8 +150,8 @@
 	</div>
 
 	<AgentDisclosure id={panelId} open={isOpen}>
-		<ol class="space-y-0.5 border-t border-chat-border/70 px-2 py-2">
-			{#each items as item (item.id)}
+		<ol bind:this={listEl} class="space-y-0.5 border-t border-chat-border/70 px-2 py-2">
+			{#each items as item, index (item.id)}
 				<li
 					animate:flip={{ duration: motionDuration(220), easing: cubicOut }}
 					in:rise
@@ -187,24 +231,61 @@
 					{/key}
 
 					<div class="min-w-0 flex-1">
-						<span
-							class="block transition-colors {item.status === 'completed' ||
-							item.status === 'cancelled'
-								? 'line-through text-fg-light'
-								: 'text-fg-main'}"
-						>
-							{#if item.status === 'in-progress'}
-								<ThinkingShimmer label={item.label} />
-							{:else}
-								{item.label}
+						{#if editable && item.detail}
+							<details class="group/detail">
+								<summary class="flex cursor-pointer list-none items-center gap-1 text-fg-main [&::-webkit-details-marker]:hidden">
+									{item.label}
+									<ChevronRight aria-hidden="true" class="size-3.5 shrink-0 text-fg-light transition-transform group-open/detail:rotate-90" />
+								</summary>
+								<p class="mt-0.5 text-xs whitespace-pre-line text-fg-light">{item.detail}</p>
+							</details>
+						{:else}
+							<span
+								class="block transition-colors {item.status === 'completed' ||
+								item.status === 'cancelled'
+									? 'line-through text-fg-light'
+									: 'text-fg-main'}"
+							>
+								{#if item.status === 'in-progress'}
+									<ThinkingShimmer label={item.label} />
+								{:else}
+									{item.label}
+								{/if}
+							</span>
+							{#if item.detail}
+								<span class="mt-0.5 block text-xs text-fg-light">{item.detail}</span>
 							{/if}
-						</span>
-						{#if item.detail}
-							<span class="mt-0.5 block text-xs text-fg-light">{item.detail}</span>
 						{/if}
 					</div>
+					{#if editable}
+						<span class="flex shrink-0 items-center text-fg-light">
+							<button type="button" data-control="up" aria-label="Move {item.label} up" aria-disabled={index === 0} onclick={() => move(index, -1)} class={pillClass('ghost', 'icon-sm', 'aria-disabled:opacity-40')}><ArrowUp aria-hidden="true" /></button>
+							<button type="button" data-control="down" aria-label="Move {item.label} down" aria-disabled={index === items.length - 1} onclick={() => move(index, 1)} class={pillClass('ghost', 'icon-sm', 'aria-disabled:opacity-40')}><ArrowDown aria-hidden="true" /></button>
+							<button type="button" data-control="remove" aria-label="Remove {item.label}" onclick={() => remove(index)} class={pillClass('ghost', 'icon-sm')}><X aria-hidden="true" /></button>
+						</span>
+					{/if}
 				</li>
 			{/each}
 		</ol>
+		{#if editable}
+			<div class="flex items-center gap-2 px-3.5 pb-3">
+				<input
+					bind:this={addField}
+					bind:value={draft}
+					aria-label="Add a step"
+					placeholder="Add a step"
+					onkeydown={(event) => {
+						if (event.key !== 'Enter' || isImeComposing(event)) return;
+						event.preventDefault();
+						add();
+					}}
+					class="h-8 min-w-0 flex-1 rounded-full bg-chat-surface px-3.5 text-[13px] text-fg-main placeholder:text-fg-light transition-shadow focus:ring-3 focus:ring-accent-primary/15 focus:outline-none"
+				/>
+				<button type="button" disabled={!draft.trim()} onclick={add} class={pillClass('ghost', 'sm')}>Add</button>
+				{#if onSubmit}
+					<button type="button" onclick={() => onSubmit(items)} class={pillClass('primary', 'sm')}>{submitLabel}</button>
+				{/if}
+			</div>
+		{/if}
 	</AgentDisclosure>
 </div>

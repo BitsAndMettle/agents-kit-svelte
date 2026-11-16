@@ -59,7 +59,7 @@ A step-by-step guide with live output is on the showcase site under **Install**.
 
 ### Entry points
 
-Import everything from `agents-kit-svelte`, or from one collection to keep editor auto-imports focused. Unused components are tree-shaken either way; a page that imports only `TodoList` builds to about 91 KB of JavaScript (Svelte runtime and `tailwind-merge` included).
+Import everything from `agents-kit-svelte`, or from one collection to keep editor auto-imports focused. Unused components are tree-shaken either way; a page that imports only `TodoList` builds to about 97 KB of JavaScript (Svelte runtime and `tailwind-merge` included).
 
 | Import | Contains |
 | --- | --- |
@@ -218,11 +218,12 @@ Approvals come from the Agent SDK's `canUseTool` callback rather than its messag
 </div>
 ```
 
-- **Messages**: `role`, Markdown `text`, and `parts` drawn in order (`text`, `tool` as `ToolResult`, `activity` as `AgentActivity`, `note`). `status: 'streaming'` shows a thinking line until text arrives; `'error'` shows `statusText` in red. `busy` adds a thinking line after the last message.
+- **Messages**: `role`, Markdown `text`, and `parts` drawn in order (`text`, `tool` as `ToolResult`, one line when it has no `output`, `activity` as `AgentActivity`, `note`). `status: 'streaming'` shows a thinking line until text arrives; `'error'` shows `statusText` in red. `busy` adds a thinking line after the last message.
 - **Layout**: with `conversations`, a sidebar from 1024px and Chat / Conversations tabs below it; `layout="panel"` keeps the tabs at any width, for a side panel. `view` is bindable. Without `conversations` there is no list.
 - **Header**: `title` (an `h2`, or `headingLevel`), `subtitle`, `status` (`text` and a `tone`), `headerActions` (given the kit's pill classes), and a `presence` banner above the messages.
-- **Snippets**: `empty` when there are no messages, `messageFooter(message)` after each one, `trailing` after the last one (a decision that waits for the person).
-- **Composer**: `value` (bindable), `placeholder`, `disabled`, `busy` with `onStop`, `attachments` (bindable) with `onRemoveAttachment`, `models` and `efforts` with `onModelChange({ model, effort })`, and `onSend(text, attachments)`.
+- **Snippets**: `empty` when there are no messages, `messageFooter(message)` after each one, `trailing` after the last one (a decision that waits for the person), and `aside`, a rail on the right from 1024px (named by `asideLabel`; not in `layout="panel"`).
+- **Composer**: `value` (bindable), `placeholder`, `disabled`, `busy` with `onStop`, `attachments` (bindable) with `onRemoveAttachment`, `contextOptions` for the `+` menu, `commands` (`{ name, text }`) for a `/` menu that puts a command's text in the field, `models` and `efforts` with `onModelChange({ model, effort })`, and `onSend(text, attachments)`.
+- **What you record**: `ApprovalCard` shows a decision only when you pass it back as `decided`, and waits while `pending`; `TodoList` with `editable` lets the person remove, move and add rows (`bind:items`) and hands them back through `onSubmit`.
 
 `Markdown` (also used by `Message` and `StreamingResponse` when you pass `text`) renders model text as elements and never as HTML: raw HTML stays text, links need an `http(s):` or `mailto:` address and open with `rel="noopener noreferrer nofollow"`, fenced code goes through `CodeBlock`, and parsing is linear in the input. The [`/workbench`](https://bitsandmettle.github.io/agents-kit-svelte/workbench/) page shows the workbench with app data.
 

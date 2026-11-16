@@ -19,7 +19,7 @@
 		X
 	} from '@lucide/svelte';
 	import { isImeComposing } from '../state/chat-helpers';
-	import type { PromptAttachment, PromptContextOption, PromptInputEffort, PromptInputOption, SupportedAgentId } from '../types';
+	import type { PromptAttachment, PromptCommand, PromptContextOption, PromptInputEffort, PromptInputOption, SupportedAgentId } from '../types';
 
 	interface Props extends Omit<HTMLFormAttributes, 'class' | 'children' | 'value' | 'placeholder' | 'busy' | 'disabled' | 'agents' | 'selectedAgentId' | 'activeSkill' | 'onAgentChange' | 'onSubmit' | 'onStop' | 'onQuickContext'> {
 		value?: string;
@@ -43,6 +43,8 @@
 		onRemoveAttachment?: (id: string) => void;
 		/** Entries of the `+` menu. No entries, no menu. */
 		contextOptions?: PromptContextOption[];
+		/** The `/` menu: typing `/` lists them, choosing one puts its text in the field. */
+		commands?: PromptCommand[];
 		onAgentChange?: (agentId: SupportedAgentId) => void;
 		onSubmit?: (prompt: string) => void;
 		onStop?: () => void;
@@ -65,6 +67,7 @@
 		attachments = $bindable([]),
 		onRemoveAttachment,
 		contextOptions = [],
+		commands = [],
 		onAgentChange,
 		onSubmit,
 		onStop,
@@ -73,7 +76,14 @@
 		...rest
 	}: Props = $props();
 
+	const uid = $props.id();
 	let menuOpen = $state(false);
+	// The `/` menu follows the text: open while it starts with `/` and a name starts with the rest, until Escape.
+	let dismissed = $state(false);
+	let active = $state(0);
+	let matches = $derived(
+		value.startsWith('/') && !dismissed ? commands.filter((command) => command.name.toLowerCase().startsWith(value.slice(1).toLowerCase())) : []
+	);
 	let agentMenuOpen = $state(false);
 	let formEl: HTMLFormElement | undefined = $state();
 	let menuButton: HTMLButtonElement | undefined = $state();
@@ -120,6 +130,17 @@
 	 * @param event - KeyboardEvent from the prompt textarea.
 	 */
 	function handleKeyDown(event: KeyboardEvent): void {
+		if (matches.length > 0 && !isImeComposing(event)) {
+			const step = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : 0;
+			if (step || event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey)) {
+				event.preventDefault();
+				event.stopPropagation();
+				if (step) active = (active + step + matches.length) % matches.length;
+				else if (event.key === 'Escape') dismissed = true;
+				else value = (matches[active] ?? matches[0]!).text;
+				return;
+			}
+		}
 		if (event.key !== 'Enter' || event.shiftKey) {
 			return;
 		}
@@ -215,7 +236,7 @@
 		submitPrompt();
 	}}
 	data-busy={busy}
-	class={cn('ak-soft-focus w-full rounded-composer border border-chat-border bg-card-bg px-3 pt-3 pb-2.5 focus-within:border-fg-light/35', className)}
+	class={cn('ak-soft-focus relative w-full rounded-composer border border-chat-border bg-card-bg px-3 pt-3 pb-2.5 focus-within:border-fg-light/35', className)}
 >
 	{#if attachments.length > 0}
 		<div class="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
@@ -235,6 +256,32 @@
 		</div>
 	{/if}
 
+	{#if matches.length > 0}
+		<div
+			id="{uid}-commands"
+			role="listbox"
+			aria-label="Commands"
+			transition:rise={{ y: 4, duration: 140 }}
+			class="absolute bottom-full left-0 z-20 mb-2 w-80 max-w-full rounded-soft border border-chat-border bg-card-bg p-1.5 ak-shadow-soft"
+		>
+			{#each matches as command, index (command.name)}
+				<button
+					type="button"
+					role="option"
+					id="{uid}-command-{index}"
+					tabindex="-1"
+					aria-selected={index === active}
+					onpointerdown={(event) => event.preventDefault()}
+					onclick={() => (value = command.text)}
+					class="flex w-full min-w-0 items-baseline gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-chat-surface {index === active ? 'bg-chat-surface' : ''}"
+				>
+					<span class="shrink-0 font-medium text-fg-main">/{command.name}</span>
+					<span class="truncate text-fg-light">{command.text}</span>
+				</button>
+			{/each}
+		</div>
+	{/if}
+
 	<label class="block">
 		<span class="sr-only">{placeholder}</span>
 		<textarea
@@ -243,6 +290,13 @@
 			{placeholder}
 			disabled={!ready || disabled}
 			aria-label={placeholder}
+			aria-autocomplete={commands.length > 0 ? 'list' : undefined}
+			aria-controls={matches.length > 0 ? `${uid}-commands` : undefined}
+			aria-activedescendant={matches.length > 0 ? `${uid}-command-${active}` : undefined}
+			oninput={() => {
+				dismissed = false;
+				active = 0;
+			}}
 			onkeydown={handleKeyDown}
 			class="field-sizing-content max-h-60 min-h-10 w-full sm:min-h-12 resize-none bg-transparent px-1.5 py-1 text-base leading-6 sm:pointer-fine:text-[15px] text-fg-main placeholder:text-fg-light/80 focus:outline-none disabled:opacity-50"
 		></textarea>

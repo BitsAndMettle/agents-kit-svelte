@@ -111,3 +111,75 @@ test('ChatWorkbench panel layout: tabs at any width, presence, empty state and a
 	await panel(page).getByRole('tab', { name: /Conversations/ }).click();
 	await expect(panel(page).getByText('Reading the conversations on devbox…')).toBeVisible();
 });
+
+test('ChatWorkbench: the / menu opens, filters, fills and closes by keyboard', async ({ page }) => {
+	await open(page);
+	const box = full(page).getByRole('textbox', { name: 'Message the Referee' });
+	const menu = full(page).getByRole('listbox', { name: 'Commands' });
+	await box.fill('/');
+	await expect(menu.getByRole('option')).toHaveCount(3);
+	await box.press('ArrowDown');
+	await expect(menu.getByRole('option', { name: /\/status/ })).toHaveAttribute('aria-selected', 'true');
+	await box.press('Enter');
+	await expect(box).toHaveValue('What is happening right now?');
+	await expect(menu).toHaveCount(0);
+	await expect(events(page)).not.toContainText('send:');
+	await box.fill('/n');
+	await expect(menu.getByRole('option')).toHaveCount(1);
+	await box.press('Escape');
+	await expect(menu).toHaveCount(0);
+	await expect(box).toHaveValue('/n');
+	await expect(box).toBeFocused();
+	await box.press('e');
+	await expect(menu.getByRole('option', { name: /\/needs/ })).toBeVisible();
+});
+
+test('ChatWorkbench: contextOptions reach the + menu; the aside rail is not drawn below 1024px', async ({ page }) => {
+	await open(page);
+	await full(page).getByRole('button', { name: 'Add context or skill' }).click();
+	await full(page).getByRole('menuitem', { name: 'Card 218 · BitsAndMettle/example' }).click();
+	await expect(full(page).getByRole('button', { name: 'Remove Card 218 · BitsAndMettle/example' })).toBeVisible();
+	await expect(full(page).getByRole('complementary', { name: 'At a glance' })).toBeVisible();
+	await page.setViewportSize({ width: 900, height: 900 });
+	await expect(full(page).getByRole('complementary', { name: 'At a glance' })).toBeHidden();
+});
+
+test('TodoList editable: rows move, are removed and added by keyboard, and File plan hands back their order', async ({ page }) => {
+	await open(page);
+	const plan = page.getByTestId('plan');
+	const up = plan.getByRole('button', { name: 'Move Reject other origins up' });
+	await up.focus();
+	await page.keyboard.press('Enter');
+	await expect(up).toBeFocused();
+	await expect(up).toHaveAttribute('aria-disabled', 'true');
+	await page.keyboard.press('Enter');
+	await page.keyboard.press('Tab');
+	await expect(plan.getByRole('button', { name: 'Move Reject other origins down' })).toBeFocused();
+	await page.keyboard.press('Tab');
+	await page.keyboard.press('Enter');
+	await expect(plan.getByText('Reject other origins')).toHaveCount(0);
+	await expect(plan.getByRole('button', { name: 'Remove Keep the return path' })).toBeFocused();
+	const field = plan.getByRole('textbox', { name: 'Add a step' });
+	await field.fill('Ship it');
+	await field.press('Enter');
+	await expect(field).toHaveValue('');
+	await expect(field).toBeFocused();
+	await expect(plan.getByText('Read next from the callback')).toBeHidden();
+	await plan.locator('summary', { hasText: 'Keep the return path' }).focus();
+	await page.keyboard.press('Enter');
+	await expect(plan.getByText('Read next from the callback')).toBeVisible();
+	await plan.getByRole('button', { name: 'File plan' }).press('Enter');
+	await expect(events(page)).toContainText('plan:Keep the return path|Test the redirects|Ship it');
+});
+
+test('ApprovalCard: a press calls onSubmit and the card waits; it reads decided only once the page records it', async ({ page }) => {
+	await open(page);
+	const card = page.getByRole('region', { name: 'Card 218 · Redirect policy' });
+	await card.getByRole('radio', { name: /Sign-in/ }).click();
+	await card.getByRole('button', { name: 'Submit decision' }).click();
+	await expect(events(page)).toContainText('answer:Sign-in');
+	await expect(card.getByRole('button', { name: 'Submit decision' })).toBeDisabled();
+	await expect(card.getByText('Decision recorded')).toHaveCount(0);
+	await page.getByRole('button', { name: 'Record the answer' }).click();
+	await expect(card.getByRole('status')).toHaveText('Decision recorded: Sign-in');
+});

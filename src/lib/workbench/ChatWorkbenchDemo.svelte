@@ -29,6 +29,7 @@
 		CheckpointEntry,
 		CitationItem,
 		PromptAttachment,
+		PromptCommand,
 		PromptContextOption,
 		ContextSourceItem,
 		SupportedAgentId,
@@ -260,7 +261,8 @@
 	let selectedAgentId = $state<SupportedAgentId>('claude-code');
 	let selectedFile = $state('apps/web/src/routes/auth/callback/+server.ts');
 	let approvalStatus = $state<ToolApprovalStatus>('pending');
-	let decisionSummary = $state<string | null>(null);
+	let decision = $state<ApprovalCardAnswers>();
+	let decisionSummary = $derived(decision && Object.values(decision).flat().join(' · '));
 	let promptText = $state('');
 	const WORKTREE_CHIP: PromptAttachment = { id: 'worktree:trailside/1210-auth-redirect', label: 'trailside/1210-auth-redirect', kind: 'worktree' };
 	let attachments = $state<PromptAttachment[]>([WORKTREE_CHIP]);
@@ -268,6 +270,11 @@
 		{ label: 'Attach callback/+server.ts', attachment: { id: 'file:callback', label: 'apps/web/src/routes/auth/callback/+server.ts', kind: 'file' } },
 		{ label: 'Pin skill: Backend v2', attachment: { id: 'skill:backend-v2', label: 'Backend v2', kind: 'skill' } },
 		{ label: 'Include boundary gate check', attachment: { id: 'gate:check-boundaries', label: 'check-boundaries', kind: 'gate' } }
+	];
+	const COMMANDS: PromptCommand[] = [
+		{ name: 'test', text: 'Run the redirect tests again.' },
+		{ name: 'review', text: 'Review the diff for anything risky before the PR.' },
+		{ name: 'explain', text: 'Explain the fix in two sentences.' }
 	];
 	let isAgentWorking = $state(false);
 	let usedTokens = $state(48_200);
@@ -390,7 +397,7 @@
 		termShown = 0;
 		answerShown = 0;
 		approvalStatus = 'pending';
-		decisionSummary = null;
+		decision = undefined;
 		todoItems = INITIAL_TODOS;
 		extraMessages = [];
 		attachments = [WORKTREE_CHIP];
@@ -437,7 +444,7 @@
 	 * @param answers - Map of question IDs to selected option labels.
 	 */
 	function handleDecisionSubmit(answers: ApprovalCardAnswers): void {
-		decisionSummary = Object.values(answers).flat().join(' · ');
+		decision = answers;
 		todoItems = todoItems.map((item) => ({ ...item, status: 'completed', detail: undefined }));
 		step = 9;
 	}
@@ -486,7 +493,7 @@
 	class={cn(`flex ${embedded ? 'h-[760px]' : 'h-[calc(100dvh-5.375rem)] min-h-[520px] lg:h-[calc(100dvh-4.0625rem)]'} flex-col overflow-hidden bg-chat-surface text-fg-main`, className)}
 >
 	<!-- Top bar -->
-	<header class="border-b border-chat-border/70 bg-chat-surface px-4 pt-3 sm:px-6">
+	<header class="bg-chat-surface px-4 pt-3 sm:px-6">
 		<div class="flex items-start justify-between gap-3">
 			<div class="flex min-w-0 items-center gap-3">
 				<span
@@ -554,7 +561,7 @@
 		<!-- Sidebar -->
 		<aside
 			aria-label="Runs and worktree files"
-			class="hidden min-h-0 w-60 shrink-0 flex-col gap-5 overflow-y-auto border-r border-chat-border/70 bg-chat-user/30 p-3.5 lg:flex"
+			class="hidden min-h-0 w-60 shrink-0 flex-col gap-5 overflow-y-auto bg-chat-user/30 p-3.5 lg:flex"
 		>
 			<div>
 				<h2 class="px-1 text-[11px] font-medium text-fg-light">Runs</h2>
@@ -675,6 +682,7 @@
 										title="One decision before I open the PR"
 										description="The callback now keeps safe relative paths. How should it treat deep links?"
 										questions={APPROVAL_QUESTIONS}
+										decided={decision}
 										onSubmit={handleDecisionSubmit}
 									/>
 								</div>
@@ -730,6 +738,7 @@
 						bind:value={promptText}
 						bind:attachments
 						contextOptions={CONTEXT_OPTIONS}
+						commands={COMMANDS}
 						activeSkill="Backend v2"
 						busy={isAgentWorking}
 						agents={SUPPORTED_AGENTS}

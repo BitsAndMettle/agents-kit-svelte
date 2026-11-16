@@ -9,7 +9,8 @@
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'tool' | 'summary' | 'output' | 'status' | 'meta' | 'defaultOpen' | 'onRetry'> {
 		tool: string;
 		summary?: string;
-		output: string;
+		/** Without it, the card is one line: no chevron, Copy or terminal box. */
+		output?: string;
 		status?: ToolResultStatus;
 		meta?: string;
 		defaultOpen?: boolean;
@@ -22,7 +23,7 @@
 	let {
 		tool,
 		summary,
-		output,
+		output = '',
 		status = 'success',
 		meta,
 		defaultOpen = true,
@@ -59,13 +60,7 @@
 	class={cn('w-full overflow-hidden rounded-soft border border-chat-border bg-card-bg ak-shadow-soft-sm text-sm', className)}
 >
 	<div class="flex h-10 items-center gap-2 px-3">
-		<button
-			type="button"
-			aria-expanded={isOpen}
-			aria-controls={panelId}
-			onclick={() => (isOpen = !isOpen)}
-			class="group flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
-		>
+		{#snippet head()}
 			<span
 				aria-hidden="true"
 				class="inline-flex size-4 shrink-0 items-center justify-center {status === 'error'
@@ -88,11 +83,23 @@
 			{#if meta}
 				<span class="ml-auto shrink-0 font-mono text-xs tabular-nums text-fg-light">{meta}</span>
 			{/if}
-
-			<ChevronDown aria-hidden="true" class="size-4 shrink-0 text-fg-light transition-transform duration-150 group-hover:text-fg-main {isOpen
-					? 'rotate-180'
-					: ''}" />
-		</button>
+		{/snippet}
+		{#if output}
+			<button
+				type="button"
+				aria-expanded={isOpen}
+				aria-controls={panelId}
+				onclick={() => (isOpen = !isOpen)}
+				class="group flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
+			>
+				{@render head()}
+				<ChevronDown aria-hidden="true" class="size-4 shrink-0 text-fg-light transition-transform duration-150 group-hover:text-fg-main {isOpen
+						? 'rotate-180'
+						: ''}" />
+			</button>
+		{:else}
+			<div class="flex min-w-0 flex-1 items-center gap-2">{@render head()}</div>
+		{/if}
 
 		<div class="flex items-center gap-1">
 			{#if status === 'error' && onRetry}
@@ -104,28 +111,32 @@
 					Retry
 				</button>
 			{/if}
-			<button
-				type="button"
-				aria-label={copied ? 'Copied output' : 'Copy output'}
-				onclick={handleCopy}
-				class={pillClass('ghost', 'icon-sm')}
-			>
-				{#if copied}
-					<Check aria-hidden="true" class="size-3.5 text-status-success" />
-				{:else}
-					<Copy aria-hidden="true" class="size-3.5" />
-				{/if}
-			</button>
+			{#if output}
+				<button
+					type="button"
+					aria-label={copied ? 'Copied output' : 'Copy output'}
+					onclick={handleCopy}
+					class={pillClass('ghost', 'icon-sm')}
+				>
+					{#if copied}
+						<Check aria-hidden="true" class="size-3.5 text-status-success" />
+					{:else}
+						<Copy aria-hidden="true" class="size-3.5" />
+					{/if}
+				</button>
+			{/if}
 		</div>
 	</div>
 
-	<AgentDisclosure id={panelId} open={isOpen}>
-		<div
-			role={status === 'running' ? 'log' : undefined}
-			aria-live={status === 'running' ? 'polite' : undefined}
-			class="max-h-56 overflow-auto border-t border-chat-border/70 bg-terminal-bg px-3.5 py-2.5 font-mono text-xs leading-5 text-terminal-fg"
-		>
-			<pre class="m-0 whitespace-pre-wrap break-words">{output}</pre>
-		</div>
-	</AgentDisclosure>
+	{#if output}
+		<AgentDisclosure id={panelId} open={isOpen}>
+			<div
+				role={status === 'running' ? 'log' : undefined}
+				aria-live={status === 'running' ? 'polite' : undefined}
+				class="max-h-56 overflow-auto border-t border-chat-border/70 bg-terminal-bg px-3.5 py-2.5 font-mono text-xs leading-5 text-terminal-fg"
+			>
+				<pre class="m-0 whitespace-pre-wrap break-words">{output}</pre>
+			</div>
+		</AgentDisclosure>
+	{/if}
 </div>

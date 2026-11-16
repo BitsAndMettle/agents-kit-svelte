@@ -10,6 +10,10 @@
 		description?: string;
 		questions: ApprovalQuestion[];
 		submitLabel?: string;
+		/** The answer is on its way: the options and the button wait. */
+		pending?: boolean;
+		/** The decision as you recorded it, shown in place of the questions. The card never marks itself decided. */
+		decided?: ApprovalCardAnswers;
 		onSubmit?: (answers: ApprovalCardAnswers) => void;
 		onCancel?: () => void;
 		class?: string;
@@ -20,6 +24,8 @@
 		description,
 		questions,
 		submitLabel = 'Submit decision',
+		pending = false,
+		decided,
 		onSubmit,
 		onCancel,
 		class: className = '',
@@ -29,7 +35,6 @@
 	let currentStep = $state(0);
 	let answers = $state<ApprovalCardAnswers>({});
 	let customText = $state<Record<string, string>>({});
-	let submitted = $state(false);
 	let ready = $state(false);
 
 	$effect(() => {
@@ -56,7 +61,7 @@
 	 * @param optionLabel - Option label to toggle.
 	 */
 	function selectOption(optionLabel: string): void {
-		if (!activeQuestion || submitted) return;
+		if (!activeQuestion || pending) return;
 		const qId = activeQuestion.id;
 		if (activeQuestion.multiple) {
 			const existing = answers[qId] ?? [];
@@ -73,7 +78,7 @@
 	 * Advances to the next question or finalizes the multi-step approval decision.
 	 */
 	function handleNextOrSubmit(): void {
-		if (!activeQuestion || !canAdvance) return;
+		if (!activeQuestion || !canAdvance || pending) return;
 		const qId = activeQuestion.id;
 		const merged = [...(answers[qId] ?? [])];
 		if (currentCustom && !merged.includes(currentCustom)) {
@@ -85,7 +90,6 @@
 		if (currentStep < questions.length - 1) {
 			currentStep += 1;
 		} else {
-			submitted = true;
 			onSubmit?.(updatedAnswers);
 		}
 	}
@@ -105,7 +109,7 @@
 					<MessageCircleQuestion aria-hidden="true" class="size-3" />
 					Decision needed
 				</span>
-				{#if questions.length > 1 && !submitted}
+				{#if questions.length > 1 && !decided}
 					<span class="text-xs tabular-nums text-fg-light">
 						Step {currentStep + 1} of {questions.length}
 					</span>
@@ -118,7 +122,7 @@
 		</div>
 	</div>
 
-	{#if submitted}
+	{#if decided}
 		<div
 			role="status"
 			aria-live="polite"
@@ -126,7 +130,7 @@
 		>
 			<Check aria-hidden="true" class="size-4 shrink-0" />
 			<p class="font-medium">
-				Decision recorded: {Object.values(answers)
+				Decision recorded: {Object.values(decided)
 					.flat()
 					.join(' · ')}
 			</p>
@@ -146,7 +150,7 @@
 						type="button"
 						role={activeQuestion.multiple ? 'checkbox' : 'radio'}
 						aria-checked={isSelected}
-						disabled={!ready}
+						disabled={!ready || pending}
 						onclick={() => selectOption(option.label)}
 						class="flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3 text-left text-[13px] transition-[background-color,border-color,box-shadow] duration-200 {isSelected
 							? 'border-chat-accent/50 bg-chat-accent-subtle/50 text-fg-main ak-shadow-soft-sm'
@@ -218,7 +222,8 @@
 
 				<button
 					type="button"
-					disabled={!canAdvance}
+					disabled={!canAdvance || pending}
+					aria-busy={pending}
 					onclick={handleNextOrSubmit}
 					class={pillClass('primary', 'md')}
 				>

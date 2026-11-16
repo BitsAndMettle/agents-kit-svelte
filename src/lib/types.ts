@@ -774,6 +774,12 @@ export interface PromptContextOption {
 	attachment: PromptAttachment;
 }
 
+/** An entry in `PromptInput`'s `/` menu: typing `/` and the start of `name` lists it, choosing it puts `text` in the field. */
+export interface PromptCommand {
+	name: string;
+	text: string;
+}
+
 /** One piece of a `ChatWorkbench` message, drawn in order. */
 export type ChatWorkbenchPart =
 	/** Markdown, rendered safely with `Markdown`. */
