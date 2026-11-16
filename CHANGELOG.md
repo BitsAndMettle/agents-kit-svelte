@@ -8,7 +8,7 @@
   
   - `TodoList` takes `editable`: each row can be moved up and down and removed, a row is added by its title, and a row's `detail` opens on a press. `items` is bindable and holds the rows as they stand; `onSubmit` draws one primary button (`submitLabel`) that hands them back. Focus stays with the row a key moved, and goes to the next row when one is removed.
   - `ToolResult` without `output` is one line: no chevron, no Copy and no empty terminal box. `output` is optional, and a `tool` part without output in `ChatWorkbench` is drawn that way.
-  - `PromptInput` takes `commands` (`{ name, text }`): while the text starts with `/`, the commands whose name starts with the rest are listed above the field. Arrow keys move through them, Enter puts the command's text in the field (it does not send) and closes the list, as do Escape and focus leaving the field, and the text field keeps focus throughout.
+  - `PromptInput` takes `commands` (`{ name, text }`): while the text starts with `/`, the commands whose name starts with the rest are listed above the field. Arrow keys move through them, Enter or a click puts the command's text in the field and closes the list (it does not send); Escape, or focus leaving the field, closes it too. Moving through the list keeps focus in the text field.
   - `ChatWorkbench` hands `contextOptions` (the `+` menu) and `commands` to its composer, and takes `aside`, a rail on the right from 1024px drawn as the conversations sidebar is and named by `asideLabel`. It is not drawn in `layout="panel"`.
   - `ChatWorkbench`'s header and conversations rail have no border lines; the rail's own tint sets it apart.
   

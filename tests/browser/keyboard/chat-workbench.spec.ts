@@ -134,6 +134,11 @@ test('ChatWorkbench: the / menu opens, filters, fills and closes by keyboard', a
 	await expect(menu.getByRole('option', { name: /\/needs/ })).toBeVisible();
 	await box.press('Tab');
 	await expect(menu).toHaveCount(0);
+	await box.fill('/');
+	await menu.getByRole('option', { name: /\/status/ }).click();
+	await expect(box).toHaveValue('What is happening right now?');
+	await expect(box).toBeFocused();
+	await expect(menu).toHaveCount(0);
 });
 
 test('ChatWorkbench: contextOptions reach the + menu; the aside rail is not drawn below 1024px', async ({ page }) => {
