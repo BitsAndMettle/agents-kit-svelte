@@ -12,7 +12,6 @@
 	import PromptInput from '../agents/PromptInput.svelte';
 	import ThinkingShimmer from '../agents/ThinkingShimmer.svelte';
 	import ToolResult from '../agents/ToolResult.svelte';
-	import ChatWorkbenchDemo from './ChatWorkbenchDemo.svelte';
 	import type {
 		ChatWorkbenchConversation,
 		ChatWorkbenchMessage,
@@ -24,7 +23,7 @@
 	} from '../types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title'> {
-		/** Plays the built-in scripted session instead of your data (the docs site uses it). */
+		/** Plays the built-in scripted session instead of your data (the docs site uses it). Loaded on demand, so it renders in the browser only. */
 		demo?: boolean;
 		/** Demo only: start in dark mode. */
 		initialDark?: boolean;
@@ -181,7 +180,10 @@
 </script>
 
 {#if demo}
-	<ChatWorkbenchDemo {...rest} {initialDark} {embedded} class={cn(className)} />
+	<!-- Loaded on demand: an app that never sets `demo` does not download it. -->
+	{#await import('./ChatWorkbenchDemo.svelte') then { default: ChatWorkbenchDemo }}
+		<ChatWorkbenchDemo {...rest} {initialDark} {embedded} class={cn(className)} />
+	{/await}
 {:else}
 	<section {...rest}
 		aria-label={rest['aria-label'] ?? (title || 'Chat')}

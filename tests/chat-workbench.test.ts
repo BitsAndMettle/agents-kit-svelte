@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { before, test } from 'node:test';
 import type { Component } from 'svelte';
 import type { ChatWorkbenchMessage } from '../src/lib/types.ts';
@@ -42,8 +43,12 @@ test('with messages, the app data renders and the demo does not', () => {
 	assert.doesNotMatch(out, /Fix OAuth callback redirect loop/);
 });
 
-test('demo plays the scripted session; data mode has no main landmark and an h2 title by default', () => {
-	assert.match(html(ChatWorkbench, { demo: true }), /Restart demo/);
+test('demo plays the scripted session and loads on demand; data mode has no main landmark and an h2 title by default', async () => {
+	assert.match(html(await load('/src/lib/workbench/ChatWorkbenchDemo.svelte')), /Restart demo/);
+	// A static import would put the demo in every app's chat chunk.
+	const source = await readFile(new URL('../src/lib/workbench/ChatWorkbench.svelte', import.meta.url), 'utf8');
+	assert.doesNotMatch(source, /^\s*import\s+\w+\s+from\s+'\.\/ChatWorkbenchDemo\.svelte'/m);
+	assert.doesNotMatch(html(ChatWorkbench, { demo: true }), /<section/);
 	const out = html(ChatWorkbench, { title: 'Referee' });
 	assert.doesNotMatch(out, /<main/);
 	assert.match(out, /<h2[^>]*>Referee<\/h2>/);
@@ -116,6 +121,10 @@ test('PromptInput: options without a version show no v prefix; no demo chips or 
 	assert.match(out, /aria-label="Run with: Opus"/);
 	const none = html(PromptInput, {});
 	assert.doesNotMatch(none, /aria-haspopup="listbox"/);
+	// 16px unless the screen is wide and the pointer fine, so iOS does not zoom on focus.
+	assert.match(none, /<textarea[^>]*class="[^"]*text-base[^"]*sm:pointer-fine:text-\[15px\]/);
+	// 44px send button on phones.
+	assert.match(none, /<button[^>]*aria-label="Send prompt"[^>]*max-sm:size-11/);
 });
 
 test('Markdown renders hostile text as text', () => {
