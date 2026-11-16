@@ -78,7 +78,7 @@
 
 	const uid = $props.id();
 	let menuOpen = $state(false);
-	// The `/` menu follows the text: open while it starts with `/` and a name starts with the rest, until Escape.
+	// The `/` menu follows the text: open while it starts with `/` and a name starts with the rest, until Escape, a choice or a blur.
 	let dismissed = $state(false);
 	let active = $state(0);
 	let matches = $derived(
@@ -137,7 +137,7 @@
 				event.stopPropagation();
 				if (step) active = (active + step + matches.length) % matches.length;
 				else if (event.key === 'Escape') dismissed = true;
-				else value = (matches[active] ?? matches[0]!).text;
+				else choose(matches[active] ?? matches[0]!);
 				return;
 			}
 		}
@@ -149,6 +149,12 @@
 		}
 		event.preventDefault();
 		submitPrompt();
+	}
+
+	/** Puts a `/` command's text in the field and closes the list. */
+	function choose(command: PromptCommand): void {
+		value = command.text;
+		dismissed = true;
 	}
 
 	/** Attaches a `+` menu entry's chip and closes the menu. */
@@ -272,7 +278,7 @@
 					tabindex="-1"
 					aria-selected={index === active}
 					onpointerdown={(event) => event.preventDefault()}
-					onclick={() => (value = command.text)}
+					onclick={() => choose(command)}
 					class="flex w-full min-w-0 items-baseline gap-2 rounded-[10px] px-2.5 py-2 text-left text-[13px] transition-colors hover:bg-chat-surface {index === active ? 'bg-chat-surface' : ''}"
 				>
 					<span class="shrink-0 font-medium text-fg-main">/{command.name}</span>
@@ -297,6 +303,7 @@
 				dismissed = false;
 				active = 0;
 			}}
+			onblur={() => (dismissed = true)}
 			onkeydown={handleKeyDown}
 			class="field-sizing-content max-h-60 min-h-10 w-full sm:min-h-12 resize-none bg-transparent px-1.5 py-1 text-base leading-6 sm:pointer-fine:text-[15px] text-fg-main placeholder:text-fg-light/80 focus:outline-none disabled:opacity-50"
 		></textarea>

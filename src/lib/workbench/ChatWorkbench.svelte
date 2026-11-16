@@ -156,8 +156,8 @@
 		info: 'bg-status-info',
 		neutral: 'bg-fg-light'
 	} as const;
-	// Phone-sized controls are 44px tall.
 	const RAIL = 'hidden min-h-0 w-60 shrink-0 flex-col gap-2 overflow-y-auto bg-chat-user/30 p-3.5 lg:flex';
+	// Phone-sized controls are 44px tall.
 	const actionClasses = {
 		button: pillClass('secondary', 'sm', 'max-sm:h-11'),
 		icon: pillClass('secondary', 'icon-sm', 'max-sm:size-11')
@@ -233,7 +233,7 @@
 			</div>
 
 			{#if hasList}
-				<div class="-mb-px mt-2.5 flex items-center gap-1 {tabsClass}">
+				<div class="mt-2.5 flex items-center gap-1 {tabsClass}">
 					<div role="tablist" aria-label="{title || 'Chat'} views" class="flex gap-1 overflow-x-auto [scrollbar-width:none]">
 						{#each TABS as tab (tab.id)}
 							<button

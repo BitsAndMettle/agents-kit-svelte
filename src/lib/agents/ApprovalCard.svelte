@@ -188,6 +188,7 @@
 							type="text"
 							placeholder={activeQuestion.customPlaceholder ?? 'Or type custom guidance…'}
 							value={customText[activeQuestion.id] ?? ''}
+							disabled={pending}
 							oninput={(e) => {
 								const target = e.currentTarget as HTMLInputElement;
 								customText = { ...customText, [activeQuestion.id]: target.value };
@@ -203,6 +204,7 @@
 					{#if currentStep > 0}
 						<button
 							type="button"
+							disabled={pending}
 							onclick={() => (currentStep -= 1)}
 							class={pillClass('secondary', 'md')}
 						>
@@ -212,6 +214,7 @@
 					{#if onCancel}
 						<button
 							type="button"
+							disabled={pending}
 							onclick={onCancel}
 							class={pillClass('ghost', 'md')}
 						>
@@ -222,10 +225,11 @@
 
 				<button
 					type="button"
-					disabled={!canAdvance || pending}
+					disabled={!canAdvance}
+					aria-disabled={pending}
 					aria-busy={pending}
 					onclick={handleNextOrSubmit}
-					class={pillClass('primary', 'md')}
+					class={pillClass('primary', 'md', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}
 				>
 					{currentStep < questions.length - 1 ? 'Next question' : submitLabel}
 				</button>

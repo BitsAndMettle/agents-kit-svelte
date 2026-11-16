@@ -534,7 +534,7 @@
 		<div
 			role="tablist"
 			aria-label="Workbench views"
-			class="-mb-px mt-2.5 flex gap-1 overflow-x-auto [scrollbar-width:none]"
+			class="mt-2.5 flex gap-1 overflow-x-auto [scrollbar-width:none]"
 		>
 			{#each [{ id: 'chat', label: 'Chat', icon: MessageCircle }, { id: 'changes', label: 'Changes', count: 2, icon: FileCode }, { id: 'checks', label: 'Checks', icon: SquareTerminal }] as tab (tab.id)}
 				<button

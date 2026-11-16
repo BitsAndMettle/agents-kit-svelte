@@ -50,7 +50,6 @@
 		summary.totalCount > 0 ? Math.round((summary.completedCount / summary.totalCount) * 100) : 0
 	);
 
-	const uid = $props.id();
 	let added = 0;
 	let draft = $state('');
 	let listEl: HTMLOListElement | undefined = $state();
@@ -79,8 +78,9 @@
 	function add(): void {
 		const label = draft.trim();
 		if (!label) return;
-		items = [...items, { id: `${uid}-added-${++added}`, label, status: 'pending' }];
+		items = [...items, { id: `added-${Date.now()}-${++added}`, label, status: 'pending' }];
 		draft = '';
+		addField?.focus();
 	}
 
 	const progressTween = new Tween(0, { duration: 280, easing: cubicOut });
@@ -231,15 +231,7 @@
 					{/key}
 
 					<div class="min-w-0 flex-1">
-						{#if editable && item.detail}
-							<details class="group/detail">
-								<summary class="flex cursor-pointer list-none items-center gap-1 text-fg-main [&::-webkit-details-marker]:hidden">
-									{item.label}
-									<ChevronRight aria-hidden="true" class="size-3.5 shrink-0 text-fg-light transition-transform group-open/detail:rotate-90" />
-								</summary>
-								<p class="mt-0.5 text-xs whitespace-pre-line text-fg-light">{item.detail}</p>
-							</details>
-						{:else}
+						{#snippet rowLabel()}
 							<span
 								class="block transition-colors {item.status === 'completed' ||
 								item.status === 'cancelled'
@@ -252,15 +244,26 @@
 									{item.label}
 								{/if}
 							</span>
+						{/snippet}
+						{#if editable && item.detail}
+							<details class="group/detail">
+								<summary class="flex cursor-pointer list-none items-center gap-1 [&::-webkit-details-marker]:hidden">
+									{@render rowLabel()}
+									<ChevronRight aria-hidden="true" class="size-3.5 shrink-0 text-fg-light transition-transform group-open/detail:rotate-90" />
+								</summary>
+								<p class="mt-0.5 text-xs whitespace-pre-line text-fg-light">{item.detail}</p>
+							</details>
+						{:else}
+							{@render rowLabel()}
 							{#if item.detail}
 								<span class="mt-0.5 block text-xs text-fg-light">{item.detail}</span>
 							{/if}
 						{/if}
 					</div>
 					{#if editable}
-						<span class="flex shrink-0 items-center text-fg-light">
-							<button type="button" data-control="up" aria-label="Move {item.label} up" aria-disabled={index === 0} onclick={() => move(index, -1)} class={pillClass('ghost', 'icon-sm', 'aria-disabled:opacity-40')}><ArrowUp aria-hidden="true" /></button>
-							<button type="button" data-control="down" aria-label="Move {item.label} down" aria-disabled={index === items.length - 1} onclick={() => move(index, 1)} class={pillClass('ghost', 'icon-sm', 'aria-disabled:opacity-40')}><ArrowDown aria-hidden="true" /></button>
+						<span class="flex shrink-0 items-center">
+							<button type="button" data-control="up" aria-label="Move {item.label} up" aria-disabled={index === 0} onclick={() => move(index, -1)} class={pillClass('ghost', 'icon-sm', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}><ArrowUp aria-hidden="true" /></button>
+							<button type="button" data-control="down" aria-label="Move {item.label} down" aria-disabled={index === items.length - 1} onclick={() => move(index, 1)} class={pillClass('ghost', 'icon-sm', 'aria-disabled:opacity-50 aria-disabled:cursor-not-allowed')}><ArrowDown aria-hidden="true" /></button>
 							<button type="button" data-control="remove" aria-label="Remove {item.label}" onclick={() => remove(index)} class={pillClass('ghost', 'icon-sm')}><X aria-hidden="true" /></button>
 						</span>
 					{/if}
@@ -279,7 +282,7 @@
 						event.preventDefault();
 						add();
 					}}
-					class="h-8 min-w-0 flex-1 rounded-full bg-chat-surface px-3.5 text-[13px] text-fg-main placeholder:text-fg-light transition-shadow focus:ring-3 focus:ring-accent-primary/15 focus:outline-none"
+					class="h-8 min-w-0 flex-1 rounded-full bg-chat-surface px-3.5 text-base sm:pointer-fine:text-[13px] text-fg-main placeholder:text-fg-light"
 				/>
 				<button type="button" disabled={!draft.trim()} onclick={add} class={pillClass('ghost', 'sm')}>Add</button>
 				{#if onSubmit}

@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { before, test } from 'node:test';
 import type { Component } from 'svelte';
@@ -197,14 +196,10 @@ test('ApprovalCard shows a decision only when it is given one, and waits while p
 	assert.match(open, /Where to\?/);
 	assert.doesNotMatch(open, /Decision recorded/);
 	const waiting = html(ApprovalCard, { title: 'Policy', questions, pending: true });
-	assert.match(waiting, /role="radio"[^>]*disabled/);
 	assert.match(waiting, /aria-busy="true"[^>]*>\s*Submit decision/);
 	const decided = html(ApprovalCard, { title: 'Policy', questions, decided: { q: ['Sign-in'] } });
 	assert.match(decided, /Decision recorded: Sign-in/);
 	assert.doesNotMatch(decided, /role="radio"/);
-	// No state of its own says it was recorded: a click only calls onSubmit.
-	const source = readFileSync(new URL('../src/lib/agents/ApprovalCard.svelte', import.meta.url), 'utf8');
-	assert.doesNotMatch(source, /submitted/);
 });
 
 test('TodoList editable: each row moves and is removed, a detail opens on a press, rows are added, one button hands them back', () => {
@@ -216,7 +211,9 @@ test('TodoList editable: each row moves and is removed, a detail opens on a pres
 	assert.match(out, /aria-label="Move Keep the return path up" aria-disabled="true"/);
 	assert.match(out, /aria-label="Move Test the redirects down" aria-disabled="true"/);
 	assert.match(out, /aria-label="Remove Test the redirects"/);
-	assert.match(out, /<details[^>]*><summary[^>]*>\s*Keep the return path[\s\S]*?<\/summary>\s*<p[^>]*>Read next\.<\/p>/);
+	assert.match(out, /<details[^>]*><summary[^>]*>\s*<span[^>]*>Keep the return path<\/span>[\s\S]*?<\/summary>\s*<p[^>]*>Read next\.<\/p>/);
+	const done = html(TodoList, { items: [{ ...items[0], status: 'completed' }], editable: true });
+	assert.match(done, /<summary[^>]*>\s*<span class="[^"]*line-through[^"]*">Keep the return path</);
 	assert.match(out, /<input[^>]*aria-label="Add a step"/);
 	assert.match(out, />File plan<\/button>/);
 	assert.doesNotMatch(html(TodoList, { items, editable: true }), /File plan|Done<\/button>/);

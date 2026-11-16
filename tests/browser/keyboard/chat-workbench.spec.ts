@@ -132,6 +132,8 @@ test('ChatWorkbench: the / menu opens, filters, fills and closes by keyboard', a
 	await expect(box).toBeFocused();
 	await box.press('e');
 	await expect(menu.getByRole('option', { name: /\/needs/ })).toBeVisible();
+	await box.press('Tab');
+	await expect(menu).toHaveCount(0);
 });
 
 test('ChatWorkbench: contextOptions reach the + menu; the aside rail is not drawn below 1024px', async ({ page }) => {
@@ -179,6 +181,7 @@ test('ApprovalCard: a press calls onSubmit and the card waits; it reads decided 
 	await card.getByRole('button', { name: 'Submit decision' }).click();
 	await expect(events(page)).toContainText('answer:Sign-in');
 	await expect(card.getByRole('button', { name: 'Submit decision' })).toBeDisabled();
+	await expect(card.getByRole('radio', { name: /Home/ })).toBeDisabled();
 	await expect(card.getByText('Decision recorded')).toHaveCount(0);
 	await page.getByRole('button', { name: 'Record the answer' }).click();
 	await expect(card.getByRole('status')).toHaveText('Decision recorded: Sign-in');

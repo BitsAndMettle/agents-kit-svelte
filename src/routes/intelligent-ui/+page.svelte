@@ -440,6 +440,15 @@
 			{ id: ++intentSeq, node: node?.title ?? intent.nodeId, action: intent.action, detail: intent.detail },
 			...intents
 		].slice(0, 8);
+		// The page records the decision, as an app would: the card reads decided only from its node.
+		if (intent.action === 'submit' && intent.detail) {
+			const decided = JSON.parse(intent.detail) as unknown;
+			jsonDraft = JSON.stringify(
+				parsed.nodes.map((n) => (n.id === intent.nodeId ? { ...n, props: { ...n.props, decided } } : n)),
+				null,
+				2
+			);
+		}
 	}
 
 	async function copySvelte(): Promise<void> {
