@@ -1,6 +1,7 @@
 <!--
 	ChatWorkbench with app-supplied data: no demo, no scripted reply. The page owns the conversation, as an
-	app would, and logs every event the workbench raises. Also the fixture for tests/browser/keyboard/chat-workbench.spec.ts.
+	app would, and logs every event the workbench raises. The conversations sit under day labels with a dot per
+	repository; switch the site to dark to see the rail's tint and dark scrollbars. Also the fixture for tests/browser/keyboard/chat-workbench.spec.ts.
 -->
 <script lang="ts">
 	import ApprovalCard from '$lib/agents/ApprovalCard.svelte';
@@ -46,8 +47,11 @@
 		}
 	]);
 	let conversations = $state<ChatWorkbenchConversation[]>([
-		{ id: 'c1', title: 'What is blocked right now?', date: 'Nov 12, 14:02', subtitle: 'devbox', active: true },
-		{ id: 'c2', title: 'Card 198 · BitsAndMettle/example', date: 'Nov 11, 09:40', subtitle: 'devbox' }
+		{ id: 'q', title: 'Questions', subtitle: 'Asked by the agents' },
+		{ id: 'c1', title: 'What is blocked right now?', date: '14:02', group: 'Today', mark: 'example', active: true },
+		{ id: 'c3', title: 'Plan the sign-in redirects', date: '09:15', group: 'Today', mark: 'website' },
+		{ id: 'c2', title: 'Card 198 · BitsAndMettle/example', date: '1d', group: 'Yesterday', mark: 'example' },
+		{ id: 'c4', title: 'Why did the nightly build fail?', date: '4d', group: 'Earlier', mark: 'agents-kit-svelte' }
 	]);
 	const models: PromptInputOption[] = [
 		{ id: 'sonnet', label: 'Sonnet' },

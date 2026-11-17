@@ -841,10 +841,14 @@ export interface ChatWorkbenchMessage {
 export interface ChatWorkbenchConversation {
 	id: string;
 	title: string;
-	/** Shown under the title, e.g. `Nov 12, 14:05`. */
+	/** Shown at the end of the row, e.g. `14:05` or `2d`. */
 	date?: string;
-	/** Shown after the date, e.g. the machine it ran on. */
+	/** A second line, e.g. the machine it ran on. Drawn only on a row without `mark`. */
 	subtitle?: string;
+	/** A muted label above the first row of each run of rows with the same group, e.g. `Today`. */
+	group?: string;
+	/** A dot before the title whose colour is chosen by this key, e.g. the repository's name. The key is also the dot's spoken name. */
+	mark?: string;
 	/** The conversation on screen. */
 	active?: boolean;
 }

@@ -22,8 +22,10 @@
 		ariaLabel: string;
 	}
 
-	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'items' | 'navigation' | 'followOutput' | 'followThreshold' | 'smooth' | 'streaming' | 'busy' | 'label' | 'navigationLabel' | 'onFollowChange' | 'viewportClass' | 'contentClass' | 'children'> {
+	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'items' | 'navigation' | 'followOutput' | 'followThreshold' | 'smooth' | 'streaming' | 'busy' | 'label' | 'navigationLabel' | 'onFollowChange' | 'viewportClass' | 'contentClass' | 'children' | 'scrollKey'> {
 		items?: RailItem[];
+		/** When this changes, e.g. to another conversation's id, the viewport goes to its end. */
+		scrollKey?: unknown;
 		navigation?: 'rail' | 'none';
 		followOutput?: boolean;
 		followThreshold?: number;
@@ -52,6 +54,7 @@
 
 	let {
 		items = [],
+		scrollKey,
 		navigation = 'rail',
 		followOutput = true,
 		followThreshold = DEFAULT_FOLLOW_THRESHOLD_PX,
@@ -514,6 +517,13 @@
 			mutationObserver?.disconnect();
 			if (scrollTimerId) clearTimeout(scrollTimerId);
 		};
+	});
+
+	let lastKey = untrack(() => scrollKey);
+	$effect(() => {
+		if (scrollKey === lastKey) return;
+		lastKey = scrollKey;
+		untrack(() => scrollToEnd('auto'));
 	});
 
 	$effect(() => {

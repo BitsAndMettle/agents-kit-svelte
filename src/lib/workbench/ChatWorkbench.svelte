@@ -3,7 +3,8 @@
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { pillClass } from '../ui/styles';
-	import { Sparkle } from '@lucide/svelte';
+	import { Plus, Sparkle } from '@lucide/svelte';
+	import { AVATAR_TINTS, toneIndexFromName } from '../primitives/display/helpers';
 	import AgentActivity from '../agents/AgentActivity.svelte';
 	import Markdown from '../agents/Markdown.svelte';
 	import Message from '../agents/Message.svelte';
@@ -45,6 +46,8 @@
 		status?: ChatWorkbenchStatus;
 		/** The title's heading level. */
 		headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
+		/** Draws the sparkle mark before the title. */
+		headerMark?: boolean;
 		/** Your controls on the right of the header, given the kit's pill classes (44px tall on phones). */
 		headerActions?: Snippet<[{ button: string; icon: string }]>;
 		/** A reachability banner above the messages, drawn as `PresenceBanner`. */
@@ -112,6 +115,7 @@
 		subtitle = '',
 		status,
 		headingLevel = 2,
+		headerMark = true,
 		headerActions,
 		presence,
 		empty,
@@ -156,7 +160,9 @@
 		info: 'bg-status-info',
 		neutral: 'bg-fg-light'
 	} as const;
-	const RAIL = 'hidden min-h-0 w-60 shrink-0 flex-col gap-2 overflow-y-auto bg-chat-user/30 p-3.5 lg:flex';
+	const RAIL = 'hidden min-h-0 w-60 shrink-0 flex-col gap-2 overflow-y-auto bg-canvas-secondary p-3.5 lg:flex';
+	const ROW = 'flex min-h-11 w-full min-w-0 rounded-xl px-3 py-1.5 text-left transition-colors';
+	const IDLE = 'text-fg-light hover:bg-chat-user/60 hover:text-fg-main';
 	// Phone-sized controls are 44px tall.
 	const actionClasses = {
 		button: pillClass('secondary', 'sm', 'max-sm:h-11'),
@@ -167,6 +173,7 @@
 	let tabsClass = $derived(layout === 'panel' ? '' : 'lg:hidden');
 	let sidebar = $derived(hasList && layout === 'auto');
 	let streaming = $derived(busy || messages.some((message) => message.status === 'streaming'));
+	let activeId = $derived(conversations?.find((row) => row.active)?.id);
 
 	function send(text: string): void {
 		view = 'chat';
@@ -208,9 +215,11 @@
 		<header class="shrink-0 bg-chat-surface px-4 pt-3 sm:px-6 {hasList && layout === 'auto' ? 'lg:pb-3' : hasList ? '' : 'pb-3'}">
 			<div class="flex items-start justify-between gap-3">
 				<div class="flex min-w-0 items-center gap-3">
-					<span aria-hidden="true" class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-chat-accent-subtle text-chat-accent">
-						<Sparkle class="size-4 fill-current" />
-					</span>
+					{#if headerMark}
+						<span aria-hidden="true" class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-chat-accent-subtle text-chat-accent">
+							<Sparkle class="size-4 fill-current" />
+						</span>
+					{/if}
 					<div class="min-w-0">
 						{#if title}
 							<svelte:element this={`h${headingLevel}`} class="truncate text-[15px] font-semibold text-fg-main">{title}</svelte:element>
@@ -271,12 +280,11 @@
 		<div class="flex min-h-0 flex-1 overflow-hidden">
 			{#if sidebar}
 				<aside aria-label="Conversations" class={RAIL}>
-					<div class="flex items-center justify-between gap-2 px-1">
-						<h2 class="text-[11px] font-medium text-fg-light">Conversations</h2>
-						{#if onNewConversation}
-							<button type="button" class={pillClass('ghost', 'xs')} onclick={startNew}>New conversation</button>
-						{/if}
-					</div>
+					{#if onNewConversation}
+						<button type="button" class="{ROW} items-center gap-2 text-[13px] font-medium {IDLE}" onclick={startNew}>
+							<Plus aria-hidden="true" class="size-3.5" />New conversation
+						</button>
+					{/if}
 					{@render list()}
 				</aside>
 			{/if}
@@ -294,7 +302,7 @@
 					aria-labelledby={hasList ? `${uid}-tab-chat` : undefined}
 					class="min-h-0 flex-1 flex-col {hasList && view === 'conversations' ? (layout === 'auto' ? 'hidden lg:flex' : 'hidden') : 'flex'}"
 				>
-					<MessageScroller navigation="none" followOutput {streaming} {busy} label={title ? `${title} conversation` : 'Conversation'} contentClass="pb-10">
+					<MessageScroller navigation="none" followOutput scrollKey={activeId} {streaming} {busy} label={title ? `${title} conversation` : 'Conversation'} contentClass="pb-10">
 						{#if presence}
 							<PresenceBanner state={presence.state} subject={presence.subject} detail={presence.detail} since={presence.since} />
 						{/if}
@@ -380,19 +388,29 @@
 			<p role="status" class="px-1 text-[13px] text-fg-light">No conversations yet.</p>
 		{:else}
 			<ul class="space-y-0.5 text-[13px]">
-				{#each conversations as row (row.id)}
+				{#each conversations as row, index (row.id)}
 					<li>
+						{#if row.group && row.group !== conversations[index - 1]?.group}
+							<p class="px-3 pb-1 text-[11px] font-medium text-fg-light {index ? 'pt-3' : ''}">{row.group}</p>
+						{/if}
 						<button
 							type="button"
 							aria-current={row.active ? 'true' : undefined}
 							onclick={() => openConversation(row.id)}
-							class="flex min-h-11 w-full min-w-0 flex-col items-start justify-center rounded-xl px-3 py-1.5 text-left transition-colors {row.active
-								? 'bg-card-bg font-medium text-fg-main ak-shadow-soft-sm'
-								: 'text-fg-light hover:bg-chat-user/60 hover:text-fg-main'}"
+							class="{ROW} flex-col justify-center {row.active ? 'bg-card-bg font-medium text-fg-main ak-shadow-soft-sm' : IDLE}"
 						>
-							<span class="w-full truncate">{row.title}</span>
-							{#if row.date || row.subtitle}
-								<span class="text-[11px] font-normal text-fg-light">{[row.date, row.subtitle].filter(Boolean).join(' · ')}</span>
+							<span class="flex w-full min-w-0 items-center gap-2">
+								{#if row.mark}
+									<!-- The chart colour of the bucket an Avatar of the same name is tinted with. -->
+									<span role="img" aria-label={row.mark} title={row.mark} class="size-2 shrink-0 rounded-full" style="background-color: var(--ak-chart-{toneIndexFromName(row.mark, AVATAR_TINTS.length) + 1})"></span>
+								{/if}
+								<span class="min-w-0 flex-1 truncate">{row.title}</span>
+								{#if row.date}
+									<span class="shrink-0 text-[11px] font-normal tabular-nums text-fg-light">{row.date}</span>
+								{/if}
+							</span>
+							{#if row.subtitle && !row.mark}
+								<span class="w-full truncate text-[11px] font-normal text-fg-light">{row.subtitle}</span>
 							{/if}
 						</button>
 					</li>
