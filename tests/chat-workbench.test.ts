@@ -97,10 +97,11 @@ test('conversation rows: a label above each run of a group, a dot by key, the da
 	const list = out.slice(out.indexOf('<aside'), out.indexOf('</aside>'));
 	// A label per run: Today twice, since its rows are not together.
 	assert.deepEqual([...list.matchAll(/<p class="[^"]*">(\w+)<\/p>/g)].map((m) => m[1]), ['Today', 'Yesterday', 'Today']);
-	// The dot is spoken as its key and coloured by it: the same key, the same colour.
-	const dots = [...list.matchAll(/role="img" aria-label="([\w-]+)"[^>]*style="background-color: var\((--ak-chart-\d)\)"/g)].map((m) => [m[1], m[2]]);
+	// The dot is spoken as its key and coloured by it: the same key, the same colour, and these two keys land on different ones.
+	const dots = [...list.matchAll(/role="img" aria-label="([\w-]+)"[^>]*style="background-color: var\((--ak-chart-[1-6])\)"/g)].map((m) => [m[1], m[2]]);
 	assert.deepEqual(dots.map(([name]) => name), ['example', 'website', 'example']);
 	assert.equal(dots[0][1], dots[2][1]);
+	assert.notEqual(dots[0][1], dots[1][1]);
 	assert.match(list, /Alpha<\/span>(\s|<!--[^>]*-->)*<span[^>]*>14:02<\/span>/);
 	// The subtitle is a second line only on a row without a mark.
 	assert.match(list, /Questions[\s\S]*?Asked by the agents/);

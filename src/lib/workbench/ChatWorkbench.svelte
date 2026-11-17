@@ -162,7 +162,7 @@
 	} as const;
 	const RAIL = 'hidden min-h-0 w-60 shrink-0 flex-col gap-2 overflow-y-auto bg-canvas-secondary p-3.5 lg:flex';
 	const ROW = 'flex min-h-11 w-full min-w-0 rounded-xl px-3 py-1.5 text-left transition-colors';
-	const IDLE = 'text-fg-light hover:bg-chat-user/60 hover:text-fg-main';
+	const IDLE = 'text-fg-light hover:bg-card-bg hover:text-fg-main';
 	// Phone-sized controls are 44px tall.
 	const actionClasses = {
 		button: pillClass('secondary', 'sm', 'max-sm:h-11'),
@@ -173,7 +173,6 @@
 	let tabsClass = $derived(layout === 'panel' ? '' : 'lg:hidden');
 	let sidebar = $derived(hasList && layout === 'auto');
 	let streaming = $derived(busy || messages.some((message) => message.status === 'streaming'));
-	let activeId = $derived(conversations?.find((row) => row.active)?.id);
 
 	function send(text: string): void {
 		view = 'chat';
@@ -302,7 +301,7 @@
 					aria-labelledby={hasList ? `${uid}-tab-chat` : undefined}
 					class="min-h-0 flex-1 flex-col {hasList && view === 'conversations' ? (layout === 'auto' ? 'hidden lg:flex' : 'hidden') : 'flex'}"
 				>
-					<MessageScroller navigation="none" followOutput scrollKey={activeId} {streaming} {busy} label={title ? `${title} conversation` : 'Conversation'} contentClass="pb-10">
+					<MessageScroller navigation="none" followOutput {streaming} {busy} label={title ? `${title} conversation` : 'Conversation'} contentClass="pb-10">
 						{#if presence}
 							<PresenceBanner state={presence.state} subject={presence.subject} detail={presence.detail} since={presence.since} />
 						{/if}
