@@ -89,6 +89,7 @@ mount(TodoList, { target: document.getElementById('app')!, props: { items: [] } 
 		'index.html': `<!doctype html><html><body><div id="app"></div><script type="module" src="/src/main.ts"></script></body></html>\n`,
 		'src/app.css': `@import "tailwindcss";
 @import "agents-kit-svelte/theme.css";
+@import "agents-kit-svelte/fonts.css";
 @source "../node_modules/agents-kit-svelte/dist";
 `,
 		'src/main.ts': `import { mount } from 'svelte';
@@ -177,6 +178,23 @@ mount(App, { target: document.getElementById('app')! });
 	const expected = ['--ak-color-surface', '.bg-card-bg', '.text-fg-main', '.ak-shimmer-text'];
 	const missing = expected.filter((needle) => !css.includes(needle));
 	if (missing.length) throw new Error(`Built CSS is missing: ${missing.join(', ')}`);
+
+	// Fonts: every file fonts.css names is in the tarball, and the app's build emits and links each one.
+	// Vite leaves a url() it cannot resolve as it is, with only a warning, so a green build proves nothing here.
+	const fontsDir = join(app, 'node_modules', 'agents-kit-svelte', 'dist', 'fonts');
+	const fontFiles = [...readFileSync(join(fontsDir, 'fonts.css'), 'utf8').matchAll(/url\("\.\/([^"]+)"\)/g)].map(([, file]) => file);
+	if (fontFiles.length !== 4) throw new Error(`fonts.css names ${fontFiles.length} font files, not 4`);
+	const packed = readdirSync(fontsDir);
+	const unpacked = [...fontFiles, 'Inter-OFL.txt', 'JetBrainsMono-OFL.txt'].filter((file) => !packed.includes(file));
+	if (unpacked.length) throw new Error(`The tarball is missing: ${unpacked.join(', ')}`);
+	const emitted = readdirSync(assets).filter((f) => f.endsWith('.woff2'));
+	const unlinked = fontFiles.filter((file) => {
+		// Vite names it <name>-<8-character hash>.woff2, so inter-latin is not mistaken for inter-latin-ext.
+		const built = emitted.find((f) => f.replace(/-[\w-]{8}\.woff2$/, '.woff2') === file);
+		return !built || !css.includes(`/assets/${built}`);
+	});
+	if (unlinked.length) throw new Error(`The built app does not emit and link: ${unlinked.join(', ')}`);
+	console.log(`Fonts: ${emitted.length} woff2 files emitted and linked from the built CSS.`);
 
 	// Tree-shaking: one component from the root barrel must not pull in the rest of the kit.
 	run('npx vite build --config vite.single.config.js', app);

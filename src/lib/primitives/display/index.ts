@@ -17,7 +17,7 @@ export type { Props as SkeletonProps } from './Skeleton.svelte';
 export { default as Spinner } from './Spinner.svelte';
 export type { Props as SpinnerProps, SpinnerSize } from './Spinner.svelte';
 export { default as Progress } from './Progress.svelte';
-export type { Props as ProgressProps } from './Progress.svelte';
+export type { Props as ProgressProps, ProgressSegment } from './Progress.svelte';
 export { default as Alert } from './Alert.svelte';
 export type { Props as AlertProps } from './Alert.svelte';
 export { default as Notice } from './Notice.svelte';

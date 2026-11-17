@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/BitsAndMettle/agents-kit-svelte/issues"
   },
-  "license": "Apache-2.0",
+  "license": "Apache-2.0 AND OFL-1.1",
   "private": false,
   "type": "module",
   "packageManager": "pnpm@10.34.5",
@@ -111,6 +111,10 @@
     "./theme.css": {
       "style": "./dist/theme.css",
       "default": "./dist/theme.css"
+    },
+    "./fonts.css": {
+      "style": "./dist/fonts/fonts.css",
+      "default": "./dist/fonts/fonts.css"
     },
     "./package.json": "./package.json"
   },
