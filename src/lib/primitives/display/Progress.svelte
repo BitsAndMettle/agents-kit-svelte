@@ -58,7 +58,7 @@
 			? ''
 			: typeof valueText === 'function'
 				? valueText(value as number, percent)
-				: (valueText ?? (segments ? segments.map((part) => `${part.value} ${part.label}`).join(', ') : `${Math.round(percent)}%`))
+				: (valueText ?? (segments?.length ? segments.map((part) => `${part.value} ${part.label}`).join(', ') : `${Math.round(percent)}%`))
 	);
 </script>
 

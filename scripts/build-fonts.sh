@@ -2,7 +2,7 @@
 # Rebuilds the woff2 files in src/lib/fonts from the fonts' official GitHub releases.
 # The outputs are committed; run this only to move to a new font release.
 #
-#   pip install fonttools brotli   (fontTools 4.68.0 built the committed files)
+#   pip install fonttools==4.68.0 brotli==1.2.1   (the pair that built the committed files)
 #   bash scripts/build-fonts.sh
 #
 # Each release zip is checked against the sha256 pinned below. When you bump a release, pin the
@@ -30,21 +30,25 @@ fetch() { # url sha256 -> extracted dir
 	rm -rf "$work/x" && unzip -q "$work/src.zip" -d "$work/x" && rm "$work/src.zip"
 }
 
-subset() { # source name
+# Each font keeps pyftsubset's default OpenType features (kerning, marks, contextual forms,
+# fractions) adjusted by its own flag: Inter adds the cv11, ss01 and tnum the theme and components
+# turn on, and JetBrains Mono drops the code ligatures theme.css turns off. Name a feature here
+# before an app's CSS can use it.
+subset() { # source name layout-features-flag
 	for range in latin latin-ext; do
 		local unicodes=$LATIN
 		[ "$range" = latin-ext ] && unicodes=$LATIN_EXT
-		python3 -m fontTools.subset "$1" --unicodes="$unicodes" --layout-features='*' --name-IDs='*' \
+		python3 -m fontTools.subset "$1" --unicodes="$unicodes" "$3" --name-IDs='*' \
 			--flavor=woff2 --output-file="$out/$2-$range.woff2"
 	done
 }
 
 fetch "$INTER_URL" "$INTER_SHA256"
-subset "$work/x/web/InterVariable.woff2" inter
+subset "$work/x/web/InterVariable.woff2" inter --layout-features+=cv11,ss01,tnum
 cp "$work/x/LICENSE.txt" "$out/Inter-OFL.txt"
 
 fetch "$MONO_URL" "$MONO_SHA256"
-subset "$work/x/fonts/variable/JetBrainsMono[wght].ttf" jetbrains-mono
+subset "$work/x/fonts/variable/JetBrainsMono[wght].ttf" jetbrains-mono --layout-features-=calt,liga
 cp "$work/x/OFL.txt" "$out/JetBrainsMono-OFL.txt"
 
 ls -l "$out"
