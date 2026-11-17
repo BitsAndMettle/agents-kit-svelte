@@ -66,19 +66,21 @@ export function usageWindowText(account: AccountUsage, key: keyof AccountUsage['
 }
 
 /**
- * `TokenBurnChart` props for one window from a single reading: the line runs from the window's start to the
- * reading, the projection carries the average rate since the start on to the switch point, or to the reset when it
- * stays under, and nothing reads past 100%. Time is in hours since the window began. Undefined when the window was
- * never read.
+ * `TokenBurnChart` props for one window: the line runs from the window's start through its earlier `points` (those
+ * after the start and before the reading) to the reading, the projection carries the rate on to the switch point, or
+ * to the reset when it stays under, and nothing reads past 100%. With one reading the rate is the average since the
+ * start. Time is in hours since the window began. Undefined when the window was never read.
  */
 export function usageBurn(account: AccountUsage, key: keyof AccountUsage['windows'], timeZone = 'UTC') {
 	const window = account.windows[key];
 	const hours = WINDOW_HOURS[key];
-	if (!window || account.at === undefined) return undefined;
+	const at = account.at;
+	if (!window || at === undefined) return undefined;
 	const start = window.resetsAt - hours * HOUR;
 	const points: BurnPoint[] = [
 		{ t: 0, spent: 0 },
-		{ t: Math.min(hours, Math.max(0, (account.at - start) / HOUR)), spent: window.used }
+		...(window.points ?? []).filter((p) => p.at > start && p.at < at).map((p) => ({ t: (p.at - start) / HOUR, spent: p.used })),
+		{ t: Math.min(hours, Math.max(0, (at - start) / HOUR)), spent: window.used }
 	];
 	return {
 		points,

@@ -98,6 +98,24 @@ test('usageBurn draws nothing without a reading, and a reading past the switch p
 	assert.equal(projectBurn(past.points, past.end, past.budget).crossesAt, past.points[1].t);
 });
 
+test('usageBurn draws the line through the earlier readings between the window start and the reading', () => {
+	const week = personal.windows.week!;
+	const start = week.resetsAt - 168 * 3_600_000;
+	const hour = (h: number) => start + h * 3_600_000;
+	const points = [{ at: hour(-1), used: 90 }, { at: hour(5), used: 10 }, { at: hour(24), used: 20 }, { at: hour(48), used: 45 }, { at: at + 3_600_000, used: 70 }];
+	const burn = usage.usageBurn({ ...personal, windows: { week: { ...week, points } } }, 'week')!;
+	assert.deepEqual(burn.points.slice(0, 4), [{ t: 0, spent: 0 }, { t: 5, spent: 10 }, { t: 24, spent: 20 }, { t: 48, spent: 45 }], 'in order, the one before the start left out');
+	assert.equal(burn.points.length, 5, 'the one after the reading left out');
+	assert.equal(burn.points[4].spent, 66);
+	assert.ok(Math.abs(burn.points[4].t - 66.1) < 1e-9, 'the reading ends the line');
+	const none = usage.usageBurn({ ...personal, windows: { week: { ...week, points: [] } } }, 'week')!;
+	assert.deepEqual(none.points, usage.usageBurn(personal, 'week')!.points, 'no points: the two of a single reading');
+	const meets = projectionEnd(burn.points, burn.end, burn.budget, burn.limit);
+	assert.equal(meets.spent, 98, 'the projection still ends at the switch point');
+	assert.ok(Math.abs(meets.t - (66.1 + (32 * 61.1) / 56)) < 1e-9, 'at the rate since the reading 60 h before');
+	assert.equal(projectBurn(burn.points, burn.end, burn.budget).crossesAt, meets.t);
+});
+
 test('UsagePill counts free accounts and opens on a row per account', () => {
 	const closed = html(UsagePill, { accounts: SAMPLE_ACCOUNT_USAGE });
 	assert.match(closed, /aria-expanded="false"/);
