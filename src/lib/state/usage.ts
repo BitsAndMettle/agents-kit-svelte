@@ -74,13 +74,13 @@ export function usageWindowText(account: AccountUsage, key: keyof AccountUsage['
 export function usageBurn(account: AccountUsage, key: keyof AccountUsage['windows'], timeZone = 'UTC') {
 	const window = account.windows[key];
 	const hours = WINDOW_HOURS[key];
-	const at = account.at;
-	if (!window || at === undefined) return undefined;
+	if (!window || account.at === undefined) return undefined;
 	const start = window.resetsAt - hours * HOUR;
+	const reading = Math.min(hours, Math.max(0, (account.at - start) / HOUR));
 	const points: BurnPoint[] = [
 		{ t: 0, spent: 0 },
-		...(window.points ?? []).filter((p) => p.at > start && p.at < at).map((p) => ({ t: (p.at - start) / HOUR, spent: p.used })),
-		{ t: Math.min(hours, Math.max(0, (at - start) / HOUR)), spent: window.used }
+		...(window.points ?? []).map((p) => ({ t: (p.at - start) / HOUR, spent: p.used })).filter((p) => p.t > 0 && p.t < reading),
+		{ t: reading, spent: window.used }
 	];
 	return {
 		points,

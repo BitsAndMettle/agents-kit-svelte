@@ -113,7 +113,7 @@ test('usageBurn draws the line through the earlier readings between the window s
 	const meets = projectionEnd(burn.points, burn.end, burn.budget, burn.limit);
 	assert.equal(meets.spent, 98, 'the projection still ends at the switch point');
 	assert.ok(Math.abs(meets.t - (66.1 + (32 * 61.1) / 56)) < 1e-9, 'at the rate since the reading 60 h before');
-	assert.equal(projectBurn(burn.points, burn.end, burn.budget).crossesAt, meets.t);
+	assert.deepEqual(usage.usageBurn({ ...personal, at: hour(170), windows: { week: { ...week, points: [{ at: hour(48), used: 45 }, { at: hour(169), used: 60 }] } } }, 'week')!.points, [{ t: 0, spent: 0 }, { t: 48, spent: 45 }, { t: 168, spent: 66 }], 'a reading past the reset sits at the window end, and a point past the reset is left out');
 });
 
 test('UsagePill counts free accounts and opens on a row per account', () => {
