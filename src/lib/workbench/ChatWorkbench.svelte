@@ -285,10 +285,11 @@
 					class="min-h-0 flex-1 flex-col {hasList && view === 'conversations' ? (layout === 'auto' ? 'hidden lg:flex' : 'hidden') : 'flex'}"
 				>
 					{#if quiet && (title || subtitle || status || headerActions)}
-						<!-- One line at the message text's inset; the title keeps its room and the status truncates. -->
+						<!-- One line at the message text's inset. The title keeps its room; the status truncates first, then the actions give way:
+						     each may shrink, and one with `min-w-0` and its text in a `truncate` span cuts that text short. -->
 						<div class="mx-auto flex w-full max-w-3xl shrink-0 items-baseline gap-2 px-5 pt-4 sm:px-8">
 							{#if title}
-								<svelte:element this={`h${headingLevel}`} class="min-w-0 truncate text-[15px] font-semibold text-fg-main">{title}</svelte:element>
+								<svelte:element this={`h${headingLevel}`} class="max-w-full shrink-0 truncate text-[15px] font-semibold text-fg-main">{title}</svelte:element>
 							{/if}
 							{#if status || subtitle}
 								<p class="min-w-0 flex-1 truncate text-xs text-fg-light">
@@ -299,7 +300,7 @@
 								</p>
 							{/if}
 							{#if headerActions}
-								<div class="ml-auto flex shrink-0 items-center gap-1.5">{@render headerActions(actionClasses)}</div>
+								<div class="ml-auto flex min-w-0 items-center gap-1.5 *:shrink">{@render headerActions(actionClasses)}</div>
 							{/if}
 						</div>
 					{/if}
@@ -465,7 +466,7 @@
 								{/if}
 							</span>
 							{#if row.subtitle && !row.mark}
-								<span class="w-full truncate {quiet ? 'pl-5.5 text-xs' : 'text-[11px]'} font-normal text-fg-light">{row.subtitle}</span>
+								<span class="w-full truncate {quiet || row.pinned ? 'pl-5.5 ' : ''}{quiet ? 'text-xs' : 'text-[11px]'} font-normal text-fg-light">{row.subtitle}</span>
 							{/if}
 						</button>
 					</li>

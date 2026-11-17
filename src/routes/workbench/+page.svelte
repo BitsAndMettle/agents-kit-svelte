@@ -6,6 +6,7 @@
 <script lang="ts">
 	import ApprovalCard from '$lib/agents/ApprovalCard.svelte';
 	import TodoList from '$lib/agents/TodoList.svelte';
+	import Popover from '$lib/primitives/overlays/Popover.svelte';
 	import ChatWorkbench from '$lib/workbench/ChatWorkbench.svelte';
 	import { pillClass } from '$lib/ui/styles';
 	import type {
@@ -155,6 +156,10 @@
 					<p class="text-[13px] text-fg-light">Ask the Referee what is happening.</p>
 				{/snippet}
 				{#snippet headerActions({ button })}
+					<!-- A repository chip, uncapped: on a phone it gives way and cuts its name short; Pause keeps its width. -->
+					<Popover title="Repository" description="BitsAndMettle/agents-kit-svelte" placement="bottom-end">
+						{#snippet trigger(part)}<button type="button" {...part} class="{button} min-w-0"><span class="truncate">BitsAndMettle/agents-kit-svelte</span></button>{/snippet}
+					</Popover>
 					<button type="button" class={button}>Pause</button>
 				{/snippet}
 			</ChatWorkbench>
