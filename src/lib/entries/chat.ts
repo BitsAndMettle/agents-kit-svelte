@@ -1,4 +1,4 @@
-/** Conversation and coding-agent UI: messages, composer, activity, todos, tool approval and results, action receipts, diffs, code, terminal, context meter, checkpoints and the chat workbench. */
+/** Conversation and coding-agent UI: messages, composer, activity, todos, tool approval and results, action receipts, diffs, code, terminal, context meter, account usage, checkpoints and the chat workbench. */
 
 export { default as AISidebar } from '../agents/AISidebar.svelte';
 export { default as AgentActivity } from '../agents/AgentActivity.svelte';
@@ -41,6 +41,8 @@ export { default as AgentContextMeter } from '../runtime/AgentContextMeter.svelt
 export { default as FileTree } from '../runtime/FileTree.svelte';
 export { default as Terminal } from '../runtime/Terminal.svelte';
 export { default as TestResults } from '../runtime/TestResults.svelte';
+export { default as UsagePill } from '../runtime/UsagePill.svelte';
+export { default as UsageRows } from '../runtime/UsageRows.svelte';
 import ChatWorkbench from '../workbench/ChatWorkbench.svelte';
 export { ChatWorkbench };
 /**
@@ -49,7 +51,8 @@ export { ChatWorkbench };
 export const TrailsideClaudeChat: typeof ChatWorkbench = ChatWorkbench;
 
 export * from '../state/chat-helpers';
-export { clockTime, formatElapsed, type TimeInput } from '../core/time';
+export * from '../state/usage';
+export { clockTime, dayTime, formatElapsed, type TimeInput } from '../core/time';
 export * from '../core/agent';
 export { groupCode, speakCode, timeLeft, formatRequestedAgo } from '../agents/device-approval';
 export type { TimeLeft } from '../agents/device-approval';

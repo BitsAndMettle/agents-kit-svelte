@@ -2048,7 +2048,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 />`
 	},
 
-	// 6. AI Elements & Coding (13 components)
+	// 6. AI Elements & Coding (15 components)
 	{
 		slug: 'agent-context-meter',
 		name: 'AgentContextMeter',
@@ -2072,6 +2072,48 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
   maxTokens={200000}
   {sources}
 />`
+	},
+	{
+		slug: 'usage-pill',
+		name: 'UsagePill',
+		category: 'AI Elements & Coding',
+		sveltePath: 'src/lib/runtime/UsagePill.svelte',
+		upstreamSource: 'Agents Kit Svelte · AgentContextMeter',
+		description:
+			'How many subscription accounts of one agent can still work, as a pill that opens on a row per account: its track and its status. Display only.',
+		usageSnippet: `<script lang="ts">
+  import { UsagePill, type AccountUsage } from 'agents-kit-svelte';
+
+  const accounts: AccountUsage[] = [
+    { label: 'Personal', agent: 'Claude Code', at: Date.now(), switchAt: 98, status: 'available',
+      windows: { week: { used: 61, resetsAt: Date.UTC(2026, 10, 21, 20) } } },
+    { label: 'Work', agent: 'Claude Code', status: 'out',
+      windows: { fiveHour: { used: 100, resetsAt: Date.UTC(2026, 10, 17, 18, 20) } } }
+  ];
+</script>
+
+<UsagePill {accounts} timeZone="Europe/Berlin">
+  <a href="/settings#subscriptions">Open Subscriptions</a>
+</UsagePill>`
+	},
+	{
+		slug: 'usage-rows',
+		name: 'UsageRows',
+		category: 'AI Elements & Coding',
+		sveltePath: 'src/lib/runtime/UsageRows.svelte',
+		upstreamSource: 'Agents Kit Svelte · ToolResult, Progress, Badge',
+		description:
+			'One row per subscription account: a slim track and a status badge. Inside a `ToolResult` it is the step that read usage; a rotation is a one-line `ToolResult` of its own.',
+		usageSnippet: `<script lang="ts">
+  import { ToolResult, UsageRows, type AccountUsage } from 'agents-kit-svelte';
+
+  let { accounts }: { accounts: AccountUsage[] } = $props();
+</script>
+
+<ToolResult tool="usage.read" summary="claude-code" meta="checked 12m ago">
+  <UsageRows {accounts} />
+</ToolResult>
+<ToolResult tool="rotated" summary="Spare → Personal at 98% weekly" meta="Tue 08:00" />`
 	},
 	{
 		slug: 'agent-checkpoint',
@@ -2787,7 +2829,10 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		description:
 			'Tokens spent against a budget, with the current burn rate, a projection to the end of the run, and a pulsing marker where the budget runs out. Pins handoffs, retries and escalations on the line.',
 		usageSnippet: `<script lang="ts">
-  import { TokenBurnChart, type BurnPoint, type RunMark } from 'agents-kit-svelte';
+  import { TokenBurnChart, usageBurn, type AccountUsage, type BurnPoint, type RunMark } from 'agents-kit-svelte';
+
+  let { account }: { account: AccountUsage } = $props();
+  const week = $derived(usageBurn(account, 'week'));
 
   const points: BurnPoint[] = [
     { t: 0, spent: 0 },
@@ -2805,7 +2850,10 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
   budget={20000}
   end={284}
   onSelectMark={(mark) => console.log('open', mark.id)}
-/>`
+/>
+
+<!-- A subscription window from one reading: the projection runs to the switch point. Never read: no chart. -->
+{#if week}<TokenBurnChart title="Personal · this week" {...week} />{/if}`
 	},
 	{
 		slug: 'run-replay-scrubber',

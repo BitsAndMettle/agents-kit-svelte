@@ -140,6 +140,36 @@ export interface ContextSourceItem {
 	category: 'system' | 'worktree' | 'conversation' | 'tools';
 }
 
+/** One limit window of a subscription account. */
+export interface UsageWindow {
+	/** Whole percent used, 0 to 100. */
+	used: number;
+	/** When the window resets, in epoch milliseconds. */
+	resetsAt: number;
+}
+
+/**
+ * `available` and `low` can take work; `switched` is past the switch point (it may still be the one in use);
+ * `out` is at its limit until a window resets; `off` is signed out or left out.
+ */
+export type AccountUsageStatus = 'available' | 'low' | 'switched' | 'out' | 'off';
+
+/** What one subscription account has used, as `UsagePill`, `UsageRows` and `usageBurn` draw it. */
+export interface AccountUsage {
+	/** The account's own name, e.g. `Personal`. */
+	label: string;
+	/** The agent or CLI it signs in to, e.g. `Claude Code`. */
+	agent: string;
+	/** When the windows were read, in epoch milliseconds. */
+	at?: number;
+	windows: { fiveHour?: UsageWindow; week?: UsageWindow };
+	/** The percent at which work moves to another account, e.g. 98. */
+	switchAt?: number;
+	status: AccountUsageStatus;
+	/** When an `out` account is back, in epoch milliseconds, when the refusal said so. It wins over the windows' resets. */
+	until?: number;
+}
+
 export interface CheckpointEntry {
 	id: string;
 	title: string;

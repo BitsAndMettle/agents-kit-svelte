@@ -37,16 +37,21 @@ export const SOLID_TONE_CLASS: Record<UiTone, string> = {
 	accent: 'bg-[color-mix(in_oklch,var(--ak-color-accent)_80%,var(--ak-color-fg))] text-fg-inverse',
 	success: 'bg-[color-mix(in_oklch,var(--ak-color-success)_78%,var(--ak-color-fg))] text-fg-inverse',
 	warning: 'bg-[color-mix(in_oklch,var(--ak-color-warning)_70%,var(--ak-color-fg))] text-fg-inverse',
-	danger: 'bg-[color-mix(in_oklch,var(--ak-color-danger)_80%,var(--ak-color-fg))] text-fg-inverse'
+	danger: 'bg-[color-mix(in_oklch,var(--ak-color-danger)_80%,var(--ak-color-fg))] text-fg-inverse',
+	info: 'bg-[color-mix(in_oklab,var(--ak-color-info)_80%,var(--ak-color-fg))] text-fg-inverse'
 };
 
-/** Legible text per tone for soft and outline looks: the tone mixed toward the foreground so small text clears 4.5:1 in both themes. */
+/**
+ * Legible text per tone for soft and outline looks: the tone mixed toward the foreground so small text clears 4.5:1 in
+ * both themes. `info` mixes in oklab, as its solid fill does: in oklch the warm foreground's hue would turn the blue plum or mint.
+ */
 export const READABLE_TONE_TEXT: Record<UiTone, string> = {
 	neutral: 'text-fg-light',
 	accent: 'text-[color-mix(in_oklch,var(--ak-color-accent)_55%,var(--ak-color-fg))]',
 	success: 'text-[color-mix(in_oklch,var(--ak-color-success)_55%,var(--ak-color-fg))]',
 	warning: 'text-[color-mix(in_oklch,var(--ak-color-warning)_50%,var(--ak-color-fg))]',
-	danger: 'text-[color-mix(in_oklch,var(--ak-color-danger)_55%,var(--ak-color-fg))]'
+	danger: 'text-[color-mix(in_oklch,var(--ak-color-danger)_55%,var(--ak-color-fg))]',
+	info: 'text-[color-mix(in_oklab,var(--ak-color-info)_55%,var(--ak-color-fg))]'
 };
 
 /** Outline text and border per tone. */
@@ -55,7 +60,8 @@ export const OUTLINE_TONE_CLASS: Record<UiTone, string> = {
 	accent: 'border border-accent-primary/40 bg-transparent',
 	success: 'border border-status-success/40 bg-transparent',
 	warning: 'border border-status-warning/40 bg-transparent',
-	danger: 'border border-status-danger/40 bg-transparent'
+	danger: 'border border-status-danger/40 bg-transparent',
+	info: 'border border-status-info/40 bg-transparent'
 };
 
 /** Resolved key cap: what to draw and what a screen reader should say. */

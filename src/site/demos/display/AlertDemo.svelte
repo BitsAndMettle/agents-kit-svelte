@@ -2,7 +2,7 @@
 	import { Alert } from '$lib/primitives/display';
 	import { buttonClass, type UiTone } from '$lib/ui/styles';
 
-	const tones: UiTone[] = ['neutral', 'accent', 'success', 'warning', 'danger'];
+	const tones: UiTone[] = ['neutral', 'accent', 'success', 'warning', 'danger', 'info'];
 	let dismissed = $state(false);
 	let announced = $state(false);
 </script>

@@ -3,7 +3,7 @@
 	import { Check } from '@lucide/svelte';
 	import type { UiTone } from '$lib/ui/styles';
 
-	const tones: UiTone[] = ['neutral', 'accent', 'success', 'warning', 'danger'];
+	const tones: UiTone[] = ['neutral', 'accent', 'success', 'warning', 'danger', 'info'];
 </script>
 
 <div class="flex flex-col gap-4">

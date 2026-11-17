@@ -231,3 +231,21 @@ export function projectBurn(points: { t: number; spent: number }[], end: number,
 	}
 	return { rate, projected, crossesAt };
 }
+
+/**
+ * Where the projection's line ends: at `end`, unless spend has a `limit` (a usage window's 100%). Then it ends where it
+ * meets the budget, or the limit when there is no budget, so it never reads past either; at the last sample when
+ * spend is already there.
+ *
+ * @param points - Cumulative spend samples, in time order.
+ * @param end - Time to project to.
+ * @param budget - Spend limit, if any.
+ * @param limit - The most spend can reach, if anything.
+ */
+export function projectionEnd(points: { t: number; spent: number }[], end: number, budget?: number, limit?: number): { t: number; spent: number } {
+	const last = points.at(-1);
+	const { rate, projected } = projectBurn(points, end, budget);
+	const stop = limit === undefined ? Infinity : Math.min(limit, budget ?? limit);
+	if (!last || projected <= stop) return { t: end, spent: projected };
+	return last.spent >= stop ? last : { t: last.t + (stop - last.spent) / rate, spent: stop };
+}

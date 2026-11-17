@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { SAMPLE_ARTIFACT_METADATA, SAMPLE_BLOCKED_ITEMS, SAMPLE_ARTIFACT_VERSIONS, SAMPLE_COMM_LOG, SAMPLE_EVAL_ITERATIONS, SAMPLE_FORM_FIELDS, SAMPLE_OPS_INCIDENTS, SAMPLE_OPS_METRICS, SAMPLE_OPS_SIGNALS, SAMPLE_PARALLEL_LANES, SAMPLE_ROUTES, SAMPLE_ROUTE_CLASSIFICATION, SAMPLE_ROUTING_HISTORY, SAMPLE_SUB_AGENTS, SAMPLE_TASKS, SAMPLE_TOOLS, SAMPLE_WORKFLOW_STEPS, SAMPLE_FLEET_NOW, SAMPLE_MACHINES } from '$lib/fixtures/workflows';
-	import { SAMPLE_AUTONOMY_LEVELS, SAMPLE_RISK_TOGGLE, SAMPLE_CHAIN_OF_THOUGHT, SAMPLE_ENV_VARIABLES, SAMPLE_PACKAGE_DEPENDENCIES, SAMPLE_PACKAGE_SCRIPTS, SAMPLE_PLAN_MILESTONES, SAMPLE_PREVIEW_LOGS, SAMPLE_PROMPT_SUGGESTIONS, SAMPLE_SCHEMA_PARAMETERS, SAMPLE_SCHEMA_REQUEST_BODY, SAMPLE_SCHEMA_RESPONSE_BODY, SAMPLE_SIDEBAR_RESOURCES, SAMPLE_STACK_SNIPPET, SAMPLE_STACK_TRACE, SAMPLE_VOICE_DEVICES, SAMPLE_VOICE_PERSONAS, SAMPLE_PRESENCE_NOW, SAMPLE_PRESENCE_SINCE, SAMPLE_WORK_STEPS, SAMPLE_RECEIPTS, SAMPLE_RECEIPTS_NOW, SAMPLE_APPROVAL_CODE, SAMPLE_APPROVAL_DEVICE, SAMPLE_APPROVAL_EXPIRES_AT, SAMPLE_APPROVAL_GRANTS, SAMPLE_APPROVAL_REQUESTED_AT, SAMPLE_CITED_ANSWER, SAMPLE_CITED_ASKED_BY, SAMPLE_CITED_QUESTION, SAMPLE_CITED_SOURCES, SAMPLE_CITED_SOURCES_MISMATCH, SAMPLE_DEVICE_NOW } from '$lib/fixtures/chat';
+	import { SAMPLE_AUTONOMY_LEVELS, SAMPLE_RISK_TOGGLE, SAMPLE_CHAIN_OF_THOUGHT, SAMPLE_ENV_VARIABLES, SAMPLE_PACKAGE_DEPENDENCIES, SAMPLE_PACKAGE_SCRIPTS, SAMPLE_PLAN_MILESTONES, SAMPLE_PREVIEW_LOGS, SAMPLE_PROMPT_SUGGESTIONS, SAMPLE_SCHEMA_PARAMETERS, SAMPLE_SCHEMA_REQUEST_BODY, SAMPLE_SCHEMA_RESPONSE_BODY, SAMPLE_SIDEBAR_RESOURCES, SAMPLE_STACK_SNIPPET, SAMPLE_STACK_TRACE, SAMPLE_VOICE_DEVICES, SAMPLE_VOICE_PERSONAS, SAMPLE_PRESENCE_NOW, SAMPLE_PRESENCE_SINCE, SAMPLE_WORK_STEPS, SAMPLE_RECEIPTS, SAMPLE_RECEIPTS_NOW, SAMPLE_APPROVAL_CODE, SAMPLE_APPROVAL_DEVICE, SAMPLE_APPROVAL_EXPIRES_AT, SAMPLE_APPROVAL_GRANTS, SAMPLE_APPROVAL_REQUESTED_AT, SAMPLE_CITED_ANSWER, SAMPLE_CITED_ASKED_BY, SAMPLE_CITED_QUESTION, SAMPLE_CITED_SOURCES, SAMPLE_CITED_SOURCES_MISMATCH, SAMPLE_DEVICE_NOW, SAMPLE_ACCOUNT_USAGE } from '$lib/fixtures/chat';
 	import { SAMPLE_CONTEXT_CHUNKS, SAMPLE_DIFF_ROWS, SAMPLE_FILTER_ROWS, SAMPLE_FINE_TUNE_FIELDS, SAMPLE_FLOWCHART_NODES, SAMPLE_INSIGHTS, SAMPLE_RECOMMENDATION_ALTERNATIVES, SAMPLE_RECOMMENDATION_REASONING, SAMPLE_RECORDS, SAMPLE_SEARCH_ITEMS, SAMPLE_SELECTION_ACTIONS, SAMPLE_TOOL_DIFFS, SAMPLE_TOOL_STEPS } from '$lib/fixtures/data';
 	import {
 		SAMPLE_BENTO_STATS,
@@ -152,6 +152,9 @@
 		ToolApproval,
 		ToolChips,
 		ToolResult,
+		UsagePill,
+		UsageRows,
+		usageBurn,
 		ChatWorkbench,
 		VoiceWaveVisualizer,
 		WebPreview
@@ -474,6 +477,7 @@
 		}
 	];
 
+	const sampleWeekBurn = usageBurn(SAMPLE_ACCOUNT_USAGE[0], 'week')!;
 	const sampleContextSources: ContextSourceItem[] = [
 		{ id: 'sys', label: 'System prompt and guardrails', tokens: 11_200, category: 'system' },
 		{ id: 'wt', label: 'Worktree diff and symbols', tokens: 24_600, category: 'worktree' },
@@ -1708,6 +1712,13 @@
 								<AgentThinkingIndicator detail="Claude Code 1.0 · Card 191 Attempt 1 · 18.4k tokens" />
 							{:else if item.slug === 'agent-context-meter'}
 								<div class="min-h-56"><AgentContextMeter usedTokens={64200} maxTokens={200000} sources={sampleContextSources} /></div>
+							{:else if item.slug === 'usage-pill'}
+								<div class="min-h-64"><UsagePill accounts={SAMPLE_ACCOUNT_USAGE} /></div>
+							{:else if item.slug === 'usage-rows'}
+								<div class="flex max-w-xl flex-col gap-2">
+									<ToolResult tool="usage.read" summary="claude-code" meta="checked 12m ago"><UsageRows accounts={SAMPLE_ACCOUNT_USAGE} /></ToolResult>
+									<ToolResult tool="rotated" summary="Spare → Personal at 98% weekly" meta="Tue 08:00" />
+								</div>
 							{:else if item.slug === 'agent-checkpoint'}
 								<AgentCheckpoint checkpoint={sampleCheckpoint} />
 							{:else if item.slug === 'chain-of-thought'}
@@ -1835,6 +1846,7 @@
 								<FeatureTimeline title="F-12 timeline" items={SAMPLE_TIMELINE_ITEMS} milestones={SAMPLE_TIMELINE_MILESTONES} today={SAMPLE_TIMELINE_TODAY} start={SAMPLE_FEATURE_START} />
 							{:else if item.slug === 'token-burn-chart'}
 								<TokenBurnChart title="Token burn" points={SAMPLE_BURN_POINTS} budget={SAMPLE_TOKEN_BUDGET} marks={SAMPLE_RUN_MARKS} />
+								<TokenBurnChart class="mt-4" title="Personal · this week" {...sampleWeekBurn} />
 							{:else if item.slug === 'run-replay-scrubber'}
 								<RunReplayScrubber duration={SAMPLE_RUN_DURATION} phases={SAMPLE_PHASE_BANDS} marks={SAMPLE_RUN_MARKS} />
 							{:else if item.slug === 'border-beam'}

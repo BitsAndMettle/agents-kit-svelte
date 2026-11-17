@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cn } from '../ui/cn';
+	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { pillClass } from '../ui/styles';
 	import { Check, ChevronDown, Copy, SquareTerminal } from '@lucide/svelte';
@@ -15,6 +16,8 @@
 		meta?: string;
 		defaultOpen?: boolean;
 		onRetry?: () => void;
+		/** A body under the header that is always shown, e.g. `UsageRows`. */
+		children?: Snippet;
 		class?: string;
 	}
 
@@ -28,6 +31,7 @@
 		meta,
 		defaultOpen = true,
 		onRetry,
+		children,
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -127,6 +131,10 @@
 			{/if}
 		</div>
 	</div>
+
+	{#if children}
+		<div class="border-t border-chat-border/70 px-3 py-1.5">{@render children()}</div>
+	{/if}
 
 	{#if output}
 		<AgentDisclosure id={panelId} open={isOpen}>

@@ -52,21 +52,24 @@
 		accent: 'border-accent-primary/30 bg-accent-subtle',
 		success: 'border-status-success/30 bg-status-success-subtle',
 		warning: 'border-status-warning/30 bg-status-warning-subtle',
-		danger: 'border-status-danger/30 bg-status-danger-subtle'
+		danger: 'border-status-danger/30 bg-status-danger-subtle',
+		info: 'border-status-info/30 bg-status-info-subtle'
 	};
 	const ICON_TONES: Record<UiTone, string> = {
 		neutral: 'text-fg-light',
 		accent: 'text-accent-primary',
 		success: 'text-status-success',
 		warning: 'text-status-warning',
-		danger: 'text-status-danger'
+		danger: 'text-status-danger',
+		info: 'text-status-info'
 	};
 	const ICONS: Record<UiTone, Component> = {
 		neutral: Info,
 		accent: Info,
 		success: CircleCheck,
 		warning: TriangleAlert,
-		danger: OctagonAlert
+		danger: OctagonAlert,
+		info: Info
 	};
 
 	let role = $derived(live === false ? undefined : live === 'polite' ? 'status' : 'alert');

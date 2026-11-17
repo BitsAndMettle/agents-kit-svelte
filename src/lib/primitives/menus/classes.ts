@@ -20,7 +20,8 @@ export const MENU_ITEM_TONES = {
 	accent: 'text-accent-primary data-highlighted:bg-accent-subtle',
 	success: 'text-status-success data-highlighted:bg-status-success-subtle',
 	warning: 'text-status-warning data-highlighted:bg-status-warning-subtle',
-	danger: 'text-status-danger data-highlighted:bg-status-danger-subtle'
+	danger: 'text-status-danger data-highlighted:bg-status-danger-subtle',
+	info: 'text-status-info data-highlighted:bg-status-info-subtle'
 } as const;
 
 /** Shortcut hint at the end of a menu row. */

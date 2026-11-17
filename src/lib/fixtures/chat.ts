@@ -3,7 +3,7 @@
  * Import from `agents-kit-svelte/fixtures`. Components never fall back to it.
  */
 
-import type { ActionReceiptData, CitedSource, DeviceApprovalDevice, WorkStep } from '../types';
+import type { AccountUsage, ActionReceiptData, CitedSource, DeviceApprovalDevice, WorkStep } from '../types';
 import type { AutonomyLevel } from '../agents/level-dial';
 import type { SidebarResource } from '../agents/AISidebar.svelte';
 import type { SchemaParameterItem, SchemaPropertyItem } from '../ai-elements/SchemaDisplay.svelte';
@@ -490,3 +490,31 @@ export const SAMPLE_CITED_SOURCES_MISMATCH: CitedSource[] = [
 
 /** Who asked the `CitedAnswer` sample question. */
 export const SAMPLE_CITED_ASKED_BY = 'Builder on card #3412';
+
+/** Sample data for `UsagePill`, `UsageRows` and `usageBurn`: three Claude Code accounts read on Tue 17 Nov 2026, 14:06 UTC. */
+export const SAMPLE_ACCOUNT_USAGE: AccountUsage[] = [
+	{
+		label: 'Personal',
+		agent: 'Claude Code',
+		at: Date.UTC(2026, 10, 17, 14, 6),
+		windows: { fiveHour: { used: 34, resetsAt: Date.UTC(2026, 10, 17, 17) }, week: { used: 66, resetsAt: Date.UTC(2026, 10, 21, 20) } },
+		switchAt: 98,
+		status: 'available'
+	},
+	{
+		label: 'Work',
+		agent: 'Claude Code',
+		at: Date.UTC(2026, 10, 17, 14, 6),
+		windows: { fiveHour: { used: 100, resetsAt: Date.UTC(2026, 10, 17, 18, 20) }, week: { used: 72, resetsAt: Date.UTC(2026, 10, 20, 9) } },
+		switchAt: 98,
+		status: 'out'
+	},
+	{
+		label: 'Spare',
+		agent: 'Claude Code',
+		at: Date.UTC(2026, 10, 17, 14, 6),
+		windows: { week: { used: 98, resetsAt: Date.UTC(2026, 10, 19, 20) } },
+		switchAt: 98,
+		status: 'switched'
+	}
+];

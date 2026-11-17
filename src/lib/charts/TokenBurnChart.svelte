@@ -5,7 +5,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { Flame } from '@lucide/svelte';
 	import { rise } from '../state/motion.svelte';
-	import { areaPath, formatClock, formatCompact, linePath, niceMax, projectBurn, scaleLinear, ticks } from './scale';
+	import { areaPath, formatClock, formatCompact, linePath, niceMax, projectBurn, projectionEnd, scaleLinear, ticks } from './scale';
 	import type { BurnPoint, RunMark } from './types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
@@ -26,6 +26,21 @@
 		rateLabel?: string;
 		/** Multiplier from spend per t unit to the displayed rate. Defaults to 60 (per second → per minute). */
 		rateScale?: number;
+		/** Formats a spend value for the header, axis and tooltip. Defaults to compact tokens (`12.4k`). */
+		formatValue?: (value: number) => string;
+		/** Word after the budget in the header. */
+		unit?: string;
+		/** Names the budget line, e.g. `Switch point`. */
+		budgetLabel?: string;
+		/**
+		 * The most spend can reach, e.g. `100` for a usage window. It makes the budget a switch point, not a ceiling: drawn
+		 * in info blue, read as reached or passed, the projection ends where it meets it, and the axis stops at `limit`.
+		 */
+		limit?: number;
+		/** Spacing of the time ticks in `t` units, e.g. `24` for days when `t` is in hours. Defaults to round numbers. */
+		timeStep?: number;
+		/** Names the chart for a screen reader when there is no `title`. */
+		label?: string;
 		/** Called when the person clicks a mark. */
 		onSelectMark?: (mark: RunMark) => void;
 		/** Called when the person clicks the plot: the spend at that time. */
@@ -43,6 +58,12 @@
 		formatTime = formatClock,
 		rateLabel = '/min',
 		rateScale = 60,
+		formatValue = formatCompact,
+		unit = 'tokens',
+		budgetLabel = 'Budget',
+		limit,
+		timeStep,
+		label = 'Token burn',
 		onSelectMark,
 		onSelectPoint,
 		class: className = '',
@@ -58,8 +79,18 @@
 	let last = $derived(points.at(-1));
 	let tEnd = $derived(Math.max(end ?? 0, last?.t ?? 0, 1));
 	let burn = $derived(projectBurn(points, tEnd, budget));
-	let projecting = $derived(!!last && last.t < tEnd);
+	/** Where the dashed projection ends: the end of the run, or on a usage chart's switch point. */
+	let ahead = $derived(projectionEnd(points, tEnd, budget, limit));
+	let projecting = $derived(!!last && last.t < ahead.t);
+	let toEnd = $derived(projecting && ahead.t >= tEnd);
 	let over = $derived(budget !== undefined && burn.crossesAt !== null);
+	let passed = $derived(over && !!last && burn.crossesAt! <= last.t);
+	/** A usage chart's switch point is a hand-over, drawn in info blue; a token budget is a ceiling, drawn in danger red. */
+	let ink = $derived(
+		limit === undefined
+			? { line: 'stroke-status-danger', text: 'fill-status-danger', ring: 'fill-status-danger/20', dot: 'fill-status-danger', word: 'text-status-danger' }
+			: { line: 'stroke-status-info', text: 'fill-status-info', ring: 'fill-status-info/20', dot: 'fill-status-info', word: 'text-status-info' }
+	);
 
 	const yTop = new Tween(1, { duration: 420, easing: cubicOut });
 	const spentShown = new Spring(0, { stiffness: 0.1, damping: 0.8 });
@@ -67,8 +98,8 @@
 	let primed = false;
 	$effect(() => {
 		const instant = !primed || prefersReducedMotion.current;
-		const top = Math.max(budget ?? 0, burn.projected, last?.spent ?? 0) * 1.08;
-		void yTop.set(niceMax(top, 4), { duration: instant ? 0 : 420 });
+		const top = limit ?? niceMax(Math.max(budget ?? 0, ahead.spent, last?.spent ?? 0) * 1.08, 4);
+		void yTop.set(top, { duration: instant ? 0 : 420 });
 		void spentShown.set(last?.spent ?? 0, { instant: prefersReducedMotion.current });
 		if (!primed) {
 			primed = true;
@@ -80,7 +111,12 @@
 	let innerH = $derived(Math.max(40, height - PAD.top - PAD.bottom));
 	let x = $derived(scaleLinear([0, tEnd], [0, innerW]));
 	let y = $derived(scaleLinear([0, yTop.current], [innerH, 0]));
-	let xTicks = $derived(ticks(0, tEnd, Math.max(2, Math.floor(innerW / 90))));
+	let xTicks = $derived.by(() => {
+		const count = Math.max(2, Math.floor(innerW / 90));
+		if (!timeStep) return ticks(0, tEnd, count);
+		const step = timeStep * Math.ceil(tEnd / timeStep / count);
+		return Array.from({ length: Math.floor(tEnd / step + 1e-9) + 1 }, (_, i) => i * step);
+	});
 	let yTicks = $derived(ticks(0, yTop.current, 3).filter((t) => t <= yTop.current + 1e-9));
 	let line = $derived(points.map((p): [number, number] => [x(p.t), y(p.spent)]));
 
@@ -96,8 +132,12 @@
 		return points[points.length - 1].spent;
 	}
 	function rateAt(t: number): number {
-		const before = spentAt(Math.max(0, t - 20));
-		return (spentAt(t) - before) / Math.max(1, Math.min(20, t));
+		const span = Math.min(20, t);
+		return span > 0 ? (spentAt(t) - spentAt(t - span)) / span : 0;
+	}
+	/** A spend value with its unit, when there is one. */
+	function amount(value: number): string {
+		return unit ? `${formatValue(value)} ${unit}` : formatValue(value);
 	}
 
 	function localT(event: PointerEvent): number {
@@ -118,7 +158,7 @@
 	}
 
 	let pctUsed = $derived(budget ? (spentShown.current / budget) * 100 : null);
-	let tone = $derived(pctUsed === null ? 'text-fg-main' : pctUsed >= 90 ? 'text-status-danger' : pctUsed >= 75 ? 'text-status-warning' : 'text-fg-main');
+	let tone = $derived(pctUsed === null || limit !== undefined ? 'text-fg-main' : pctUsed >= 90 ? 'text-status-danger' : pctUsed >= 75 ? 'text-status-warning' : 'text-fg-main');
 	let visibleMarks = $derived(marks.filter((m) => m.t <= (last?.t ?? 0)));
 	const MARK_TONE: Record<NonNullable<RunMark['kind']>, string> = {
 		handoff: 'fill-accent-primary',
@@ -134,27 +174,27 @@
 		<div>
 			{#if title}<h3 class="text-sm font-semibold text-fg-main">{title}</h3>{/if}
 			<p class="mt-1 flex items-baseline gap-1.5">
-				<span class={cn('text-[22px] leading-none font-semibold tabular-nums transition-colors duration-300', tone)}>{formatCompact(Math.round(spentShown.current))}</span>
-				{#if budget}<span class="text-[13px] text-fg-light">of {formatCompact(budget)} tokens</span>{/if}
+				<span class={cn('text-[22px] leading-none font-semibold tabular-nums transition-colors duration-300', tone)}>{formatValue(Math.round(spentShown.current))}</span>
+				{#if budget}<span class="text-[13px] text-fg-light">of {amount(budget)}</span>{/if}
 			</p>
 		</div>
 		<dl class="flex gap-5 text-[11px]">
 			<div>
 				<dt class="text-fg-light">Burn rate</dt>
-				<dd class="mt-0.5 flex items-center gap-1 font-medium text-fg-main tabular-nums"><Flame class={cn('size-3', over ? 'text-status-danger' : 'text-status-warning')} aria-hidden="true" />{formatCompact(Math.round(burn.rate * rateScale))}{rateLabel}</dd>
+				<dd class="mt-0.5 flex items-center gap-1 font-medium text-fg-main tabular-nums"><Flame class={cn('size-3', over && limit === undefined ? 'text-status-danger' : 'text-status-warning')} aria-hidden="true" />{formatCompact(Math.round(burn.rate * rateScale))}{rateLabel}</dd>
 			</div>
-			{#if projecting}
+			{#if toEnd}
 				<div>
 					<dt class="text-fg-light">Projected at end</dt>
-					<dd class={cn('mt-0.5 font-medium tabular-nums', budget && burn.projected > budget ? 'text-status-danger' : 'text-fg-main')}>{formatCompact(Math.round(burn.projected))}</dd>
+					<dd class={cn('mt-0.5 font-medium tabular-nums', budget && ahead.spent > budget ? 'text-status-danger' : 'text-fg-main')}>{formatValue(Math.round(ahead.spent))}</dd>
 				</div>
 			{/if}
 			{#if budget}
 				<div>
-					<dt class="text-fg-light">Budget</dt>
+					<dt class="text-fg-light">{budgetLabel}</dt>
 					{#key over}
-						<dd class={cn('mt-0.5 font-medium', over ? 'text-status-danger' : 'text-status-success')} in:rise={{ y: 4, duration: 180 }}>
-							{#if burn.crossesAt !== null}{last && burn.crossesAt <= last.t ? 'Over' : 'Runs out'} at {formatTime(burn.crossesAt)}{:else}{Math.round(pctUsed ?? 0)}% used{/if}
+						<dd class={cn('mt-0.5 font-medium', over ? ink.word : 'text-status-success')} in:rise={{ y: 4, duration: 180 }}>
+							{#if burn.crossesAt === null}{limit === undefined ? `${Math.round(pctUsed ?? 0)}% used` : 'Not reached'}{:else if limit !== undefined}{passed ? 'Passed' : `Reached ${formatTime(burn.crossesAt)}`}{:else}{passed ? 'Over' : 'Runs out'} at {formatTime(burn.crossesAt)}{/if}
 						</dd>
 					{/key}
 				</div>
@@ -168,11 +208,11 @@
 			{height}
 			class="block cursor-crosshair touch-none overflow-visible outline-none select-none focus-visible:rounded-control focus-visible:ring-2 focus-visible:ring-accent-primary/40"
 			role="slider"
-			aria-label="{title ?? 'Token burn'}. Use the arrow keys to step through time."
+			aria-label="{title ?? label}. Use the arrow keys to step through time."
 			aria-valuemin={0}
 			aria-valuemax={Math.round(last?.t ?? 0)}
 			aria-valuenow={Math.round(activeT ?? 0)}
-			aria-valuetext={activeT === null ? 'No time selected' : `${formatTime(activeT)}: ${formatCompact(Math.round(spentAt(activeT)))} tokens`}
+			aria-valuetext={activeT === null ? 'No time selected' : `${formatTime(activeT)}: ${amount(Math.round(spentAt(activeT)))}`}
 			tabindex="0"
 			onpointermove={(e) => (activeT = localT(e))}
 			onpointerleave={() => (activeT = null)}
@@ -187,7 +227,7 @@
 				</linearGradient>
 			</defs>
 			<g transform="translate({PAD.left},{PAD.top})">
-				{#if budget}
+				{#if budget && limit === undefined}
 					{@const y75 = Math.max(0, y(budget * 0.75))}
 					{@const y90 = Math.max(0, y(budget * 0.9))}
 					<rect x="0" y={y90} width={innerW} height={Math.max(0, y75 - y90)} class="fill-status-warning-subtle/60" />
@@ -196,7 +236,7 @@
 				{#each yTicks as t (t)}
 					<g transform="translate(0,{y(t)})">
 						<line x2={innerW} class="stroke-canvas-border" stroke-dasharray={t === 0 ? undefined : '2 4'} />
-						<text x="-8" dy="0.32em" text-anchor="end" class="fill-fg-light text-[10px] tabular-nums">{formatCompact(t)}</text>
+						<text x="-8" dy="0.32em" text-anchor="end" class="fill-fg-light text-[10px] tabular-nums">{formatValue(t)}</text>
 					</g>
 				{/each}
 				{#each xTicks as t (t)}
@@ -204,8 +244,8 @@
 				{/each}
 
 				{#if budget}
-					<line x1="0" x2={innerW} y1={y(budget)} y2={y(budget)} class="stroke-status-danger" stroke-width="1.5" stroke-dasharray="6 4" />
-					<text x={innerW + 6} y={y(budget) + (projecting && Math.abs(y(burn.projected) - y(budget)) < 12 ? (burn.projected > budget ? 6 : -6) : 0)} dy="0.32em" class="fill-status-danger text-[10px] font-medium">Budget</text>
+					<line x1="0" x2={innerW} y1={y(budget)} y2={y(budget)} class={ink.line} stroke-width="1.5" stroke-dasharray="6 4" />
+					<text x={innerW + 6} y={y(budget) + (toEnd && Math.abs(y(ahead.spent) - y(budget)) < 12 ? (ahead.spent > budget ? 6 : -6) : 0)} dy="0.32em" class={cn(ink.text, 'text-[10px] font-medium')}>{budgetLabel}</text>
 				{/if}
 
 				<g clip-path="url(#{uid}-reveal)">
@@ -219,19 +259,21 @@
 					<line
 						x1={x(last.t)}
 						y1={y(last.spent)}
-						x2={x(tEnd)}
-						y2={y(burn.projected)}
-						class={cn('ak-burn-projection transition-colors duration-300', budget && burn.projected > budget ? 'stroke-status-danger' : 'stroke-fg-light')}
+						x2={x(ahead.t)}
+						y2={y(ahead.spent)}
+						class={cn('ak-burn-projection transition-colors duration-300', budget && ahead.spent > budget ? 'stroke-status-danger' : 'stroke-fg-light')}
 						stroke-width="1.5"
 						stroke-dasharray="4 4"
 						style:opacity={reveal.current}
 					/>
-					<text x={x(tEnd) + 6} y={y(burn.projected) + (budget && Math.abs(y(burn.projected) - y(budget)) < 12 ? (burn.projected > budget ? -10 : 10) : 0)} dy="0.32em" class={cn('text-[10px] tabular-nums', budget && burn.projected > budget ? 'fill-status-danger' : 'fill-fg-light')} style:opacity={reveal.current}>{formatCompact(Math.round(burn.projected))}</text>
+					{#if toEnd}
+						<text x={x(tEnd) + 6} y={y(ahead.spent) + (budget && Math.abs(y(ahead.spent) - y(budget)) < 12 ? (ahead.spent > budget ? -10 : 10) : 0)} dy="0.32em" class={cn('text-[10px] tabular-nums', budget && ahead.spent > budget ? 'fill-status-danger' : 'fill-fg-light')} style:opacity={reveal.current}>{formatValue(Math.round(ahead.spent))}</text>
+					{/if}
 				{/if}
 				{#if budget && burn.crossesAt !== null && burn.crossesAt <= tEnd}
 					<g transform="translate({x(burn.crossesAt)},{y(budget)})" style:opacity={reveal.current}>
-						<circle r="9" class="ak-burn-ring fill-status-danger/20" />
-						<circle r="4" class="fill-status-danger stroke-card-bg" stroke-width="2" />
+						<circle r="9" class={cn('ak-burn-ring', ink.ring)} />
+						<circle r="4" class={cn(ink.dot, 'stroke-card-bg')} stroke-width="2" />
 					</g>
 				{/if}
 
@@ -279,7 +321,7 @@
 					in:rise={{ y: 3, duration: 120 }}
 				>
 					<p class="font-medium text-fg-main">{m.label}</p>
-					<p class="text-fg-light tabular-nums">{formatTime(m.t)} · {formatCompact(Math.round(spentAt(m.t)))} spent</p>
+					<p class="text-fg-light tabular-nums">{formatTime(m.t)} · {formatValue(Math.round(spentAt(m.t)))} spent</p>
 				</div>
 			{/if}
 		{:else if activeT !== null}
@@ -290,7 +332,7 @@
 				style:left="{left}px"
 			>
 				<p class="font-medium text-fg-main tabular-nums">{formatTime(activeT)}</p>
-				<p class="mt-0.5 flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Spent</span><span class="text-fg-main">{formatCompact(Math.round(spent))}{#if budget}<span class="ml-1 text-fg-light">{Math.round((spent / budget) * 100)}%</span>{/if}</span></p>
+				<p class="mt-0.5 flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Spent</span><span class="text-fg-main">{formatValue(Math.round(spent))}{#if budget && limit === undefined}<span class="ml-1 text-fg-light">{Math.round((spent / budget) * 100)}%</span>{/if}</span></p>
 				<p class="flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Rate</span><span class="text-fg-main">{formatCompact(Math.round(rateAt(activeT) * rateScale))}{rateLabel}</span></p>
 			</div>
 		{/if}
