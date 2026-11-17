@@ -1,5 +1,11 @@
 # agents-kit-svelte
 
+## 0.12.0
+
+### Minor Changes
+
+- 47d1afe: The parts of a settings page. `SectionNav` (primitives) draws a page's sections as links in a named `<nav>`, the one whose `href` is `current` marked `aria-current="page"`: a column from 768px, one row that scrolls sideways inside the nav below it, links `min-h-11` (`min-h-9` with a mouse). `Table` (primitives) is a real `<table>` named by its required `aria-label`, on `SURFACE.card` that scrolls a wide table inside itself: a `<colgroup>` sized by each column's `class`, a header row of `<th scope="col">` and your rows in the body, whose bare `<td>` and `<th scope="row">` cells it pads, separates with a hairline and sets in 13px, row names in medium. A column with `hideLabel` keeps its header for screen readers only, and when every column hides its label the header row is not drawn. `UsageTable` (chat) is a `Table` of one agent's accounts on one machine, counted from 1: a `Progress` per window named "<label> 5-hour window" and "<label> Week" with what is left and when it resets as its value text ("66% left · 16:40", "39% left · Thu 20:00", "Resets 18:20"), in info from the switch point, an empty track and "100% left" when an account was read with no window running, and a dash spoken "No reading" when it was never read; the status is a `Badge` in its own column, "Available" in success, `offLabel` (default "Off") for an off account, `unreadLabel` (default "Not read yet", never green) for one that can take work and was never read, else `usageText`'s words. `usageWindowText` gives one window's caption. `SettingsForm` draws a number with `options` as a group of `aria-pressed` buttons named and described by its row, each option's `value` the number as text; a press on the pressed option does nothing, and a refused press snaps back. Nothing that exists changes its markup, its words or a default; `UsageRows` is untouched.
+
 ## 0.11.0
 
 ### Minor Changes
