@@ -16,6 +16,8 @@
 @layer agents-kit {
 	:where(:root, .ak) {
 		interpolate-size: allow-keywords;
+		/* Scrollbars and native controls follow the palette. */
+		color-scheme: light;
 
 		/* Type */
 		--ak-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -103,6 +105,8 @@
 
 	:where(.dark, [data-theme="dark"]),
 	:where(.dark, [data-theme="dark"]) :where(.ak) {
+		color-scheme: dark;
+
 		/* Surfaces and text */
 		--ak-color-canvas: oklch(0.2 0.005 70);
 		--ak-color-canvas-subtle: oklch(0.235 0.006 70);
@@ -175,6 +179,8 @@
 	@media (prefers-color-scheme: dark) {
 		:where([data-theme="system"]),
 		:where([data-theme="system"]) :where(.ak) {
+			color-scheme: dark;
+
 			/* Surfaces and text */
 			--ak-color-canvas: oklch(0.2 0.005 70);
 			--ak-color-canvas-subtle: oklch(0.235 0.006 70);

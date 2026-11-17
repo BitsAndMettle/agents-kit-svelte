@@ -70,8 +70,10 @@ test('conversations: a sidebar from 1024px and tabs below, or tabs only in panel
 	assert.match(auto, /<aside[^>]*aria-label="Conversations"[^>]*lg:flex/);
 	assert.match(auto, /role="tablist"/);
 	assert.match(auto, /lg:hidden/);
-	assert.match(auto, /aria-current="true"[^>]*>[\s\S]*?First[\s\S]*?Nov 12 · devbox/);
-	assert.match(auto, /New conversation/);
+	assert.match(auto, /aria-current="true"[^>]*>[\s\S]*?First[\s\S]*?Nov 12[\s\S]*?devbox/);
+	// The rail's head is one New-conversation row; "Conversations" is only its name.
+	assert.match(auto, /<aside aria-label="Conversations"[^>]*>(<!--[^>]*-->)?<button[^>]*>[\s\S]*?New conversation\s*<\/button>/);
+	assert.doesNotMatch(auto, /<h2[^>]*>Conversations/);
 
 	const panel = html(ChatWorkbench, { conversations, layout: 'panel' });
 	assert.doesNotMatch(panel, /<aside/);
@@ -80,6 +82,44 @@ test('conversations: a sidebar from 1024px and tabs below, or tabs only in panel
 
 	const none = html(ChatWorkbench, {});
 	assert.doesNotMatch(none, /<aside|role="tablist"/);
+});
+
+test('conversation rows: a label above each run of a group, a dot by key, the date at the end of one line', () => {
+	const out = html(ChatWorkbench, {
+		conversations: [
+			{ id: 'q', title: 'Questions', subtitle: 'Asked by the agents' },
+			{ id: 'a', title: 'Alpha', date: '14:02', group: 'Today', mark: 'example' },
+			{ id: 'b', title: 'Beta', date: '09:15', group: 'Today', mark: 'website', subtitle: 'devbox' },
+			{ id: 'c', title: 'Gamma', date: '1d', group: 'Yesterday', mark: 'example' },
+			{ id: 'd', title: 'Delta', date: '4d', group: 'Today' }
+		]
+	});
+	const list = out.slice(out.indexOf('<aside'), out.indexOf('</aside>'));
+	// A label per run: Today twice, since its rows are not together.
+	assert.deepEqual([...list.matchAll(/<p class="[^"]*">(\w+)<\/p>/g)].map((m) => m[1]), ['Today', 'Yesterday', 'Today']);
+	// The dot is spoken as its key and coloured by it: the same key, the same colour, and these two keys land on different ones.
+	const dots = [...list.matchAll(/role="img" aria-label="([\w-]+)"[^>]*style="background-color: var\((--ak-chart-[1-6])\)"/g)].map((m) => [m[1], m[2]]);
+	assert.deepEqual(dots.map(([name]) => name), ['example', 'website', 'example']);
+	assert.equal(dots[0][1], dots[2][1]);
+	assert.notEqual(dots[0][1], dots[1][1]);
+	assert.match(list, /Alpha<\/span>(\s|<!--[^>]*-->)*<span[^>]*>14:02<\/span>/);
+	// The subtitle is a second line only on a row without a mark.
+	assert.match(list, /Questions[\s\S]*?Asked by the agents/);
+	assert.doesNotMatch(list, /devbox/);
+	assert.doesNotMatch(out, /bg-chat-user\/30/);
+	assert.match(out, /<aside aria-label="Conversations" class="[^"]*bg-canvas-secondary/);
+});
+
+test('the header mark can be left out', () => {
+	assert.match(html(ChatWorkbench, { title: 'Referee' }), /bg-chat-accent-subtle/);
+	assert.doesNotMatch(html(ChatWorkbench, { title: 'Referee', headerMark: false }), /bg-chat-accent-subtle/);
+});
+
+test('each palette says its color-scheme, so scrollbars follow dark', async () => {
+	const css = await readFile(new URL('../src/app.css', import.meta.url), 'utf8');
+	assert.match(css, /:where\(:root, \.ak\) \{[^}]*color-scheme: light;/);
+	assert.match(css, /:where\(\.dark, \[data-theme="dark"\]\) :where\(\.ak\) \{\s*color-scheme: dark;/);
+	assert.match(css, /:where\(\[data-theme="system"\]\) :where\(\.ak\) \{\s*color-scheme: dark;/);
 });
 
 test('message status, empty state, footer, trailing and header action snippets', () => {

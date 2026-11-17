@@ -561,7 +561,7 @@
 		<!-- Sidebar -->
 		<aside
 			aria-label="Runs and worktree files"
-			class="hidden min-h-0 w-60 shrink-0 flex-col gap-5 overflow-y-auto bg-chat-user/30 p-3.5 lg:flex"
+			class="hidden min-h-0 w-60 shrink-0 flex-col gap-5 overflow-y-auto bg-canvas-secondary p-3.5 lg:flex"
 		>
 			<div>
 				<h2 class="px-1 text-[11px] font-medium text-fg-light">Runs</h2>
