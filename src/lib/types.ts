@@ -146,6 +146,8 @@ export interface UsageWindow {
 	used: number;
 	/** When the window resets, in epoch milliseconds. */
 	resetsAt: number;
+	/** Earlier readings of this window, oldest first: `usageBurn` draws the line through them. */
+	points?: { at: number; used: number }[];
 }
 
 /**
