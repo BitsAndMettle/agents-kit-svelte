@@ -16,10 +16,10 @@
 	let { accounts, timeZone = 'UTC', class: className = '', ...rest }: Props = $props();
 </script>
 
-<ul {...rest} class={cn('@container flex flex-col text-[13px]', className)}>
-	{#each accounts as account (account.agent + account.label)}
-		{@const text = usageText(account, timeZone)}
-		<li class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2 @md:grid-cols-[5rem_minmax(0,1fr)_auto]">
+<!-- From 28rem every row shares the list's columns, so the tracks start and end at the same x and compare by length. -->
+<ul {...rest} class={cn('@container grid grid-cols-[5rem_minmax(0,1fr)_auto] gap-x-3 text-[13px]', className)}>
+	{#each accounts as account}
+		<li class="col-span-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-2 @md:grid-cols-subgrid">
 			<span class="truncate font-medium text-fg-main">{account.label}</span>
 			<Progress
 				class="order-last col-span-2 @md:order-none @md:col-span-1"
@@ -27,9 +27,8 @@
 				value={usageWindow(account)?.used ?? 0}
 				tone={USAGE_TONE[account.status]}
 				aria-label="{account.label} usage"
-				valueText={text}
 			/>
-			<Badge tone={USAGE_TONE[account.status]}>{text}</Badge>
+			<Badge class="justify-self-end" tone={USAGE_TONE[account.status]}>{usageText(account, timeZone)}</Badge>
 		</li>
 	{/each}
 </ul>

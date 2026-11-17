@@ -20,7 +20,7 @@ One way to say each thing, across every primitive. When a prop names a concept b
 
 ## Look
 
-- **`tone`** is colour meaning and always takes `UiTone` (`neutral | accent | success | warning | danger`). Menu items and AlertDialog use it too.
+- **`tone`** is colour meaning and always takes `UiTone` (`neutral | accent | success | warning | danger | info`). Menu items and AlertDialog use it too.
 - **`variant`** is shape/emphasis (`solid | soft | outline | ghost`, and Button's own `primary | secondary | ghost | danger | accent`, kept because the kit's `buttonClass` recipe and common usage expect a destructive *variant*).
 - **`size`** is `'sm' | 'md' | 'lg'`, default `'md'`, for every control that sits in a form row, so Input, NativeSelect, Select and Combobox line up. Icon-only sizes are separate (`icon-sm`, …). Display-only components may extend the scale (`xs`, `xl`) but keep `md` as default.
 - **`placement`** accepts `OverlayPlacement` (`'bottom-start'` strings or a full `Placement`) everywhere, resolved with `toPlacement` from `src/lib/primitives/placement.ts`.

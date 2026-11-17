@@ -166,6 +166,8 @@ export interface AccountUsage {
 	/** The percent at which work moves to another account, e.g. 98. */
 	switchAt?: number;
 	status: AccountUsageStatus;
+	/** When an `out` account is back, in epoch milliseconds, when the refusal said so. It wins over the windows' resets. */
+	until?: number;
 }
 
 export interface CheckpointEntry {

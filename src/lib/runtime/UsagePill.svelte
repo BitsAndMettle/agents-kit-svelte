@@ -27,10 +27,10 @@
 	let free = $derived(accounts.filter(usageFree).length);
 </script>
 
-<div {...rest} class={cn('inline-flex flex-col items-start gap-2 text-xs', className)}>
+<div {...rest} class={cn('inline-flex max-w-full flex-col items-start gap-2 text-xs', className)}>
 	<button type="button" aria-expanded={open} aria-controls={panelId} onclick={() => (open = !open)} class={pillClass('secondary', 'sm')}>
 		<span aria-hidden="true" class={cn(PROGRESS_TRACK_CLASS, 'w-10')}>
-			<span class={progressFillClass(free ? 'success' : 'neutral')} style:width="{accounts.length ? (free / accounts.length) * 100 : 0}%"></span>
+			<span class={progressFillClass('success')} style:width="{accounts.length ? (free / accounts.length) * 100 : 0}%"></span>
 		</span>
 		<span class="font-medium">{accounts[0]?.agent ?? 'Usage'} · {free} of {accounts.length} free</span>
 		<ChevronDown aria-hidden="true" class="size-3.5 text-fg-light transition-transform duration-150 {open ? 'rotate-180' : ''}" />

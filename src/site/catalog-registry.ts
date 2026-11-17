@@ -2832,6 +2832,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
   import { TokenBurnChart, usageBurn, type AccountUsage, type BurnPoint, type RunMark } from 'agents-kit-svelte';
 
   let { account }: { account: AccountUsage } = $props();
+  const week = $derived(usageBurn(account, 'week'));
 
   const points: BurnPoint[] = [
     { t: 0, spent: 0 },
@@ -2851,8 +2852,8 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
   onSelectMark={(mark) => console.log('open', mark.id)}
 />
 
-<!-- A subscription window from one reading: the projection runs to the switch point. -->
-<TokenBurnChart title="Personal · this week" {...usageBurn(account, 'week')!} />`
+<!-- A subscription window from one reading: the projection runs to the switch point. Never read: no chart. -->
+{#if week}<TokenBurnChart title="Personal · this week" {...week} />{/if}`
 	},
 	{
 		slug: 'run-replay-scrubber',
