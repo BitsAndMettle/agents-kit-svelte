@@ -114,4 +114,7 @@ test('SettingsForm: a number with options is a group of pressed buttons, named a
 	// Turned off, every option is off.
 	assert.equal(html(SettingsForm, { settings, onChange: () => {}, disabled: true }).match(/ disabled=""/g)?.length, 3);
 	assert.equal(html(SettingsForm, { settings: [{ ...settings[0], disabled: true }], onChange: () => {} }).match(/ disabled=""/g)?.length, 3);
+	// An option turned off is off on its own.
+	const some = [{ value: '1', label: '1' }, { value: '2', label: '2', disabled: true }];
+	assert.equal(html(SettingsForm, { settings: [{ ...settings[0], options: some }], onChange: () => {} }).match(/ disabled=""/g)?.length, 1);
 });

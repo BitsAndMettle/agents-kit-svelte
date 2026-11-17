@@ -59,7 +59,7 @@
 						<button
 							type="button"
 							aria-pressed={pressed}
-							disabled={off}
+							disabled={off || option.disabled}
 							onclick={() => pressed || change(setting.id, Number(option.value))}
 							class={cn(segmentClass(pressed), 'cursor-pointer disabled:cursor-not-allowed disabled:opacity-50')}
 						>

@@ -20,11 +20,11 @@
 
 	let { accounts, timeZone = 'UTC', offLabel = 'Off', unreadLabel = 'Not read yet', ...rest }: Props = $props();
 
-	const COLUMNS: TableColumn[] = [{ label: '#', class: 'w-12' }, { label: 'Account' }, { label: '5-hour window' }, { label: 'Week' }, { label: 'Status' }];
 	const WINDOWS = [
 		['fiveHour', '5-hour window'],
 		['week', 'Week']
 	] as const;
+	const COLUMNS: TableColumn[] = [{ label: '#', class: 'w-12' }, { label: 'Account' }, ...WINDOWS.map(([, label]) => ({ label })), { label: 'Status' }];
 
 	function status(account: AccountUsage): { text: string; tone: UiTone } {
 		if (account.status === 'off') return { text: offLabel, tone: 'neutral' };

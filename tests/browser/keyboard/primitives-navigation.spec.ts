@@ -375,6 +375,7 @@ test.describe('SectionNav', () => {
 		await nav.scrollIntoViewIfNeeded();
 		const links = await Promise.all((await nav.getByRole('link').all()).map(async (link) => (await link.boundingBox())!));
 		for (const link of links) expect(link.y).toBe(links[0].y);
+		await expect(nav).toHaveCSS('overflow-x', 'auto');
 		expect(await nav.evaluate((box) => box.scrollWidth > box.clientWidth)).toBe(true);
 		const box = (await nav.boundingBox())!;
 		expect(box.x + box.width).toBeLessThanOrEqual(390);

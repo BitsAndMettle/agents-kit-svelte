@@ -27,6 +27,7 @@ test('UsageTable: on a phone the table scrolls inside its box and the page does 
 	await table.scrollIntoViewIfNeeded();
 	await expect(table.getByRole('progressbar', { name: 'Personal Week' })).toHaveAttribute('aria-valuetext', '34% left · Sat 20:00');
 	const box = table.locator('xpath=..');
+	await expect(box).toHaveCSS('overflow-x', 'auto');
 	expect(await box.evaluate((root) => root.scrollWidth > root.clientWidth)).toBe(true);
 	const edge = (await box.boundingBox())!;
 	expect(edge.x + edge.width).toBeLessThanOrEqual(390);

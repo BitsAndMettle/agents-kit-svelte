@@ -35,7 +35,7 @@
 					href={item.href}
 					aria-current={here ? 'page' : undefined}
 					class={cn(
-						'flex min-h-11 items-center whitespace-nowrap rounded-control px-3 text-sm transition-colors focus-visible:outline-offset-[-2px] pointer-fine:min-h-9',
+						'flex min-h-11 items-center whitespace-nowrap rounded-control px-3 text-sm transition-colors focus-visible:-outline-offset-2 pointer-fine:min-h-9',
 						here ? 'bg-canvas-secondary font-semibold text-fg-main' : 'text-fg-light hover:bg-canvas-secondary hover:text-fg-main'
 					)}
 				>

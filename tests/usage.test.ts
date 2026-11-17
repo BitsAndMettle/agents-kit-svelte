@@ -188,10 +188,13 @@ test('UsageTable: one row per account, counted from 1, a named track per window 
 	assert.deepEqual(tracks(row('Personal')), [['Personal 5-hour window', 34, '66% left · 16:40'], ['Personal Week', 66, '34% left · Thu 20:00']]);
 	assert.match(row('Personal'), /aria-hidden="true"[^>]*>66% left · 16:40<\/span>[\s\S]*aria-hidden="true"[^>]*>34% left · Thu 20:00<\/span>/);
 	assert.match(row('Personal'), /bg-status-success-subtle[^"]*"[^>]*>\s*Available/);
+	assert.equal(row('Personal').match(/rounded-full[^"]*bg-fg-light/g)?.length, 2, 'both fills neutral under the switch point');
+	assert.match(row('Personal'), /class="[^"]*px-2\.5[^"]*"[^>]*>\s*Available/, 'the status is a large badge');
 
 	// A full window: a full neutral track, when it resets, and when the account is back.
 	assert.deepEqual(tracks(row('Work'))[0], ['Work 5-hour window', 100, 'Resets 18:20']);
 	assert.doesNotMatch(row('Work'), /bg-status-info/);
+	assert.match(row('Work').split('aria-label="Work Week"')[0], /rounded-full[^"]*bg-fg-light/);
 	assert.match(row('Work'), /Out until Tue 18:20/);
 
 	// Past the switch point: that window in info, the other empty with all of it left.
@@ -203,13 +206,13 @@ test('UsageTable: one row per account, counted from 1, a named track per window 
 
 	// Never read and free: no track, a dash spoken as no reading, and a status not on the success tint.
 	assert.doesNotMatch(row('New'), /role="progressbar"/);
-	assert.equal(row('New').match(/<span class="sr-only">No reading<\/span>/g)?.length, 2);
-	assert.match(row('New'), />\s*Not read yet\s*</);
+	assert.equal(row('New').match(/<span aria-hidden="true"[^>]*>–<\/span><span class="sr-only">No reading<\/span>/g)?.length, 2);
+	assert.match(row('New'), /class="[^"]*bg-canvas-secondary[^"]*"[^>]*>\s*Not read yet\s*</);
 	assert.doesNotMatch(row('New'), /success/);
 	assert.match(html(UsageTable, { 'aria-label': 'A', accounts: [accounts[3]], unreadLabel: 'Signed in' }), />\s*Signed in\s*</);
 
 	// Off, in its own words or yours.
-	assert.match(row('Old'), />\s*Off\s*</);
+	assert.match(row('Old'), /class="[^"]*bg-canvas-secondary[^"]*"[^>]*>\s*Off\s*</);
 	assert.match(html(UsageTable, { 'aria-label': 'A', accounts: [accounts[4]], offLabel: 'Paused' }), />\s*Paused\s*</);
 
 	// Refused with an end and never read: when it is back, and no track.
