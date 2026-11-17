@@ -7,7 +7,7 @@
 
 <div class="mx-auto flex max-w-xl flex-col gap-4">
 	<div class="flex items-center gap-2 text-[13px] text-fg-light">
-		<ThemeToggle placement="bottom-start" />
+		<ThemeToggle cookie="ak-theme" placement="bottom-start" />
 		<span>Light, dark or the system's, for the whole page.</span>
 	</div>
 	<div data-palette="studio" class="flex flex-col gap-3 rounded-card border border-card-border bg-canvas-primary p-4 text-fg-main">

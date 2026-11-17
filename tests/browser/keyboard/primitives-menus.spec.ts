@@ -129,6 +129,22 @@ test.describe('DropdownMenu', () => {
 	});
 });
 
+test.describe('ThemeToggle', () => {
+	test('a choice is written to <html data-theme> and clears the dark class', async ({ page }) => {
+		const section = await openSection(page, 'theme-toggle');
+		const html = page.locator('html');
+		await page.evaluate(() => document.documentElement.classList.add('dark'));
+		await section.getByRole('button', { name: 'Theme', exact: true }).click();
+		const dark = section.getByRole('menuitemradio', { name: 'Dark', exact: true });
+		await dark.click();
+		await expect(html).toHaveAttribute('data-theme', 'dark');
+		await expect(html).not.toHaveClass(/\bdark\b/);
+		await expect(dark).toHaveAttribute('aria-checked', 'true');
+		await section.getByRole('menuitemradio', { name: 'System', exact: true }).click();
+		await expect(html).toHaveAttribute('data-theme', 'system');
+	});
+});
+
 test.describe('ContextMenu', () => {
 	test('right-click opens at the pointer; choosing runs the action', async ({ page }) => {
 		const section = await openSection(page, 'context-menu');
