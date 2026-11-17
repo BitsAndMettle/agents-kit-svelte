@@ -131,7 +131,7 @@ test('Studio search by keyboard: the field follows New chat, typing narrows the 
 test('Studio reply footer: quiet 13px actions, a toggle that says so, chips that fill the composer', async ({ page }) => {
 	await open(page);
 	const reply = chat(page).locator('article[data-slot="message"]').nth(1);
-	for (const name of ['2 steps', 'Copy', 'Retry']) expect(await style(reply.getByRole('button', { name }), 'font-size')).toBe('13px');
+	for (const name of ['2 steps', 'Copy', 'Retry']) expect(await style(reply.getByRole('button', { name, exact: true }), 'font-size')).toBe('13px');
 	const steps = reply.getByRole('button', { name: '2 steps' });
 	await expect(steps).toHaveAttribute('aria-expanded', 'false');
 	await steps.click();
