@@ -6,7 +6,7 @@
 	import { SOFT } from '../ui/styles';
 	import Markdown from './Markdown.svelte';
 
-	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'id' | 'role' | 'author' | 'badge' | 'timestamp' | 'children' | 'text'> {
+	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'id' | 'role' | 'author' | 'badge' | 'timestamp' | 'children' | 'text' | 'plain'> {
 		id?: string;
 		role: 'user' | 'assistant' | 'system';
 		author: string;
@@ -14,6 +14,11 @@
 		timestamp?: string;
 		/** The message as Markdown, rendered safely with `Markdown`. Used when there are no children. */
 		text?: string;
+		/**
+		 * No avatar: one muted 12px line "Name · time" over the text at a 1.7 line height, 12px between its parts.
+		 * A user message is its bubble alone; its author and time stay for screen readers.
+		 */
+		plain?: boolean;
 		class?: string;
 		children?: Snippet;
 	}
@@ -25,6 +30,7 @@
 		badge,
 		timestamp,
 		text = '',
+		plain = false,
 		class: className = '',
 		children,
 		...rest
@@ -40,8 +46,21 @@
 	data-slot="message"
 	data-from={role}
 	data-role={role}
-	class={cn(`group/message flex w-full gap-3 ${role === 'user' ? 'justify-end' : 'justify-start'}`, className)}
+	class={cn(`group/message flex w-full ${plain ? '' : 'gap-3 '}${role === 'user' ? 'justify-end' : 'justify-start'}`, className)}
 >
+	{#if plain}
+	<div class="min-w-0 {role === 'user' ? 'flex max-w-[88%] flex-col items-end sm:max-w-[78%]' : 'flex-1 space-y-3'}">
+		<header class={role === 'user' ? 'sr-only' : 'flex items-center gap-2 text-xs text-fg-light'}>
+			<span>{author}{#if timestamp}{' · '}<span class="tabular-nums">{timestamp}</span>{/if}</span>
+			{#if badge}<span class="rounded-full bg-chat-user px-2 py-px text-[11px] text-fg-light">{badge}</span>{/if}
+		</header>
+		{#if role === 'user'}
+			<div data-slot="message-content" class="min-w-0 rounded-bubble bg-chat-user px-4 py-2.5 text-[15px] leading-[1.55] text-fg-main">{@render body()}</div>
+		{:else}
+			<div data-slot="message-content" class="space-y-3 text-[15px] leading-[1.7] text-fg-main">{@render body()}</div>
+		{/if}
+	</div>
+	{:else}
 	{#if role !== 'user'}
 		<div aria-hidden="true" class="{SOFT.avatar} mt-0.5 max-sm:hidden">
 			<Sparkle class="fill-current" />
@@ -83,4 +102,5 @@
 			</div>
 		{/if}
 	</div>
+	{/if}
 </article>
