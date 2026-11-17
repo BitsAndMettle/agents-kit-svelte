@@ -1,5 +1,14 @@
 # agents-kit-svelte
 
+## 0.8.0
+
+### Minor Changes
+
+- 087e4b0: Account usage, display only: `AccountUsage` is one shape for a subscription account (label, agent, `fiveHour` and `week` windows, switch point, status, and `until` for a refusal that names its end). `UsagePill` counts the accounts that can still work and opens on a row per account; `UsageRows` draws those rows (a slim `Progress` and a status `Badge`) and is the body of a `usage.read` step, since `ToolResult` now takes `children`; `usageBurn` turns one reading into `TokenBurnChart` props that project the average rate since the window began to the switch point, or to the reset when it stays under. `TokenBurnChart` takes `formatValue`, `unit`, `budgetLabel`, `label` (its name when untitled), `timeStep` (time ticks on days) and `limit`: with a limit the budget is a switch point drawn in info blue and read as reached or passed, the projection ends on it, and nothing reads past the limit. A token chart draws what it drew before; `UiTone` gains `info`; `dayTime` formats "Thu 20:00".
+- 81bb4c8: Ship the kit's fonts in the package. A new opt-in `agents-kit-svelte/fonts.css` loads Inter and JetBrains Mono. Both are variable woff2 files, subset to latin and latin-ext, with `font-display: swap`. Your bundler serves them from your own origin, so pages render in the kit's fonts under a `font-src 'self'` policy and no request goes to a font CDN. The fonts are under the SIL Open Font License 1.1, and their licence texts ship in `dist/fonts/`. The `--ak-font-*` stacks are unchanged.
+  
+  `AppShell` takes `maxWidth`, which lines the bar's content up with a page of that width while the bar still spans the window. `Progress` takes `segments`: parts side by side, each with its own tone, e.g. done, building and needs you. The value text names each part.
+
 ## 0.7.0
 
 ### Minor Changes
