@@ -29,6 +29,16 @@ test('UsageTable: on a phone the table scrolls inside its box and the page does 
 	const box = table.locator('xpath=..');
 	await expect(box).toHaveCSS('overflow-x', 'auto');
 	expect(await box.evaluate((root) => root.scrollWidth > root.clientWidth)).toBe(true);
+	// Hidden text must move with the table, so the box is what positions it.
+	const hidden = table.getByText('No reading').last();
+	const x = () => hidden.evaluate((el) => el.getBoundingClientRect().x);
+	const before = await x();
+	const moved = await box.evaluate((root) => {
+		root.scrollLeft = root.scrollWidth;
+		return root.scrollLeft;
+	});
+	expect(moved).toBeGreaterThan(0);
+	expect(Math.abs((await x()) - (before - moved))).toBeLessThan(1);
 	const edge = (await box.boundingBox())!;
 	expect(edge.x + edge.width).toBeLessThanOrEqual(390);
 	expect(await section.evaluate((root) => root.scrollWidth <= root.clientWidth)).toBe(true);
