@@ -20,7 +20,7 @@ export function usageFree(account: AccountUsage): boolean {
 	return account.status !== 'out' && account.status !== 'off';
 }
 
-/** The window nearest its limit, which is the one that decides when the account is back. */
+/** The window nearest its limit: the one a row's track and reset time show. */
 export function usageWindow(account: AccountUsage): UsageWindow | undefined {
 	const { fiveHour, week } = account.windows;
 	return fiveHour && week ? (fiveHour.used >= week.used ? fiveHour : week) : (fiveHour ?? week);
