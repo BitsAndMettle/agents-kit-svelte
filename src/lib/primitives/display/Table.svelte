@@ -33,7 +33,7 @@
 </script>
 
 <!-- A wide table scrolls inside its own box. -->
-<div {...rest} class={cn(SURFACE.card, 'overflow-x-auto', className)}>
+<div {...rest} class={cn(SURFACE.card, 'relative overflow-x-auto', className)}>
 	<table aria-label={ariaLabel} class="w-full border-collapse text-left text-[13px] text-fg-main">
 		<colgroup>
 			{#each columns as column, index (index)}<col class={column.class} />{/each}
