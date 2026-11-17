@@ -3,6 +3,20 @@
  * directly (tests/primitives-menus.test.ts).
  */
 
+/** A colour theme, as `<html data-theme>` holds it. */
+export type Theme = 'light' | 'dark' | 'system';
+
+/** The theme the kit draws for `<html>`: dark under the `dark` class, else its `data-theme`, else light. */
+export function themeOf(dataTheme: string | null, darkClass: boolean): Theme {
+	if (darkClass) return 'dark';
+	return dataTheme === 'dark' || dataTheme === 'system' ? dataTheme : 'light';
+}
+
+/** The `document.cookie` assignment that keeps a theme for a year on every path. */
+export function themeCookie(name: string, theme: Theme): string {
+	return `${name}=${theme}; Max-Age=31536000; Path=/; SameSite=Lax; Secure`;
+}
+
 /**
  * The default matcher: every whitespace-separated word of `query` appears, ignoring case,
  * in one of `texts`. An empty query matches everything.
