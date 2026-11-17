@@ -858,7 +858,7 @@ export interface ChatWorkbenchConversation {
 /** The status line under a `ChatWorkbench` title: a coloured dot and its text. */
 export interface ChatWorkbenchStatus {
 	text: string;
-	tone?: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+	tone?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' | 'accent';
 	/** Makes the dot breathe, e.g. while a reply is on its way. */
 	pulse?: boolean;
 }

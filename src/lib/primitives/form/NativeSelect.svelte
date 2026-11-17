@@ -15,7 +15,8 @@
 		disabled?: boolean;
 	}
 
-	export type NativeSelectSize = FormControlSize;
+	/** `studio`: the Studio design's select, 36px with an 8px radius and 13px text. */
+	export type NativeSelectSize = FormControlSize | 'studio';
 </script>
 
 <script lang="ts">
@@ -36,6 +37,8 @@
 		/** A first, unselectable option shown while nothing is chosen. With `required`, the form will not submit until a real option is picked. */
 		placeholder?: string;
 		size?: NativeSelectSize;
+		/** Sets the select in the monospace face, e.g. for repository names. */
+		mono?: boolean;
 		/** Marks the select invalid (a surrounding Field with an error does too). */
 		invalid?: boolean;
 		onValueChange?: (value: string) => void;
@@ -53,6 +56,7 @@
 		value = $bindable(defaultValue ?? ''),
 		placeholder,
 		size = 'md',
+		mono = false,
 		invalid = false,
 		onValueChange,
 		ref = $bindable(null),
@@ -73,7 +77,8 @@
 	const SIZES: Record<NativeSelectSize, string> = {
 		sm: 'h-7 pl-2.5 pr-7 text-xs',
 		md: 'h-8 pl-3 pr-8 text-[13px]',
-		lg: 'h-10 pl-3.5 pr-9 text-sm'
+		lg: 'h-10 pl-3.5 pr-9 text-sm',
+		studio: 'h-9 rounded-chip pl-2.5 pr-7 text-[13px]'
 	};
 </script>
 
@@ -87,7 +92,7 @@
 			onValueChange?.(event.currentTarget.value);
 			rest.onchange?.(event);
 		}}
-		class={cn(INPUT_CLASS, 'cursor-pointer appearance-none truncate [&_option]:bg-card-bg [&_option]:text-fg-main aria-invalid:border-status-danger/70 disabled:cursor-not-allowed disabled:opacity-50', !value && placeholder && 'text-fg-light', SIZES[size])}
+		class={cn(INPUT_CLASS, 'cursor-pointer appearance-none truncate [&_option]:bg-card-bg [&_option]:text-fg-main aria-invalid:border-status-danger/70 disabled:cursor-not-allowed disabled:opacity-50', !value && placeholder && 'text-fg-light', SIZES[size], mono && 'font-mono')}
 	>
 		{#if placeholder !== undefined}
 			<option value="" disabled>{placeholder}</option>

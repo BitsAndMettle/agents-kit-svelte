@@ -30,7 +30,8 @@
 		showValue?: boolean;
 		/** Spoken and shown value text. Defaults to a percentage. */
 		valueText?: string | ((value: number, percent: number) => string);
-		size?: 'sm' | 'md' | 'lg';
+		/** `xs`: a 2px track in the border colour, which shows on a tinted rail. */
+		size?: 'xs' | 'sm' | 'md' | 'lg';
 		class?: string;
 	}
 
@@ -77,7 +78,7 @@
 			{#if showValue && !indeterminate}<span aria-hidden="true" class="ml-auto tabular-nums text-fg-light">{text}</span>{/if}
 		</div>
 	{/if}
-	<div class={cn(PROGRESS_TRACK_CLASS, size === 'lg' && 'h-2.5', size === 'sm' && 'h-1', 'relative', segments && 'flex')}>
+	<div class={cn(PROGRESS_TRACK_CLASS, size === 'lg' && 'h-2.5', size === 'sm' && 'h-1', size === 'xs' && 'h-0.5 bg-card-border', 'relative', segments && 'flex')}>
 		{#if segments}
 			{#each segments as part, index (index)}
 				<span class={cn(progressFillClass(part.tone), 'rounded-none')} style:width="{progressPercent(min + part.value, min, max)}%"></span>

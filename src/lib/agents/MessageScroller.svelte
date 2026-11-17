@@ -553,7 +553,7 @@
 			aria-live="polite"
 			aria-relevant="additions text"
 			aria-busy={busy || streaming}
-			class="mx-auto w-full max-w-3xl space-y-7 px-5 py-6 sm:px-8 {contentClass}"
+			class={cn('mx-auto w-full max-w-3xl space-y-7 px-5 py-6 sm:px-8', contentClass)}
 		>
 			{@render children()}
 		</div>
