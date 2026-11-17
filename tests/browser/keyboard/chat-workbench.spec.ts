@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 /** Loads the data-driven ChatWorkbench fixture (src/routes/workbench) and waits for hydration. */
 async function open(page: Page, width = 1280): Promise<void> {
@@ -10,6 +10,42 @@ async function open(page: Page, width = 1280): Promise<void> {
 const events = (page: Page) => page.getByTestId('events');
 const full = (page: Page) => page.getByRole('region', { name: 'Referee', exact: true });
 const panel = (page: Page) => page.getByRole('region', { name: 'Referee panel' });
+const quiet = (page: Page) => page.getByRole('region', { name: 'Referee quiet' });
+
+test('ChatWorkbench quiet: from 1024px the rails start at the top and there are no tabs', async ({ page }) => {
+	await open(page);
+	const region = await quiet(page).boundingBox();
+	const sidebar = await quiet(page).getByRole('complementary', { name: 'Conversations' }).boundingBox();
+	expect(sidebar!.y).toBeCloseTo(region!.y, 0);
+	await expect(quiet(page).getByRole('tablist')).toBeHidden();
+	await expect(quiet(page).getByRole('heading', { level: 2, name: 'Referee' })).toBeVisible();
+});
+
+test('ChatWorkbench quiet on a phone: the tabs work and rows are 44px tall', async ({ page }) => {
+	await open(page, 390);
+	await quiet(page).getByRole('tab', { name: /Conversations/ }).click();
+	const row = quiet(page).getByRole('tabpanel').getByRole('button', { name: /Card 198/ });
+	expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+	await row.click();
+	await expect(quiet(page).getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true');
+	await expect(quiet(page).getByRole('textbox', { name: 'Message the Referee' })).toBeVisible();
+});
+
+test('ChatWorkbench quiet on a phone: the title keeps its width and the actions give way inside the line', async ({ page }) => {
+	await open(page);
+	const title = quiet(page).getByRole('heading', { level: 2, name: 'Referee' });
+	const chip = quiet(page).getByRole('button', { name: 'BitsAndMettle/agents-kit-svelte' });
+	const pause = quiet(page).getByRole('button', { name: 'Pause' });
+	const width = async (locator: Locator) => (await locator.boundingBox())!.width;
+	const [titleWide, pauseWide] = [await width(title), await width(pause)];
+	await page.setViewportSize({ width: 390, height: 900 });
+	await expect.poll(() => chip.locator('span').evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+	expect(await width(title)).toBeCloseTo(titleWide, 0);
+	expect(await title.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+	expect(await width(pause)).toBeCloseTo(pauseWide, 0);
+	const [region, end] = [(await quiet(page).boundingBox())!, (await pause.boundingBox())!];
+	expect(end.x + end.width).toBeLessThanOrEqual(region.x + region.width);
+});
 
 test('ChatWorkbench: sending calls onSend with the text and attachments and adds no reply of its own', async ({ page }) => {
 	await open(page);

@@ -11,6 +11,7 @@ import {
 	themeCookie,
 	themeOf
 } from '../src/lib/primitives/menus/helpers.ts';
+import { pillClass } from '../src/lib/ui/styles.ts';
 import { ssr } from './ssr.ts';
 
 const { load, html } = ssr();
@@ -35,6 +36,20 @@ test('ThemeToggle: one button named Theme opens the Light, Dark and System choic
 	assert.equal(out.match(/<button\b/g)?.length, 1);
 	assert.match(out, /<button aria-label="Theme"[^>]*aria-haspopup="menu"/);
 	assert.deepEqual([...out.matchAll(/role="menuitemradio"[^>]*>[\s\S]*?<span[^>]*>([^<]*)<\/span>/g)].map(([, label]) => label), ['Light', 'Dark', 'System']);
+});
+
+test('CommandPalette triggerCompact: a 32px ghost icon opener named by triggerLabel, the shortcut from 640px', async () => {
+	const CommandPalette = await load('/src/lib/primitives/menus/CommandPalette.svelte');
+	const opener = (props: Record<string, unknown>) => html(CommandPalette, { commands: [], triggerLabel: 'Search', ...props }).match(/<button[\s\S]*?<\/button>/)![0];
+	const compact = opener({ triggerCompact: true });
+	assert.match(compact, /aria-label="Search"/);
+	assert.ok(compact.includes(`class="${pillClass('ghost', 'md').replaceAll('&', '&amp;')}"`));
+	assert.match(compact, /<span class="hidden text-xs sm:inline">Ctrl\+K<\/span>/);
+	assert.doesNotMatch(compact, /<kbd|>Search</);
+	const full = opener({});
+	assert.match(full, /<span>Search<\/span>/);
+	assert.match(full, /<kbd[^>]*>Ctrl\+K<\/kbd>/);
+	assert.doesNotMatch(full, /aria-label=/);
 });
 
 const key = (k: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({

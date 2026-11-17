@@ -110,6 +110,97 @@ test('conversation rows: a label above each run of a group, a dot by key, the da
 	assert.match(out, /<aside aria-label="Conversations" class="[^"]*bg-canvas-secondary/);
 });
 
+test('quiet header: the band holds only the tabs and hides from 1024px; the title line sits atop the chat column', () => {
+	const conversations = [{ id: 'c1', title: 'First', active: true }];
+	const out = html(ChatWorkbench, {
+		chrome: 'quiet',
+		title: 'Referee',
+		subtitle: 'devbox',
+		status: { text: 'Online', tone: 'success' },
+		conversations,
+		onNewConversation: () => {},
+		headerActions: snippet(() => '<button type="button">Pause</button>')
+	});
+	const header = out.slice(out.indexOf('<header'), out.indexOf('</header>'));
+	assert.match(header, /^<header class="[^"]*lg:hidden/);
+	assert.match(header, /role="tablist"/);
+	assert.doesNotMatch(header, /Referee<\/h2>|devbox|Pause|bg-chat-accent-subtle/);
+	assert.match(out, /role="tabpanel"[\s\S]*?<div class="mx-auto flex w-full max-w-3xl[^"]*items-baseline[^"]*px-5[^"]*sm:px-8"><h2[^>]*truncate[^>]*>Referee<\/h2>[\s\S]*?devbox[\s\S]*?Online[\s\S]*?Pause[\s\S]*?role="log"/);
+	// The title keeps its room and the actions give way: each may shrink, past the kit pill's shrink-0.
+	assert.match(out, /<h2 class="max-w-full shrink-0 truncate /);
+	assert.match(out, /<div class="ml-auto flex min-w-0 items-center gap-1\.5 \*:shrink"><button type="button">Pause/);
+	// The panel layout keeps its tabs at any width.
+	assert.doesNotMatch(html(ChatWorkbench, { chrome: 'quiet', conversations, layout: 'panel' }).match(/<header[^>]*>/)![0], /lg:hidden/);
+	// Nothing to show, no band and no line.
+	const bare = html(ChatWorkbench, { chrome: 'quiet' });
+	assert.doesNotMatch(bare, /<header|<h2|items-baseline/);
+});
+
+test('quiet rail: one 14px leading slot per row, 32px sidebar rows with a mouse, 44px in the tab panel; pinned draws the pin', () => {
+	const conversations = [
+		{ id: 'q', title: 'Questions', subtitle: 'Asked by the agents', pinned: true },
+		{ id: 'a', title: 'Alpha', date: '14:02', group: 'Today', mark: 'example', active: true },
+		{ id: 'b', title: 'Beta', subtitle: 'Waiting', group: 'Today' }
+	];
+	const out = html(ChatWorkbench, { chrome: 'quiet', conversations, onNewConversation: () => {}, view: 'conversations' });
+	// Pinned or not, the second line starts at the title's edge, past the slot and its gap.
+	const subtitle = /<span class="w-full truncate pl-5\.5 text-xs[^"]*">(Asked by the agents|Waiting)<\/span>/g;
+	const sidebar = out.slice(out.indexOf('<aside'), out.indexOf('</aside>'));
+	const panel = out.slice(out.indexOf('role="tabpanel"'), out.indexOf('</nav>', out.indexOf('role="tabpanel"')));
+	assert.match(sidebar, /^<aside aria-label="Conversations" class="[^"]*\bp-2\b/);
+	assert.equal([...sidebar.matchAll(/<button[^>]*pointer-fine:min-h-8/g)].length, 4);
+	assert.doesNotMatch(panel, /pointer-fine:min-h-8/);
+	for (const list of [sidebar, panel]) {
+		assert.equal([...list.matchAll(/<span class="flex size-3\.5 shrink-0 items-center justify-center">/g)].length, 3);
+		assert.match(list, /<svg[^>]*role="img"[^>]*aria-label="Pinned"[\s\S]*?Questions/);
+		// Spoken, as the dot is: lucide hides an icon only when it is given no aria or role.
+		assert.doesNotMatch(list.match(/<svg[^>]*aria-label="Pinned"[^>]*>/)![0], /aria-hidden/);
+		assert.match(list, /aria-current="true" class="[^"]*bg-card-bg font-medium text-fg-main"/);
+		// Idle titles are as dark as the active one.
+		const idle = list.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*?Beta/)![0];
+		assert.match(idle, /class="[^"]* text-fg-main hover:bg-card-bg"/);
+		assert.equal([...list.matchAll(subtitle)].length, 2);
+		assert.doesNotMatch(list, /ak-shadow-soft-sm|text-\[11px\]/);
+	}
+	assert.match(sidebar, /<p class="flex h-8 items-end[^"]*text-xs text-fg-light">Today<\/p>/);
+	// No gaps between the sidebar's rows, so every pitch is 32px; the tab panel keeps its 2px.
+	assert.match(sidebar, /<ul class="text-\[13px\]">/);
+	assert.match(panel, /<ul class="space-y-0\.5 text-\[13px\]">/);
+	// Full chrome draws the pin in place of the mark, with no slot; a pinned row's second line starts at its title.
+	const full = html(ChatWorkbench, { conversations });
+	assert.match(full, /aria-label="Pinned"/);
+	assert.match(full, /<span class="w-full truncate pl-5\.5 text-\[11px\][^"]*">Asked by the agents<\/span>/);
+	assert.doesNotMatch(full, /size-3\.5 shrink-0 items-center justify-center|pointer-fine:min-h-8/);
+	// An unpinned row's second line keeps the row's edge.
+	assert.match(html(ChatWorkbench, { conversations: [{ id: 'b', title: 'Beta', subtitle: 'Asked by the agents' }] }), /<span class="w-full truncate text-\[11px\]/);
+});
+
+test('quiet empty state sits above a compact composer; without the snippet the log keeps its line', () => {
+	const empty = snippet(() => '<p>Ask me anything</p>');
+	const out = html(ChatWorkbench, { chrome: 'quiet', empty });
+	assert.match(out, /role="log"[\s\S]*<div class="mx-auto max-w-3xl pb-3"><p>Ask me anything<\/p><\/div>\s*<form[\s\S]*<textarea[^>]*class="[^"]*block min-h-8/);
+	// Drawn once: not at the top of the log as well.
+	assert.equal(out.match(/Ask me anything/g)?.length, 1);
+	assert.doesNotMatch(out, /sm:min-h-12/);
+	// Once there are messages, it is gone.
+	assert.doesNotMatch(html(ChatWorkbench, { chrome: 'quiet', empty, messages: [{ id: 'm', role: 'user', text: 'Hi' }] }), /Ask me anything|max-w-3xl pb-3/);
+	assert.match(html(ChatWorkbench, { chrome: 'quiet' }), /role="log"[\s\S]*No messages yet\.[\s\S]*<textarea/);
+	// Full chrome: the empty state stays in the log and the composer at full height.
+	const full = html(ChatWorkbench, { empty: snippet(() => '<p>Ask me anything</p>') });
+	assert.match(full, /Ask me anything[\s\S]*<textarea[^>]*sm:min-h-12/);
+	assert.doesNotMatch(full, /max-w-3xl pb-3/);
+});
+
+test('PromptInput compact: a one-line field and tighter padding', () => {
+	const compact = html(PromptInput, { compact: true });
+	assert.match(compact, /<form[^>]*class="[^"]*pt-2\.5 pb-2/);
+	assert.match(compact, /<textarea[^>]*class="[^"]*\bblock min-h-8\b/);
+	assert.doesNotMatch(compact, /min-h-10|sm:min-h-12/);
+	const full = html(PromptInput, {});
+	assert.match(full, /<form[^>]*class="[^"]*pt-3 pb-2\.5/);
+	assert.match(full, /<textarea[^>]*class="[^"]*min-h-10 sm:min-h-12/);
+});
+
 test('the header mark can be left out', () => {
 	assert.match(html(ChatWorkbench, { title: 'Referee' }), /bg-chat-accent-subtle/);
 	assert.doesNotMatch(html(ChatWorkbench, { title: 'Referee', headerMark: false }), /bg-chat-accent-subtle/);

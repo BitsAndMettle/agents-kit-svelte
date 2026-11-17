@@ -49,6 +49,8 @@
 		onSubmit?: (prompt: string) => void;
 		onStop?: () => void;
 		onQuickContext?: (attachmentId: string) => void;
+		/** A one-line text field and tighter padding; it still grows as the text does. */
+		compact?: boolean;
 		class?: string;
 	}
 
@@ -72,6 +74,7 @@
 		onSubmit,
 		onStop,
 		onQuickContext,
+		compact = false,
 		class: className = '',
 		...rest
 	}: Props = $props();
@@ -242,7 +245,7 @@
 		submitPrompt();
 	}}
 	data-busy={busy}
-	class={cn('ak-soft-focus relative w-full rounded-composer border border-chat-border bg-card-bg px-3 pt-3 pb-2.5 focus-within:border-fg-light/35', className)}
+	class={cn('ak-soft-focus relative w-full rounded-composer border border-chat-border bg-card-bg px-3 focus-within:border-fg-light/35', compact ? 'pt-2.5 pb-2' : 'pt-3 pb-2.5', className)}
 >
 	{#if attachments.length > 0}
 		<div class="mb-1.5 flex flex-wrap items-center gap-1.5 px-1">
@@ -305,7 +308,7 @@
 			}}
 			onblur={() => (dismissed = true)}
 			onkeydown={handleKeyDown}
-			class="field-sizing-content max-h-60 min-h-10 w-full sm:min-h-12 resize-none bg-transparent px-1.5 py-1 text-base leading-6 sm:pointer-fine:text-[15px] text-fg-main placeholder:text-fg-light/80 focus:outline-none disabled:opacity-50"
+			class="field-sizing-content max-h-60 {compact ? 'block min-h-8' : 'min-h-10 sm:min-h-12'} w-full resize-none bg-transparent px-1.5 py-1 text-base leading-6 sm:pointer-fine:text-[15px] text-fg-main placeholder:text-fg-light/80 focus:outline-none disabled:opacity-50"
 		></textarea>
 	</label>
 

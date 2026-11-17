@@ -849,6 +849,8 @@ export interface ChatWorkbenchConversation {
 	group?: string;
 	/** A dot before the title whose colour is chosen by this key, e.g. the repository's name. The key is also the dot's spoken name. */
 	mark?: string;
+	/** A pin before the title, in place of the mark, e.g. for Questions. The order stays yours. */
+	pinned?: boolean;
 	/** The conversation on screen. */
 	active?: boolean;
 }
