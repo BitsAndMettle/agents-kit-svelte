@@ -1,5 +1,0 @@
----
-'agents-kit-svelte': minor
----
-
-Account usage, display only: `AccountUsage` is one shape for a subscription account (label, agent, `fiveHour` and `week` windows, switch point, status, and `until` for a refusal that names its end). `UsagePill` counts the accounts that can still work and opens on a row per account; `UsageRows` draws those rows (a slim `Progress` and a status `Badge`) and is the body of a `usage.read` step, since `ToolResult` now takes `children`; `usageBurn` turns one reading into `TokenBurnChart` props that project the average rate since the window began to the switch point, or to the reset when it stays under. `TokenBurnChart` takes `formatValue`, `unit`, `budgetLabel`, `label` (its name when untitled), `timeStep` (time ticks on days) and `limit`: with a limit the budget is a switch point drawn in info blue and read as reached or passed, the projection ends on it, and nothing reads past the limit. A token chart draws what it drew before; `UiTone` gains `info`; `dayTime` formats "Thu 20:00".
