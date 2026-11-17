@@ -8,6 +8,16 @@
 	<Progress {value} label="Upload" showValue />
 	<Progress value={7} max={10} tone="success" label="Tasks done" showValue valueText={(v, p) => `${v} of 10 (${Math.round(p)}%)`} />
 	<Progress value={92} tone="warning" size="md" label="Quota" showValue />
+	<Progress
+		label="Cards"
+		max={10}
+		showValue
+		segments={[
+			{ value: 5, tone: 'success', label: 'done' },
+			{ value: 2, tone: 'accent', label: 'building' },
+			{ value: 1, tone: 'warning', label: 'need you' }
+		]}
+	/>
 	<Progress tone="accent" label="Waiting for the runner" />
 	<label class="flex items-center gap-2 text-xs text-fg-light">
 		Value

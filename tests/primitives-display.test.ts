@@ -93,3 +93,22 @@ test('progressPercent clamps to the range and tolerates an empty range', () => {
 	assert.equal(progressPercent(7, 5, 10), 40);
 	assert.equal(progressPercent(3, 5, 5), 0);
 });
+
+test('Progress: segments sit side by side in their tones, and the bar says what each one counts', async () => {
+	const Progress = await load('/src/lib/primitives/display/Progress.svelte');
+	const out = html(Progress, {
+		label: 'Cards',
+		max: 10,
+		segments: [
+			{ value: 5, tone: 'success', label: 'done' },
+			{ value: 2, tone: 'accent', label: 'building' },
+			{ value: 1, tone: 'warning', label: 'need you' }
+		]
+	});
+	assert.match(out, /aria-valuenow="8"/);
+	assert.match(out, /aria-valuetext="5 done, 2 building, 1 need you"/);
+	const widths = [...out.matchAll(/<span class="([^"]*)" style="width: ([\d.]+)%;"><\/span>/g)].map(([, cls, width]) => [cls.match(/bg-[\w-]+/)?.[0], width]);
+	assert.equal(widths.length, 3);
+	assert.deepEqual(widths.map(([, width]) => width), ['50', '20', '10']);
+	assert.equal(new Set(widths.map(([cls]) => cls)).size, 3, 'each segment has its own tone');
+});

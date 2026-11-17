@@ -73,7 +73,7 @@ test('AppShell: one bar over the page, with the name, the places inside a named 
 	// Your attributes reach the root, and your class replaces the kit's: here, how tall the shell is at least.
 	assert.match(out, /^<div data-app="acme" class="(?![^"]*min-h-dvh)[^"]* min-h-full">/);
 	// The bar, then the page as the one main region.
-	assert.match(out, /<header[^>]*><p[^>]*>Acme<\/p>\s*<nav aria-label="Workspace"[^>]*>[\s\S]*<\/nav>\s*<div[^>]*><button type="button">Sign out<\/button><\/div><\/header>\s*<main[^>]*><p>The page<\/p><\/main><\/div>$/);
+	assert.match(out, /<header[^>]*><div[^>]*><p[^>]*>Acme<\/p>\s*<nav aria-label="Workspace"[^>]*>[\s\S]*<\/nav>\s*<div[^>]*><button type="button">Sign out<\/button><\/div><\/div><\/header>\s*<main[^>]*><p>The page<\/p><\/main><\/div>$/);
 	assert.deepEqual([...out.matchAll(/<a href="([^"]*)"/g)].map(([, href]) => href), PLACES.map((item) => item.href));
 	// A count shows after its label, with what it counts for a screen reader. A count of 0 does not show.
 	assert.match(out, />Settings\s*<span[^>]*>\s*2<span class="sr-only"> open notices<\/span><\/span>\s*<\/a>/);
@@ -81,7 +81,13 @@ test('AppShell: one bar over the page, with the name, the places inside a named 
 
 	// Without a name or controls the bar is the navigation alone, and it still has a name.
 	const bare = html(AppShell, { items: PLACES, path: '/' });
-	assert.match(bare, /<header[^>]*>\s*<nav aria-label="Main"[^>]*>[\s\S]*<\/nav>\s*<\/header>/);
+	assert.match(bare, /<header[^>]*><div[^>]*>\s*<nav aria-label="Main"[^>]*>[\s\S]*<\/nav>\s*<\/div><\/header>/);
+});
+
+test('AppShell: given the width of the page, the content of the bar lines up with it while the bar spans the window', async () => {
+	const AppShell = await load('/src/lib/primitives/navigation/AppShell.svelte');
+	assert.match(html(AppShell, { items: PLACES, path: '/', maxWidth: '72rem' }), /<header class="[^"]*border-b[^"]*"><div class="mx-auto [^"]*px-4 sm:px-6" style="max-width: 72rem;">/);
+	assert.doesNotMatch(html(AppShell, { items: PLACES, path: '/' }), /max-width/);
 });
 
 test('AppShell: a page scrolls with the document under a bar that stays, and a place that fills gets exactly the viewport', async () => {

@@ -79,6 +79,7 @@ Import everything from `agents-kit-svelte`, or from one collection to keep edito
 | `agents-kit-svelte/core` | Types, diff parsing, skill ranking, agent events, `AgentSession` and the Claude adapters. No components, safe on a server. |
 | `agents-kit-svelte/fixtures` | Sample data for demos and tests. Not exported from the root. |
 | `agents-kit-svelte/theme.css` | `--ak-*` design tokens and light/dark palettes |
+| `agents-kit-svelte/fonts.css` | Inter and JetBrains Mono as woff2 files served from your app (opt-in, see [Fonts](#fonts)) |
 
 ### Customising
 
@@ -118,6 +119,25 @@ The same merge is exported as `cn()` from `agents-kit-svelte/primitives` for you
 The main tokens are `--ak-color-canvas`, `-canvas-subtle`, `-surface`, `-fg`, `-fg-muted`, `-fg-inverse`, `-border`, `-border-subtle`, `-accent`, `-accent-subtle`, `-success`, `-warning`, `-danger` and `-info` (each status with a `-subtle` pair), plus `--ak-radius-{chip,control,card,window,bubble,composer}`, `--ak-font-{sans,mono,display}` and `--ak-shadow-{card,btn,soft,soft-sm}`. The chat follows the main accent and canvas; set `--ak-chat-accent` or `--ak-chat-surface` to give it its own. Dark values apply under `.dark` or `[data-theme="dark"]`, or under `[data-theme="system"]` when the OS prefers dark. The Tailwind utility names (`bg-card-bg`, `text-fg-main`, ...) are unchanged.
 
 Themes written for 0.1 against `--color-*-val` variables still work in this release and stop working in the next minor.
+
+### Fonts
+
+The theme's font stacks start with Inter and JetBrains Mono, and fall back to the device's fonts when those aren't loaded. To load them, import the kit's copies after the theme:
+
+```css
+@import "tailwindcss";
+@import "agents-kit-svelte/theme.css";
+@import "agents-kit-svelte/fonts.css";
+@source "../node_modules/agents-kit-svelte/dist";
+```
+
+(`import 'agents-kit-svelte/fonts.css';` in your JavaScript works too.)
+
+Your bundler copies the woff2 files into your build and serves them from your origin, so nothing is fetched from a font CDN and a Content-Security-Policy of `font-src 'self'` is enough. Both fonts are variable (Inter 100–900, JetBrains Mono 100–800) and use `font-display: swap`. Each comes in a latin and a latin-ext file, and the browser downloads latin-ext only when a page uses those characters. Together they add about 260 KB to your build. A browser fetches about 115 KB of that for an English page. No italic files ship, so browsers slant the upright fonts.
+
+The files keep only the OpenType features the theme uses. Inter keeps its kerning, marks and contextual forms (`calt`, `ccmp`, `kern`, `locl`, `mark`, `mkmk`), so it draws as before by default, plus the `cv11`, `ss01` and tabular figures (`tnum`) the theme and components turn on. JetBrains Mono leaves out its code ligatures, which the theme already turns off for `code`, `pre`, `kbd` and `.font-mono`, so only Mono text outside those selectors changes. Slashed zero, ordinals, the other stylistic sets and the other character variants do nothing for an app on `fonts.css`; to use one, name it in `scripts/build-fonts.sh` and rebuild.
+
+The fonts are under the [SIL Open Font License 1.1](https://openfontlicense.org), not Apache-2.0. Their licence texts ship next to them in `dist/fonts/`. They were subset from the official releases (Inter 4.1, JetBrains Mono 2.304) by `scripts/build-fonts.sh`. To use other fonts, skip this import and set `--ak-font-sans` and `--ak-font-mono`.
 
 ---
 
@@ -325,10 +345,11 @@ Agents Kit Svelte stands on other people's work, and we want that to stay visibl
 - **Agents Kit for React.** This library is inspired by the look of [`agents-ui/agents-kit`](https://github.com/agents-ui/agents-kit) by Emiliano. It was built fresh, and no code was copied or translated from it. See [NOTICE](NOTICE).
 - **Claude Code.** The warm, soft visual style is inspired by the look and feel of Claude Code by Anthropic. This is an independent project, not affiliated with or endorsed by Anthropic.
 - **Lucide.** Icons come from [Lucide](https://lucide.dev) (ISC License).
+- **Inter and JetBrains Mono.** The opt-in `fonts.css` ships [Inter](https://github.com/rsms/inter) by The Inter Project Authors and [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) by The JetBrains Mono Project Authors, both under the SIL Open Font License 1.1.
 
 ### License
 
-Licensed under the [Apache License 2.0](LICENSE). You can use, change and ship it, including commercially. If you redistribute the library or a work based on it, you must:
+Licensed under the [Apache License 2.0](LICENSE), except the font files in `dist/fonts/`, which are under the SIL Open Font License 1.1 (see [Fonts](#fonts)). You can use, change and ship it, including commercially. If you redistribute the library or a work based on it, you must:
 
 1. include a copy of the license,
 2. keep the [NOTICE](NOTICE) file, which credits Agents Kit Svelte and the projects it builds on, and

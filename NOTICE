@@ -17,3 +17,16 @@ by Anthropic (https://www.anthropic.com/claude-code). Agents Kit Svelte is an
 independent project and is not affiliated with or endorsed by Anthropic.
 
 Icons are from Lucide (https://lucide.dev), released under the ISC License.
+
+Fonts
+-----
+
+The opt-in fonts.css ships two typefaces, each subset to latin and latin-ext.
+They are licensed under the SIL Open Font License, Version 1.1, not the
+Apache License; the licence texts are in dist/fonts/.
+
+- Inter 4.1 (https://github.com/rsms/inter).
+  Copyright (c) 2016 The Inter Project Authors. See dist/fonts/Inter-OFL.txt.
+- JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono).
+  Copyright 2020 The JetBrains Mono Project Authors.
+  See dist/fonts/JetBrainsMono-OFL.txt.

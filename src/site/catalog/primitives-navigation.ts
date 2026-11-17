@@ -109,7 +109,7 @@ export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/navigation/AppShell.svelte',
 		upstreamSource: SOURCE,
 		description:
-			'The frame of an app: one bar with its name, the places to go and your controls, over the page. The item the current path is under is marked as the current page, and a count after a label says what it counts. The page scrolls with the document and the bar stays in view; a place marked fill gives its page exactly the space under the bar instead, for a chat that does its own scrolling. On a phone the places are a row of their own.',
+			'The frame of an app: one bar with its name, the places to go and your controls, over the page. The item the current path is under is marked as the current page, and a count after a label says what it counts. The page scrolls with the document and the bar stays in view; a place marked fill gives its page exactly the space under the bar instead, for a chat that does its own scrolling. On a phone the places are a row of their own. Give maxWidth the max width of your page and the content of the bar lines up with it.',
 		usageSnippet: `<script lang="ts">
   import { AppShell, Button, type AppShellItem } from 'agents-kit-svelte/primitives';
 
