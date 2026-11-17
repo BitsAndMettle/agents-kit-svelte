@@ -6,7 +6,7 @@ One way to say each thing, across every primitive. When a prop names a concept b
 
 - **`label`** is always *visible* text that names the control (Checkbox, Switch, Radio options, Select, Combobox, Progress, Field). It is required unless a `Field` or `aria-labelledby` already names the control.
 - **Text-entry and value controls are labelled by `Field`** (Input, Textarea, Slider, NativeSelect, RadioGroup, Select, Combobox). They do not each grow a `label` prop of their own; standalone use takes `aria-label` or `aria-labelledby`. Select and Combobox keep an optional `label` for convenience, used only when no Field is present.
-- **`aria-label`** (the real attribute, passed through) is the name when nothing visible names the element: IconButton (required), ButtonGroup, ToggleGroup, Tabs, Pagination, Breadcrumb, AppShell's navigation, ContextMenu regions. Never a camelCase `ariaLabel`.
+- **`aria-label`** (the real attribute, passed through) is the name when nothing visible names the element: IconButton (required), ButtonGroup, ToggleGroup, Tabs, Pagination, Breadcrumb, AppShell's navigation, SectionNav (required), Table (required), ContextMenu regions. Never a camelCase `ariaLabel`.
 - **`triggerLabel`** is the text on a button that opens something (DropdownMenu, CommandPalette).
 - **`description`** is secondary help text everywhere (Field, Checkbox, Switch, options, commands). Not `hint`, not `subtitle`.
 - **Item text** in item arrays is `label` (Tabs, Accordion, menu items, options, commands). Not `title`.

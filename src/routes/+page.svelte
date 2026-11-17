@@ -154,6 +154,7 @@
 		ToolResult,
 		UsagePill,
 		UsageRows,
+		UsageTable,
 		usageBurn,
 		ChatWorkbench,
 		VoiceWaveVisualizer,
@@ -188,7 +189,8 @@
 		PromptInputOption,
 		ContextSourceItem,
 		TodoItem,
-		ToolApprovalParam
+		ToolApprovalParam,
+		AccountUsage
 	} from '$lib';
 
 	const CATEGORIES: ('All' | CatalogCategory)[] = [
@@ -478,6 +480,12 @@
 	];
 
 	const sampleWeekBurn = usageBurn(SAMPLE_ACCOUNT_USAGE[0], 'week')!;
+	// The table also shows an account read with no 5-hour window running and one never read.
+	const sampleUsageTable: AccountUsage[] = [
+		...SAMPLE_ACCOUNT_USAGE,
+		{ label: 'Weekend', agent: 'Claude Code', at: Date.UTC(2026, 10, 17, 14, 6), windows: { week: { used: 12, resetsAt: Date.UTC(2026, 10, 22, 9) } }, switchAt: 98, status: 'available' },
+		{ label: 'New', agent: 'Claude Code', windows: {}, status: 'available' }
+	];
 	const sampleContextSources: ContextSourceItem[] = [
 		{ id: 'sys', label: 'System prompt and guardrails', tokens: 11_200, category: 'system' },
 		{ id: 'wt', label: 'Worktree diff and symbols', tokens: 24_600, category: 'worktree' },
@@ -1719,6 +1727,8 @@
 									<ToolResult tool="usage.read" summary="claude-code" meta="checked 12m ago"><UsageRows accounts={SAMPLE_ACCOUNT_USAGE} /></ToolResult>
 									<ToolResult tool="rotated" summary="Spare → Personal at 98% weekly" meta="Tue 08:00" />
 								</div>
+							{:else if item.slug === 'usage-table'}
+								<UsageTable aria-label="Claude Code accounts on the build box" accounts={sampleUsageTable} />
 							{:else if item.slug === 'agent-checkpoint'}
 								<AgentCheckpoint checkpoint={sampleCheckpoint} />
 							{:else if item.slug === 'chain-of-thought'}

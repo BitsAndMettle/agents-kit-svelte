@@ -97,3 +97,24 @@ test('TierMatrix: a radio group per tier, a locked tier turned off, and the matc
 	assert.equal(bare.match(/role="radiogroup" aria-disabled="true"/g)?.length, 2);
 	assert.match(html(TierMatrix, { ...props, disabled: true, presetsLabel: 'Profils' }), /aria-label="Profils"[^>]*><button type="button" aria-pressed="false" disabled=""/);
 });
+
+test('SettingsForm: a number with options is a group of pressed buttons, named and described by its row', async () => {
+	const SettingsForm = await load('/src/lib/settings/SettingsForm.svelte');
+	const options = ['1', '2', '3'].map((value) => ({ value, label: value }));
+	const settings: Setting[] = [{ id: 'slots', label: 'Runs at once', description: 'Per machine.', value: 2, options }];
+	const out = html(SettingsForm, { settings, onChange: () => {} });
+
+	assert.match(out, /<label id="(\S+?)-label"[^>]*>Runs at once<\/label>\s*<p id="\1-description"[^>]*>Per machine\.<\/p>[\s\S]*<div role="group" aria-labelledby="\1-label" aria-describedby="\1-description"/);
+	assert.doesNotMatch(out, /<label for=|type="number"/, 'the label points at no control, and there is no number box');
+	const pressed = (markup: string) => [...markup.matchAll(/<button type="button" aria-pressed="(true|false)"[^>]*>\s*(\d)\s*<\/button>/g)].map(([, on, label]) => [label, on]);
+	assert.deepEqual(pressed(out), [['1', 'false'], ['2', 'true'], ['3', 'false']]);
+
+	// A value that is none of the options presses none.
+	assert.deepEqual(pressed(html(SettingsForm, { settings: [{ ...settings[0], value: 7 }], onChange: () => {} })).map(([, on]) => on), ['false', 'false', 'false']);
+	// Turned off, every option is off.
+	assert.equal(html(SettingsForm, { settings, onChange: () => {}, disabled: true }).match(/ disabled=""/g)?.length, 3);
+	assert.equal(html(SettingsForm, { settings: [{ ...settings[0], disabled: true }], onChange: () => {} }).match(/ disabled=""/g)?.length, 3);
+	// An option turned off is off on its own.
+	const some = [{ value: '1', label: '1' }, { value: '2', label: '2', disabled: true }];
+	assert.equal(html(SettingsForm, { settings: [{ ...settings[0], options: some }], onChange: () => {} }).match(/ disabled=""/g)?.length, 1);
+});

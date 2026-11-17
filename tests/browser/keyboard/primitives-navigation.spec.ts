@@ -347,3 +347,38 @@ test.describe('AppShell', () => {
 		expect(await shell.evaluate((root) => root.scrollWidth <= root.clientWidth)).toBe(true);
 	});
 });
+
+test.describe('SectionNav', () => {
+	test('Tab walks the sections in order and Enter follows one, which becomes the current page', async ({ page }) => {
+		const section = await openSection(page, 'section-nav');
+		const nav = section.getByRole('navigation', { name: 'Settings sections' });
+		const link = (name: string) => nav.getByRole('link', { name, exact: true });
+		await expect(nav.getByRole('link')).toHaveText(['General', 'Subscriptions', 'Machines', 'Repositories', 'Notifications', 'Members']);
+		await expect(link('Subscriptions')).toHaveAttribute('aria-current', 'page');
+
+		await link('General').focus();
+		for (const name of ['Subscriptions', 'Machines', 'Repositories']) {
+			await press(page, 'Tab');
+			await expect(link(name)).toBeFocused();
+		}
+		await press(page, 'Shift+Tab', 'Enter');
+		await expect(link('Machines')).toHaveAttribute('aria-current', 'page');
+		await expect(nav.locator('[aria-current]')).toHaveCount(1);
+		await expect(section.getByRole('heading', { name: 'Machines', exact: true })).toBeVisible();
+		await expect(link('Machines')).toBeFocused();
+	});
+
+	test('on a phone the sections are one row that scrolls inside the nav, and the page does not', async ({ page }) => {
+		const section = await openSection(page, 'section-nav');
+		await page.setViewportSize({ width: 390, height: 800 });
+		const nav = section.getByRole('navigation', { name: 'Settings sections' });
+		await nav.scrollIntoViewIfNeeded();
+		const links = await Promise.all((await nav.getByRole('link').all()).map(async (link) => (await link.boundingBox())!));
+		for (const link of links) expect(link.y).toBe(links[0].y);
+		await expect(nav).toHaveCSS('overflow-x', 'auto');
+		expect(await nav.evaluate((box) => box.scrollWidth > box.clientWidth)).toBe(true);
+		const box = (await nav.boundingBox())!;
+		expect(box.x + box.width).toBeLessThanOrEqual(390);
+		expect(await section.evaluate((root) => root.scrollWidth <= root.clientWidth)).toBe(true);
+	});
+});

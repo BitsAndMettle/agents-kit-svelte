@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { hold, openOnClock, press } from './helpers';
 
 /** Longer than the demos' 800 ms "server". */
@@ -111,4 +111,42 @@ test('TierMatrix: a preset and a single tier both save the whole value, and a lo
 	await page.clock.runFor(SAVED);
 	await expect(critical.getByRole('radio', { name: 'Ask' })).toBeChecked();
 	await expect(note).toHaveText('Merges on its own: low, medium, high.');
+});
+
+test('SettingsForm: a number with options is a row of pressed buttons; a press shows at once, and snaps back when refused', async ({ page }) => {
+	const section = await openOnClock(page, 'settings-form');
+	const note = section.getByRole('status');
+	const option = (group: Locator, name: string) => group.getByRole('button', { name, exact: true });
+	const slots = section.getByRole('group', { name: 'Runs at once' });
+	const form = slots.locator('xpath=ancestor::ul[1]');
+	await expect(slots).toHaveAccessibleDescription('How many runs one machine takes at a time.');
+	await expect(option(slots, '2')).toHaveAttribute('aria-pressed', 'true');
+	await hold(page);
+
+	// Enter presses: the choice shows at once and is saved.
+	await option(slots, '3').focus();
+	await press(page, 'Enter');
+	await expect(option(slots, '3')).toHaveAttribute('aria-pressed', 'true');
+	await expect(option(slots, '2')).toHaveAttribute('aria-pressed', 'false');
+	await expect(form).toHaveAttribute('aria-busy', 'true');
+	await page.clock.runFor(SAVED);
+	await expect(note).toHaveText('Saved slots: 3');
+	await expect(form).toHaveAttribute('aria-busy', 'false');
+
+	// A press on the pressed option changes nothing and saves nothing.
+	await press(page, 'Space');
+	await expect(form).toHaveAttribute('aria-busy', 'false');
+	await expect(option(slots, '3')).toHaveAttribute('aria-pressed', 'true');
+
+	// The demo's server refuses this one: Space presses, the choice shows while it is asked, then snaps back, focus kept.
+	const reviewers = section.getByRole('group', { name: 'Required reviewers' });
+	await option(reviewers, '2').focus();
+	await press(page, 'Space');
+	await expect(option(reviewers, '2')).toHaveAttribute('aria-pressed', 'true');
+	await expect(option(reviewers, '1')).toHaveAttribute('aria-pressed', 'false');
+	await page.clock.runFor(SAVED);
+	await expect(note).toHaveText('Refused: one review is enough here.');
+	await expect(option(reviewers, '1')).toHaveAttribute('aria-pressed', 'true');
+	await expect(option(reviewers, '2')).toHaveAttribute('aria-pressed', 'false');
+	await expect(option(reviewers, '2')).toBeFocused();
 });

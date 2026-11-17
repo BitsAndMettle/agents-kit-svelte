@@ -2,7 +2,7 @@
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { cn } from '../ui/cn';
-	import { ROW } from '../ui/styles';
+	import { ROW, SEGMENT_GROUP_CLASS, segmentClass } from '../ui/styles';
 	import { Input, NativeSelect, Switch } from '../primitives/form';
 	import { Draft } from './draft.svelte';
 	import type { Setting } from './types';
@@ -42,14 +42,31 @@
 		{@const value = drafts.get(setting.id)?.value ?? setting.value}
 		{@const describedBy = setting.description ? `${id}-description` : undefined}
 		{@const off = disabled || setting.disabled}
+		{@const segmented = typeof value === 'number' && !!setting.options}
 		<li class={ROW.root}>
 			<div class="min-w-0 flex-1">
 				<!-- Only as wide as its words: empty space in a row changes nothing. -->
-				<label for={id} class={cn(ROW.title, 'w-fit')}>{setting.label}</label>
+				<label for={segmented ? undefined : id} id={segmented ? `${id}-label` : undefined} class={cn(ROW.title, 'w-fit')}>{setting.label}</label>
 				{#if setting.description}<p id={describedBy} class={ROW.description}>{setting.description}</p>{/if}
 			</div>
 			{#if typeof value === 'boolean'}
 				<Switch {id} checked={value} disabled={off} aria-describedby={describedBy} class="shrink-0" onCheckedChange={(next) => change(setting.id, next)} />
+			{:else if typeof value === 'number' && setting.options}
+				<!-- A press on the pressed option does nothing, so the setting always keeps a value. -->
+				<div role="group" aria-labelledby="{id}-label" aria-describedby={describedBy} class={cn(SEGMENT_GROUP_CLASS, 'shrink-0')}>
+					{#each setting.options as option (option.value)}
+						{@const pressed = Number(option.value) === value}
+						<button
+							type="button"
+							aria-pressed={pressed}
+							disabled={off || option.disabled}
+							onclick={() => pressed || change(setting.id, Number(option.value))}
+							class={cn(segmentClass(pressed), 'cursor-pointer disabled:cursor-not-allowed disabled:opacity-50')}
+						>
+							{option.label}
+						</button>
+					{/each}
+				</div>
 			{:else if typeof value === 'number'}
 				<!-- The browser checks the number and says what is wrong with it, in the person's language. -->
 				<Input

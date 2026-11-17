@@ -2,7 +2,7 @@ import type { CatalogItemMeta } from '../catalog-registry.ts';
 
 const SOURCE = 'Agents Kit Svelte · Primitives';
 
-/** Catalogue entries for the Primitives collection. Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination, AppShell. Category: 'Primitives'. */
+/** Catalogue entries for the Primitives collection. Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination, AppShell, SectionNav. Category: 'Primitives'. */
 export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
 	{
 		slug: 'tabs',
@@ -131,5 +131,30 @@ export const PRIMITIVES_NAVIGATION: CatalogItemMeta[] = [
   {/snippet}
   <p class="p-6">The page for {path}</p>
 </AppShell>`
+	},
+	{
+		slug: 'section-nav',
+		name: 'SectionNav',
+		category: 'Primitives',
+		sveltePath: 'src/lib/primitives/navigation/SectionNav.svelte',
+		upstreamSource: SOURCE,
+		description:
+			'The sections of one page as links, with the one on screen marked as the current page. From 768px a column beside the page; on a phone one row above it that scrolls sideways inside itself, so the page never does.',
+		usageSnippet: `<script lang="ts">
+  import { SectionNav } from 'agents-kit-svelte/primitives';
+
+  // From your router, e.g. page.url.pathname in SvelteKit.
+  let { path }: { path: string } = $props();
+</script>
+
+<SectionNav
+  aria-label="Settings sections"
+  current={path}
+  items={[
+    { label: 'General', href: '/settings' },
+    { label: 'Subscriptions', href: '/settings/subscriptions' },
+    { label: 'Machines', href: '/settings/machines' }
+  ]}
+/>`
 	}
 ];

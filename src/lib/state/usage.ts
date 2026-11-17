@@ -1,4 +1,4 @@
-import { dayTime } from '../core/time';
+import { clockTime, dayTime } from '../core/time';
 import type { BurnPoint } from '../charts/types';
 import type { AccountUsage, AccountUsageStatus, UsageWindow } from '../types';
 import type { UiTone } from '../ui/styles';
@@ -51,6 +51,18 @@ export function usageText(account: AccountUsage, timeZone = 'UTC'): string {
 		default:
 			return window ? `${Math.max(0, 100 - window.used)}% left · ${when}` : 'Not read yet';
 	}
+}
+
+/**
+ * One window in a few words, as a usage table's cell says it: "66% left · 16:40", "Resets 18:20" at its limit, "100% left"
+ * when none is running. A week names its day: "39% left · Thu 20:00". Undefined when the account was never read.
+ */
+export function usageWindowText(account: AccountUsage, key: keyof AccountUsage['windows'], timeZone = 'UTC'): string | undefined {
+	const window = account.windows[key];
+	if (account.at === undefined) return undefined;
+	if (!window) return '100% left';
+	const when = (key === 'week' ? dayTime : clockTime)(window.resetsAt, timeZone);
+	return window.used >= 100 ? `Resets ${when}` : `${100 - window.used}% left · ${when}`;
 }
 
 /**

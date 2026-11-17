@@ -2,7 +2,8 @@ import type { NativeSelectOption, RadioOption } from '../primitives/form';
 
 /**
  * One row of a `SettingsForm`. Its control follows its value: a switch for a boolean, a number box
- * for a number, and for a string a select of its `options`, or a text box when it has none.
+ * for a number (a row of pressed buttons when it has `options`), and for a string a select of its
+ * `options`, or a text box when it has none.
  */
 export interface Setting {
 	/** Unique in the form. Reported with every change. */
@@ -18,7 +19,10 @@ export interface Setting {
 	max?: number;
 	/** A number: the distance between allowed values. Without it, whole numbers. */
 	step?: number;
-	/** A string: the values to choose from. */
+	/**
+	 * A string: the values to choose from, as a select. A number: its choices as a row of pressed buttons, each
+	 * option's `value` the number as text, e.g. `{ value: '3', label: '3' }`.
+	 */
 	options?: NativeSelectOption[];
 	disabled?: boolean;
 }
