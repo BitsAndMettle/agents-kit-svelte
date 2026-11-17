@@ -33,10 +33,19 @@ export function formatElapsed(since: TimeInput, now: TimeInput): string {
  * Returns an empty string when the time is not valid.
  */
 export function clockTime(time: TimeInput, timeZone = 'UTC'): string {
+	return formatTime(time, { timeZone });
+}
+
+/** The weekday and time of day as "Thu 20:00", in `timeZone` (default UTC). Empty when the time is not valid. */
+export function dayTime(time: TimeInput, timeZone = 'UTC'): string {
+	return formatTime(time, { weekday: 'short', timeZone });
+}
+
+function formatTime(time: TimeInput, options: Intl.DateTimeFormatOptions): string {
 	const ms = toMillis(time);
 	if (!Number.isFinite(ms)) return '';
 	try {
-		return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone }).format(ms);
+		return new Intl.DateTimeFormat('en-GB', { ...options, hour: '2-digit', minute: '2-digit', hour12: false }).format(ms);
 	} catch {
 		return '';
 	}

@@ -6,7 +6,7 @@
  * every collection shares one look without a parallel component layer.
  */
 
-export type UiTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
+export type UiTone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger' | 'info';
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent';
 export type ButtonSize = 'xs' | 'sm' | 'md' | 'lg' | 'icon-xs' | 'icon-sm' | 'icon';
 
@@ -56,7 +56,8 @@ export const STATUS_TEXT_CLASS: Record<UiTone, string> = {
 	accent: 'text-accent-primary',
 	success: 'text-status-success',
 	warning: 'text-status-warning',
-	danger: 'text-status-danger'
+	danger: 'text-status-danger',
+	info: 'text-status-info'
 };
 
 const BADGE_TONES: Record<UiTone, string> = {
@@ -64,7 +65,8 @@ const BADGE_TONES: Record<UiTone, string> = {
 	accent: 'bg-accent-subtle text-accent-primary',
 	success: 'bg-status-success-subtle text-status-success',
 	warning: 'bg-status-warning-subtle text-status-warning',
-	danger: 'bg-status-danger-subtle text-status-danger'
+	danger: 'bg-status-danger-subtle text-status-danger',
+	info: 'bg-status-info-subtle text-status-info'
 };
 
 /**
@@ -84,7 +86,8 @@ export const TONE_FILL_CLASS: Record<UiTone, string> = {
 	accent: 'bg-accent-primary',
 	success: 'bg-status-success',
 	warning: 'bg-status-warning',
-	danger: 'bg-status-danger'
+	danger: 'bg-status-danger',
+	info: 'bg-status-info'
 };
 
 /** Slim 6px progress track. Pair with `progressFillClass`. */

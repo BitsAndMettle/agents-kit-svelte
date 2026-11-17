@@ -26,6 +26,12 @@
 		rateLabel?: string;
 		/** Multiplier from spend per t unit to the displayed rate. Defaults to 60 (per second → per minute). */
 		rateScale?: number;
+		/** Formats a spend value for the header, axis and tooltip. Defaults to compact tokens (`12.4k`). */
+		formatValue?: (value: number) => string;
+		/** Word after the budget in the header. */
+		unit?: string;
+		/** Names the budget line, e.g. `Switch point`. */
+		budgetLabel?: string;
 		/** Called when the person clicks a mark. */
 		onSelectMark?: (mark: RunMark) => void;
 		/** Called when the person clicks the plot: the spend at that time. */
@@ -43,6 +49,9 @@
 		formatTime = formatClock,
 		rateLabel = '/min',
 		rateScale = 60,
+		formatValue = formatCompact,
+		unit = 'tokens',
+		budgetLabel = 'Budget',
 		onSelectMark,
 		onSelectPoint,
 		class: className = '',
@@ -134,8 +143,8 @@
 		<div>
 			{#if title}<h3 class="text-sm font-semibold text-fg-main">{title}</h3>{/if}
 			<p class="mt-1 flex items-baseline gap-1.5">
-				<span class={cn('text-[22px] leading-none font-semibold tabular-nums transition-colors duration-300', tone)}>{formatCompact(Math.round(spentShown.current))}</span>
-				{#if budget}<span class="text-[13px] text-fg-light">of {formatCompact(budget)} tokens</span>{/if}
+				<span class={cn('text-[22px] leading-none font-semibold tabular-nums transition-colors duration-300', tone)}>{formatValue(Math.round(spentShown.current))}</span>
+				{#if budget}<span class="text-[13px] text-fg-light">of {formatValue(budget)} {unit}</span>{/if}
 			</p>
 		</div>
 		<dl class="flex gap-5 text-[11px]">
@@ -146,12 +155,12 @@
 			{#if projecting}
 				<div>
 					<dt class="text-fg-light">Projected at end</dt>
-					<dd class={cn('mt-0.5 font-medium tabular-nums', budget && burn.projected > budget ? 'text-status-danger' : 'text-fg-main')}>{formatCompact(Math.round(burn.projected))}</dd>
+					<dd class={cn('mt-0.5 font-medium tabular-nums', budget && burn.projected > budget ? 'text-status-danger' : 'text-fg-main')}>{formatValue(Math.round(burn.projected))}</dd>
 				</div>
 			{/if}
 			{#if budget}
 				<div>
-					<dt class="text-fg-light">Budget</dt>
+					<dt class="text-fg-light">{budgetLabel}</dt>
 					{#key over}
 						<dd class={cn('mt-0.5 font-medium', over ? 'text-status-danger' : 'text-status-success')} in:rise={{ y: 4, duration: 180 }}>
 							{#if burn.crossesAt !== null}{last && burn.crossesAt <= last.t ? 'Over' : 'Runs out'} at {formatTime(burn.crossesAt)}{:else}{Math.round(pctUsed ?? 0)}% used{/if}
@@ -172,7 +181,7 @@
 			aria-valuemin={0}
 			aria-valuemax={Math.round(last?.t ?? 0)}
 			aria-valuenow={Math.round(activeT ?? 0)}
-			aria-valuetext={activeT === null ? 'No time selected' : `${formatTime(activeT)}: ${formatCompact(Math.round(spentAt(activeT)))} tokens`}
+			aria-valuetext={activeT === null ? 'No time selected' : `${formatTime(activeT)}: ${formatValue(Math.round(spentAt(activeT)))} ${unit}`}
 			tabindex="0"
 			onpointermove={(e) => (activeT = localT(e))}
 			onpointerleave={() => (activeT = null)}
@@ -196,7 +205,7 @@
 				{#each yTicks as t (t)}
 					<g transform="translate(0,{y(t)})">
 						<line x2={innerW} class="stroke-canvas-border" stroke-dasharray={t === 0 ? undefined : '2 4'} />
-						<text x="-8" dy="0.32em" text-anchor="end" class="fill-fg-light text-[10px] tabular-nums">{formatCompact(t)}</text>
+						<text x="-8" dy="0.32em" text-anchor="end" class="fill-fg-light text-[10px] tabular-nums">{formatValue(t)}</text>
 					</g>
 				{/each}
 				{#each xTicks as t (t)}
@@ -205,7 +214,7 @@
 
 				{#if budget}
 					<line x1="0" x2={innerW} y1={y(budget)} y2={y(budget)} class="stroke-status-danger" stroke-width="1.5" stroke-dasharray="6 4" />
-					<text x={innerW + 6} y={y(budget) + (projecting && Math.abs(y(burn.projected) - y(budget)) < 12 ? (burn.projected > budget ? 6 : -6) : 0)} dy="0.32em" class="fill-status-danger text-[10px] font-medium">Budget</text>
+					<text x={innerW + 6} y={y(budget) + (projecting && Math.abs(y(burn.projected) - y(budget)) < 12 ? (burn.projected > budget ? 6 : -6) : 0)} dy="0.32em" class="fill-status-danger text-[10px] font-medium">{budgetLabel}</text>
 				{/if}
 
 				<g clip-path="url(#{uid}-reveal)">
@@ -226,7 +235,7 @@
 						stroke-dasharray="4 4"
 						style:opacity={reveal.current}
 					/>
-					<text x={x(tEnd) + 6} y={y(burn.projected) + (budget && Math.abs(y(burn.projected) - y(budget)) < 12 ? (burn.projected > budget ? -10 : 10) : 0)} dy="0.32em" class={cn('text-[10px] tabular-nums', budget && burn.projected > budget ? 'fill-status-danger' : 'fill-fg-light')} style:opacity={reveal.current}>{formatCompact(Math.round(burn.projected))}</text>
+					<text x={x(tEnd) + 6} y={y(burn.projected) + (budget && Math.abs(y(burn.projected) - y(budget)) < 12 ? (burn.projected > budget ? -10 : 10) : 0)} dy="0.32em" class={cn('text-[10px] tabular-nums', budget && burn.projected > budget ? 'fill-status-danger' : 'fill-fg-light')} style:opacity={reveal.current}>{formatValue(Math.round(burn.projected))}</text>
 				{/if}
 				{#if budget && burn.crossesAt !== null && burn.crossesAt <= tEnd}
 					<g transform="translate({x(burn.crossesAt)},{y(budget)})" style:opacity={reveal.current}>
@@ -279,7 +288,7 @@
 					in:rise={{ y: 3, duration: 120 }}
 				>
 					<p class="font-medium text-fg-main">{m.label}</p>
-					<p class="text-fg-light tabular-nums">{formatTime(m.t)} · {formatCompact(Math.round(spentAt(m.t)))} spent</p>
+					<p class="text-fg-light tabular-nums">{formatTime(m.t)} · {formatValue(Math.round(spentAt(m.t)))} spent</p>
 				</div>
 			{/if}
 		{:else if activeT !== null}
@@ -290,7 +299,7 @@
 				style:left="{left}px"
 			>
 				<p class="font-medium text-fg-main tabular-nums">{formatTime(activeT)}</p>
-				<p class="mt-0.5 flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Spent</span><span class="text-fg-main">{formatCompact(Math.round(spent))}{#if budget}<span class="ml-1 text-fg-light">{Math.round((spent / budget) * 100)}%</span>{/if}</span></p>
+				<p class="mt-0.5 flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Spent</span><span class="text-fg-main">{formatValue(Math.round(spent))}{#if budget}<span class="ml-1 text-fg-light">{Math.round((spent / budget) * 100)}%</span>{/if}</span></p>
 				<p class="flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Rate</span><span class="text-fg-main">{formatCompact(Math.round(rateAt(activeT) * rateScale))}{rateLabel}</span></p>
 			</div>
 		{/if}
