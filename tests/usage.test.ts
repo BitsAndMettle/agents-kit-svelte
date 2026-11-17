@@ -30,8 +30,8 @@ test('each status takes a kit tone and its own words', () => {
 	assert.deepEqual(usage.USAGE_TONE, { available: 'success', low: 'warning', switched: 'info', out: 'neutral', off: 'neutral' });
 	assert.equal(usage.usageText(personal), '34% left · Sat 20:00');
 	assert.equal(usage.usageText(work), 'Out until Tue 18:20');
-	assert.equal(usage.usageText(spare), 'Past the 98% switch point · Thu 20:00');
-	assert.equal(usage.usageText({ ...spare, switchAt: undefined }), 'Past the switch point · Thu 20:00');
+	assert.equal(usage.usageText(spare), 'Past the 98% switch point');
+	assert.equal(usage.usageText({ ...spare, switchAt: undefined }), 'Past the switch point');
 	assert.equal(usage.usageText({ ...personal, status: 'off' }), 'Off');
 	const low: AccountUsage = { label: 'L', agent: 'Claude Code', status: 'low', windows: { fiveHour: { used: 91, resetsAt: Date.UTC(2026, 10, 17, 17) }, week: { used: 40, resetsAt: Date.UTC(2026, 10, 21, 20) } } };
 	assert.equal(usage.usageText(low), '9% left · Tue 17:00', 'the window nearest its limit decides');

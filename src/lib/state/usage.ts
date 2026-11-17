@@ -35,7 +35,7 @@ function backAt(account: AccountUsage): number | undefined {
 	return account.until ?? (full.length ? Math.max(...full.map((w) => w.resetsAt)) : usageWindow(account)?.resetsAt);
 }
 
-/** The account's status in a few words: "39% left · Thu 20:00", "Past the 98% switch point · Thu 20:00", "Out until Mon 18:20", "Off". */
+/** The account's status in a few words: "39% left · Thu 20:00", "Past the 98% switch point", "Out until Mon 18:20", "Off". */
 export function usageText(account: AccountUsage, timeZone = 'UTC'): string {
 	const window = usageWindow(account);
 	const when = window ? dayTime(window.resetsAt, timeZone) : '';
@@ -46,10 +46,8 @@ export function usageText(account: AccountUsage, timeZone = 'UTC'): string {
 			const back = backAt(account);
 			return back === undefined ? 'Out' : `Out until ${dayTime(back, timeZone)}`;
 		}
-		case 'switched': {
-			const past = account.switchAt === undefined ? 'Past the switch point' : `Past the ${account.switchAt}% switch point`;
-			return when ? `${past} · ${when}` : past;
-		}
+		case 'switched':
+			return account.switchAt === undefined ? 'Past the switch point' : `Past the ${account.switchAt}% switch point`;
 		default:
 			return window ? `${Math.max(0, 100 - window.used)}% left · ${when}` : 'Not read yet';
 	}

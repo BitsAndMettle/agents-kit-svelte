@@ -11,7 +11,7 @@ test('UsagePill: Enter opens the per-account breakdown, Space closes it, focus s
 	await expect(pill).toHaveAttribute('aria-expanded', 'true');
 	const panel = section.locator(`[id="${await pill.getAttribute('aria-controls')}"]`);
 	await expect(panel.getByRole('progressbar')).toHaveCount(3);
-	await expect(panel.getByRole('progressbar', { name: 'Spare usage' })).toHaveAttribute('aria-valuetext', 'Past the 98% switch point');
+	await expect(panel.getByRole('progressbar', { name: 'Spare usage' })).toHaveAttribute('aria-valuetext', '98%');
 	await expect(pill).toBeFocused();
 
 	await press(page, 'Space');
