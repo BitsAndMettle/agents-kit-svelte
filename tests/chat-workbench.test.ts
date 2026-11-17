@@ -140,11 +140,11 @@ test('quiet rail: one 14px leading slot per row, 32px sidebar rows with a mouse,
 	const conversations = [
 		{ id: 'q', title: 'Questions', subtitle: 'Asked by the agents', pinned: true },
 		{ id: 'a', title: 'Alpha', date: '14:02', group: 'Today', mark: 'example', active: true },
-		{ id: 'b', title: 'Beta', group: 'Today' }
+		{ id: 'b', title: 'Beta', subtitle: 'Waiting', group: 'Today' }
 	];
 	const out = html(ChatWorkbench, { chrome: 'quiet', conversations, onNewConversation: () => {}, view: 'conversations' });
-	// The second line starts at the title's edge, past the slot and its gap.
-	const subtitle = /<span class="w-full truncate pl-5\.5 text-xs[^"]*">Asked by the agents<\/span>/;
+	// Pinned or not, the second line starts at the title's edge, past the slot and its gap.
+	const subtitle = /<span class="w-full truncate pl-5\.5 text-xs[^"]*">(Asked by the agents|Waiting)<\/span>/g;
 	const sidebar = out.slice(out.indexOf('<aside'), out.indexOf('</aside>'));
 	const panel = out.slice(out.indexOf('role="tabpanel"'), out.indexOf('</nav>', out.indexOf('role="tabpanel"')));
 	assert.match(sidebar, /^<aside aria-label="Conversations" class="[^"]*\bp-2\b/);
@@ -159,7 +159,7 @@ test('quiet rail: one 14px leading slot per row, 32px sidebar rows with a mouse,
 		// Idle titles are as dark as the active one.
 		const idle = list.match(/<button[^>]*>(?:(?!<\/button>)[\s\S])*?Beta/)![0];
 		assert.match(idle, /class="[^"]* text-fg-main hover:bg-card-bg"/);
-		assert.match(list, subtitle);
+		assert.equal([...list.matchAll(subtitle)].length, 2);
 		assert.doesNotMatch(list, /ak-shadow-soft-sm|text-\[11px\]/);
 	}
 	assert.match(sidebar, /<p class="flex h-8 items-end[^"]*text-xs text-fg-light">Today<\/p>/);
