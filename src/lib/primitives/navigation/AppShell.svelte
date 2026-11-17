@@ -27,6 +27,13 @@
 	export interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children' | 'title'> {
 		/** The app's name, at the start of the bar. */
 		title?: string;
+		/** Your mark before the name, e.g. a 20px logo. Decorative: hide it from assistive technology. */
+		mark?: Snippet;
+		/**
+		 * `soft`: today's bar. `studio`: the Studio design's bar. 56px on the card surface, the name at 16px bold
+		 * from 640px, the places as flat links with the one on screen filled, counts solid.
+		 */
+		chrome?: 'soft' | 'studio';
 		/** The places to go, in order. */
 		items: AppShellItem[];
 		/**
@@ -55,7 +62,17 @@
 	import { SEGMENT_GROUP_CLASS, segmentClass } from '../../ui/styles';
 	import Badge from '../display/Badge.svelte';
 
-	let { title = '', items, path, actions, maxWidth, children, 'aria-label': ariaLabel = 'Main', class: className = '', ...rest }: Props = $props();
+	let { title = '', mark, chrome = 'soft', items, path, actions, maxWidth, children, 'aria-label': ariaLabel = 'Main', class: className = '', ...rest }: Props = $props();
+
+	// Studio: a 56px bar on the card surface; 24px between its groups from 1024px.
+	const STUDIO_HEADER = 'sticky top-0 z-40 shrink-0 border-b border-card-border bg-card-bg';
+	const STUDIO_ROW = 'mx-auto flex flex-wrap items-center min-h-14 gap-x-4 gap-y-3 px-4 py-2 lg:gap-x-6';
+	const STUDIO_NAME = 'text-sm font-semibold sm:text-base sm:font-bold';
+	const STUDIO_LINK = 'flex h-[30px] w-full items-center justify-center gap-2 rounded-chip px-3 text-sm transition-colors max-sm:h-10';
+	const STUDIO_HERE = 'bg-canvas-secondary font-semibold text-fg-main';
+	const STUDIO_IDLE = 'text-fg-light hover:bg-canvas-secondary hover:text-fg-main';
+
+	let studio = $derived(chrome === 'studio');
 
 	/** A path ending in a slash, so `/board` is above `/board/42` and `/board/`, and not above `/boardroom`. */
 	const slashed = (at: string) => (at.endsWith('/') ? at : `${at}/`);
@@ -65,24 +82,24 @@
 </script>
 
 <div {...rest} class={cn('flex flex-col bg-canvas-primary text-fg-main', here?.fill ? 'h-dvh' : 'min-h-dvh', className)}>
-	<header class="sticky top-0 z-40 shrink-0 border-b border-canvas-border bg-canvas-primary py-2">
-		<div class="mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-6" style:max-width={maxWidth}>
-			{#if title}<p class="m-0 text-sm font-semibold">{title}</p>{/if}
+	<header class={studio ? STUDIO_HEADER : 'sticky top-0 z-40 shrink-0 border-b border-canvas-border bg-canvas-primary py-2'}>
+		<div class={studio ? `${STUDIO_ROW} ${maxWidth ? 'sm:px-6' : 'sm:px-5'}` : 'mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-6'} style:max-width={maxWidth}>
+			{#if title || mark}<p class="m-0 {mark ? 'flex items-center gap-2 ' : ''}{studio ? STUDIO_NAME : 'text-sm font-semibold'}">{@render mark?.()}{title}</p>{/if}
 			<nav aria-label={ariaLabel} class="order-last w-full sm:order-none sm:w-auto">
-				<ul class={cn(SEGMENT_GROUP_CLASS, 'm-0 flex list-none')}>
+				<ul class={studio ? 'm-0 flex list-none items-center gap-1 p-0' : cn(SEGMENT_GROUP_CLASS, 'm-0 flex list-none')}>
 					{#each items as item (item.href)}
 						<li class="flex-1 sm:flex-none">
-							<a href={item.href} aria-current={item === here ? 'page' : undefined} class={cn(segmentClass(item === here), 'w-full justify-center max-sm:h-10')}>
+							<a href={item.href} aria-current={item === here ? 'page' : undefined} class={studio ? `${STUDIO_LINK} ${item === here ? STUDIO_HERE : STUDIO_IDLE}` : cn(segmentClass(item === here), 'w-full justify-center max-sm:h-10')}>
 								{item.label}
 								{#if item.count}
-									<Badge tone={item.countTone ?? 'accent'} size="sm">{item.count}{#if item.countLabel}<span class="sr-only">{` ${item.countLabel}`}</span>{/if}</Badge>
+									<Badge tone={item.countTone ?? 'accent'} size={studio ? undefined : 'sm'} variant={studio ? 'solid' : undefined} class={studio ? 'px-[7px] leading-[14px] font-semibold' : undefined}>{item.count}{#if item.countLabel}<span class="sr-only">{` ${item.countLabel}`}</span>{/if}</Badge>
 								{/if}
 							</a>
 						</li>
 					{/each}
 				</ul>
 			</nav>
-			{#if actions}<div class="ml-auto flex items-center gap-1.5">{@render actions()}</div>{/if}
+			{#if actions}<div class={studio ? 'ml-auto flex items-center gap-1.5 lg:gap-6' : 'ml-auto flex items-center gap-1.5'}>{@render actions()}</div>{/if}
 		</div>
 	</header>
 	<main class="min-h-0 flex-1">{@render children?.()}</main>
