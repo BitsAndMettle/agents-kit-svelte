@@ -18,6 +18,8 @@
 		ChatWorkbenchStatus,
 		PresenceState,
 		PromptAttachment,
+		PromptCommand,
+		PromptContextOption,
 		PromptInputEffort,
 		PromptInputOption
 	} from '../types';
@@ -53,6 +55,10 @@
 		messageFooter?: Snippet<[ChatWorkbenchMessage]>;
 		/** Drawn after the last message, e.g. a decision that waits for the person. */
 		trailing?: Snippet;
+		/** A rail on the right from 1024px, drawn as the conversations sidebar is, e.g. what needs the person at a glance. Not in `panel` layout. */
+		aside?: Snippet;
+		/** The rail's accessible name. */
+		asideLabel?: string;
 
 		/** Past conversations. Without them there is no list, sidebar or tabs. */
 		conversations?: ChatWorkbenchConversation[];
@@ -74,6 +80,10 @@
 		/** Chips sent with the next message, e.g. a card. Bindable. */
 		attachments?: PromptAttachment[];
 		onRemoveAttachment?: (id: string) => void;
+		/** Entries of the composer's `+` menu, each attaching a chip. */
+		contextOptions?: PromptContextOption[];
+		/** The composer's `/` menu: typing `/` lists them, choosing one puts its text in the field. */
+		commands?: PromptCommand[];
 		/** Models for the composer's picker. No models, no picker. */
 		models?: PromptInputOption[];
 		/** The current model. Bindable. */
@@ -107,6 +117,8 @@
 		empty,
 		messageFooter,
 		trailing,
+		aside,
+		asideLabel = 'At a glance',
 		conversations,
 		conversationsNotice = '',
 		onSelectConversation,
@@ -118,6 +130,8 @@
 		disabled = false,
 		attachments = $bindable([]),
 		onRemoveAttachment,
+		contextOptions,
+		commands,
 		models = [],
 		model = $bindable(),
 		efforts = [],
@@ -142,6 +156,7 @@
 		info: 'bg-status-info',
 		neutral: 'bg-fg-light'
 	} as const;
+	const RAIL = 'hidden min-h-0 w-60 shrink-0 flex-col gap-2 overflow-y-auto bg-chat-user/30 p-3.5 lg:flex';
 	// Phone-sized controls are 44px tall.
 	const actionClasses = {
 		button: pillClass('secondary', 'sm', 'max-sm:h-11'),
@@ -190,7 +205,7 @@
 		data-layout={layout}
 		class={cn('flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-chat-surface text-fg-main', className)}
 	>
-		<header class="shrink-0 border-b border-chat-border/70 bg-chat-surface px-4 pt-3 sm:px-6 {hasList && layout === 'auto' ? 'lg:pb-3' : hasList ? '' : 'pb-3'}">
+		<header class="shrink-0 bg-chat-surface px-4 pt-3 sm:px-6 {hasList && layout === 'auto' ? 'lg:pb-3' : hasList ? '' : 'pb-3'}">
 			<div class="flex items-start justify-between gap-3">
 				<div class="flex min-w-0 items-center gap-3">
 					<span aria-hidden="true" class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-chat-accent-subtle text-chat-accent">
@@ -218,7 +233,7 @@
 			</div>
 
 			{#if hasList}
-				<div class="-mb-px mt-2.5 flex items-center gap-1 {tabsClass}">
+				<div class="mt-2.5 flex items-center gap-1 {tabsClass}">
 					<div role="tablist" aria-label="{title || 'Chat'} views" class="flex gap-1 overflow-x-auto [scrollbar-width:none]">
 						{#each TABS as tab (tab.id)}
 							<button
@@ -255,7 +270,7 @@
 
 		<div class="flex min-h-0 flex-1 overflow-hidden">
 			{#if sidebar}
-				<aside aria-label="Conversations" class="hidden min-h-0 w-60 shrink-0 flex-col gap-2 overflow-y-auto border-r border-chat-border/70 bg-chat-user/30 p-3.5 lg:flex">
+				<aside aria-label="Conversations" class={RAIL}>
 					<div class="flex items-center justify-between gap-2 px-1">
 						<h2 class="text-[11px] font-medium text-fg-light">Conversations</h2>
 						{#if onNewConversation}
@@ -300,7 +315,7 @@
 									{#if part.type === 'text'}
 										<Markdown text={part.text} />
 									{:else if part.type === 'tool'}
-										<ToolResult tool={part.tool} summary={part.summary} output={part.output ?? ''} status={part.status} meta={part.meta} defaultOpen={Boolean(part.output)} />
+										<ToolResult tool={part.tool} summary={part.summary} output={part.output} status={part.status} meta={part.meta} defaultOpen={Boolean(part.output)} />
 									{:else if part.type === 'activity'}
 										<AgentActivity items={part.items} status={part.status} />
 									{:else}
@@ -331,6 +346,8 @@
 							bind:value
 							bind:attachments
 							{onRemoveAttachment}
+							{contextOptions}
+							{commands}
 							{placeholder}
 							{disabled}
 							{busy}
@@ -347,6 +364,10 @@
 					</div>
 				</div>
 			</div>
+
+			{#if aside && layout === 'auto'}
+				<aside aria-label={asideLabel} class={RAIL}>{@render aside()}</aside>
+			{/if}
 		</div>
 	</section>
 {/if}

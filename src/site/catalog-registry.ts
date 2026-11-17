@@ -181,7 +181,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/agents/TodoList.svelte',
 		upstreamSource: 'beUI · components/beui/components/agents/todo-list.tsx',
 		description:
-			'Streaming task plan checklist with Svelte 5 Tween progress bar, animate:flip items, and completion counter.',
+			'Streaming task plan checklist with Svelte 5 Tween progress bar, animate:flip items, and completion counter. `editable` lets a person remove, move and add rows and hand them back with one button.',
 		usageSnippet: `<script lang="ts">
   import { TodoList, type TodoItem } from 'agents-kit-svelte';
 
@@ -235,7 +235,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/agents/ToolResult.svelte',
 		upstreamSource: 'beUI · components/beui/components/agents/tool-result.tsx',
 		description:
-			'Collapsible terminal & tool output stream with duration metadata, copy, and retry callbacks.',
+			'Collapsible terminal & tool output stream with duration metadata, copy, and retry callbacks. Without `output` it is one line.',
 		usageSnippet: `<script lang="ts">
   import { ToolResult } from 'agents-kit-svelte';
 
@@ -313,7 +313,8 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		usageSnippet: `<script lang="ts">
   import { ApprovalCard, type ApprovalQuestion, type ApprovalCardAnswers } from 'agents-kit-svelte';
 
-  let recorded = $state<ApprovalCardAnswers | null>(null);
+  // The card shows a decision only once you pass it back as \`decided\`.
+  let decided = $state<ApprovalCardAnswers>();
 
   const questions: ApprovalQuestion[] = [
     {
@@ -339,7 +340,8 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 <ApprovalCard
   title="Confirm verification scope before creating PR"
   {questions}
-  onSubmit={(answers) => (recorded = answers)}
+  {decided}
+  onSubmit={(answers) => (decided = answers)}
 />`
 	},
 	{
@@ -395,7 +397,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/agents/PromptInput.svelte',
 		upstreamSource: 'beUI · components/beui/components/agents/prompt-input.tsx',
 		description:
-			'IME-safe composer with @worktree/@skill context pills and Supported Agent switcher.',
+			'IME-safe composer with @worktree/@skill context pills, a `/` menu of `commands` and Supported Agent switcher.',
 		usageSnippet: `<script lang="ts">
   import { PromptInput, type SupportedAgentId, type SupportedAgentOption } from 'agents-kit-svelte';
 

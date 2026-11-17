@@ -9,11 +9,17 @@ const { load, html, snippet } = ssr();
 let ChatWorkbench: Component<Record<string, unknown>>;
 let Markdown: Component<Record<string, unknown>>;
 let PromptInput: Component<Record<string, unknown>>;
+let ToolResult: Component<Record<string, unknown>>;
+let ApprovalCard: Component<Record<string, unknown>>;
+let TodoList: Component<Record<string, unknown>>;
 
 before(async () => {
 	ChatWorkbench = await load('/src/lib/workbench/ChatWorkbench.svelte');
 	Markdown = await load('/src/lib/agents/Markdown.svelte');
 	PromptInput = await load('/src/lib/agents/PromptInput.svelte');
+	ToolResult = await load('/src/lib/agents/ToolResult.svelte');
+	ApprovalCard = await load('/src/lib/agents/ApprovalCard.svelte');
+	TodoList = await load('/src/lib/agents/TodoList.svelte');
 });
 
 const MESSAGES: ChatWorkbenchMessage[] = [
@@ -135,4 +141,83 @@ test('Markdown renders hostile text as text', () => {
 	assert.match(out, /&lt;img src=x onerror=alert\(1\)>/);
 	assert.match(out, /\[x\]\(javascript:alert\(1\)\)/);
 	assert.match(out, />text<\/span>/);
+});
+
+test('aside: a right rail from 1024px without border lines, and none in panel layout', () => {
+	const aside = snippet(() => '<p>2 need you</p>');
+	const out = html(ChatWorkbench, { aside, asideLabel: 'Needs you', conversations: [] });
+	assert.match(out, /<aside aria-label="Needs you" class="hidden [^"]*lg:flex"><p>2 need you<\/p><\/aside>/);
+	assert.doesNotMatch(out, /border-[rb] /);
+	assert.doesNotMatch(html(ChatWorkbench, { aside, layout: 'panel' }), /<aside/);
+	assert.doesNotMatch(html(ChatWorkbench, {}), /<aside/);
+});
+
+test('ChatWorkbench hands contextOptions and commands to its composer', () => {
+	const out = html(ChatWorkbench, {
+		contextOptions: [{ label: 'Card 218', attachment: { id: 'card-218', label: 'Card 218' } }],
+		commands: [{ name: 'status', text: 'What is happening right now?' }],
+		value: '/'
+	});
+	assert.match(out, /aria-label="Add context or skill"/);
+	assert.match(out, /role="listbox" aria-label="Commands"[\s\S]*\/status[\s\S]*What is happening right now\?/);
+});
+
+test('PromptInput: the / menu opens while the text starts with /, filtered by the name', () => {
+	const commands = [
+		{ name: 'plan', text: 'Plan the next Feature with me.' },
+		{ name: 'status', text: 'What is happening right now?' },
+		{ name: 'stop', text: 'Stop what you are doing.' }
+	];
+	const options = (value: string) => [...html(PromptInput, { commands, value }).matchAll(/role="option"[^>]*>[\s\S]*?\/(\w+)</g)].map((m) => m[1]);
+	assert.deepEqual(options('/'), ['plan', 'status', 'stop']);
+	assert.deepEqual(options('/St'), ['status', 'stop']);
+	assert.deepEqual(options('/x'), []);
+	assert.deepEqual(options('status'), []);
+	const out = html(PromptInput, { commands, value: '/s' });
+	// The text field keeps focus and names the option the keys move through.
+	assert.match(out, /<textarea[^>]*aria-autocomplete="list"[^>]*aria-controls="([^"]+)"[^>]*aria-activedescendant="([^"]+)"/);
+	assert.match(out, /aria-selected="true"[^>]*>[\s\S]*?\/status/);
+	assert.doesNotMatch(html(PromptInput, {}), /aria-autocomplete|role="listbox"/);
+});
+
+test('ToolResult without output is one line: no chevron, Copy or terminal box', () => {
+	const bare = html(ToolResult, { tool: 'plan.file', summary: 'Card 218', meta: '14:02' });
+	assert.match(bare, /plan\.file[\s\S]*Card 218[\s\S]*14:02/);
+	assert.doesNotMatch(bare, /<button|aria-expanded|Copy output|bg-terminal-bg/);
+	const full = html(ToolResult, { tool: 'Bash', output: 'ok' });
+	assert.match(full, /aria-expanded="true"/);
+	assert.match(full, /Copy output/);
+	assert.match(full, /bg-terminal-bg[\s\S]*>ok</);
+});
+
+test('ApprovalCard shows a decision only when it is given one, and waits while pending', () => {
+	const questions = [{ id: 'q', question: 'Where to?', options: [{ id: 'a', label: 'Home' }, { id: 'b', label: 'Sign-in' }] }];
+	const open = html(ApprovalCard, { title: 'Policy', questions });
+	assert.match(open, /Where to\?/);
+	assert.doesNotMatch(open, /Decision recorded/);
+	const waiting = html(ApprovalCard, { title: 'Policy', questions, pending: true });
+	assert.match(waiting, /aria-busy="true"[^>]*>\s*Submit decision/);
+	const decided = html(ApprovalCard, { title: 'Policy', questions, decided: { q: ['Sign-in'] } });
+	assert.match(decided, /Decision recorded: Sign-in/);
+	assert.doesNotMatch(decided, /role="radio"/);
+});
+
+test('TodoList editable: each row moves and is removed, a detail opens on a press, rows are added, one button hands them back', () => {
+	const items = [
+		{ id: 'a', label: 'Keep the return path', detail: 'Read next.', status: 'pending' },
+		{ id: 'b', label: 'Test the redirects', status: 'pending' }
+	];
+	const out = html(TodoList, { items, editable: true, submitLabel: 'File plan', onSubmit: () => {} });
+	assert.match(out, /aria-label="Move Keep the return path up" aria-disabled="true"/);
+	assert.match(out, /aria-label="Move Test the redirects down" aria-disabled="true"/);
+	assert.match(out, /aria-label="Remove Test the redirects"/);
+	assert.match(out, /<details[^>]*><summary[^>]*>\s*<span[^>]*>Keep the return path<\/span>[\s\S]*?<\/summary>\s*<p[^>]*>Read next\.<\/p>/);
+	const done = html(TodoList, { items: [{ ...items[0], status: 'completed' }], editable: true });
+	assert.match(done, /<summary[^>]*>\s*<span class="[^"]*line-through[^"]*">Keep the return path</);
+	assert.match(out, /<input[^>]*aria-label="Add a step"/);
+	assert.match(out, />File plan<\/button>/);
+	assert.doesNotMatch(html(TodoList, { items, editable: true }), /File plan|Done<\/button>/);
+	const still = html(TodoList, { items });
+	assert.doesNotMatch(still, /Move |Remove |Add a step|<details/);
+	assert.match(still, />Read next\.<\/span>/);
 });

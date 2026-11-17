@@ -91,7 +91,7 @@ export const defaultUIRegistry: UIRegistry = {
 			onDeny: () => emit('deny')
 		})
 	},
-	'tool-result': { component: ToolResult, required: ['tool', 'output'] },
+	'tool-result': { component: ToolResult, required: ['tool'] },
 	'file-diff': { component: FileDiff, required: ['filename', 'patch'] },
 	'code-block': {
 		component: CodeBlock,

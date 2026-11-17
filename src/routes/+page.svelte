@@ -164,6 +164,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import type {
 		ActivityItem,
+		ApprovalCardAnswers,
 		ApprovalQuestion,
 		CheckpointEntry,
 		CitationItem,
@@ -453,6 +454,7 @@
 		}, 600);
 	}
 
+	let sampleDecision = $state<ApprovalCardAnswers>();
 	const sampleQuestions: ApprovalQuestion[] = [
 		{
 			id: 'q-scope',
@@ -1457,6 +1459,8 @@
 								<ApprovalCard
 									title="Confirm verification scope before creating PR"
 									questions={sampleQuestions}
+									decided={sampleDecision}
+									onSubmit={(answers) => (sampleDecision = answers)}
 								/>
 							{:else if item.slug === 'level-dial'}
 								<div class="mx-auto max-w-md">

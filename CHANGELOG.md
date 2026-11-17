@@ -1,5 +1,21 @@
 # agents-kit-svelte
 
+## 0.7.0
+
+### Minor Changes
+
+- **A plan the person shapes, a decision the app records, and a calmer chat.**
+  
+  - `TodoList` takes `editable`: each row can be moved up and down and removed, a row is added by its title, and a row's `detail` opens on a press. `items` is bindable and holds the rows as they stand; `onSubmit` draws one primary button (`submitLabel`) that hands them back. Focus stays with the row a key moved, and goes to the next row when one is removed.
+  - `ToolResult` without `output` is one line: no chevron, no Copy and no empty terminal box. `output` is optional, and a `tool` part without output in `ChatWorkbench` is drawn that way.
+  - `PromptInput` takes `commands` (`{ name, text }`): while the text starts with `/`, the commands whose name starts with the rest are listed above the field. Arrow keys move through them, Enter or a click puts the command's text in the field and closes the list (it does not send); Escape, or focus leaving the field, closes it too. Moving through the list keeps focus in the text field.
+  - `ChatWorkbench` hands `contextOptions` (the `+` menu) and `commands` to its composer, and takes `aside`, a rail on the right from 1024px drawn as the conversations sidebar is and named by `asideLabel`. It is not drawn in `layout="panel"`.
+  - `ChatWorkbench`'s header and conversations rail have no border lines; the rail's own tint sets it apart.
+  
+  **Breaking:**
+  
+  - `ApprovalCard` no longer marks itself decided when Submit is pressed. Pass the decision you recorded as `decided` (the answers, shown as "Decision recorded"), and `pending` while it is on its way, which holds the options, the write-in, Back, Skip and Submit; Submit is `aria-disabled`, so focus stays on it. A card that reads "Decision recorded" before your app has recorded anything was saying something untrue when the answer failed to send. An `approval-card` node in `IntelligentUIRenderer` takes `decided` and `pending` among its props; its submit event no longer closes the card.
+
 ## 0.6.1
 
 ### Patch Changes

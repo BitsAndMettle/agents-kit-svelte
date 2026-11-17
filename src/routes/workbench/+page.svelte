@@ -3,9 +3,21 @@
 	app would, and logs every event the workbench raises. Also the fixture for tests/browser/keyboard/chat-workbench.spec.ts.
 -->
 <script lang="ts">
+	import ApprovalCard from '$lib/agents/ApprovalCard.svelte';
+	import TodoList from '$lib/agents/TodoList.svelte';
 	import ChatWorkbench from '$lib/workbench/ChatWorkbench.svelte';
 	import { pillClass } from '$lib/ui/styles';
-	import type { ChatWorkbenchConversation, ChatWorkbenchMessage, PromptAttachment, PromptInputEffort, PromptInputOption } from '$lib/types';
+	import type {
+		ApprovalCardAnswers,
+		ChatWorkbenchConversation,
+		ChatWorkbenchMessage,
+		PromptAttachment,
+		PromptCommand,
+		PromptContextOption,
+		PromptInputEffort,
+		PromptInputOption,
+		TodoItem
+	} from '$lib/types';
 
 	const REPLY = [
 		'Two cards are **blocked**, both on review:',
@@ -51,6 +63,19 @@
 	let model = $state('sonnet');
 	let effort = $state('medium');
 	let attachments = $state<PromptAttachment[]>([{ id: 'card-212', label: 'Card 212 · BitsAndMettle/example', title: 'The Referee reads this card' }]);
+	const contextOptions: PromptContextOption[] = [{ label: 'Card 218 · BitsAndMettle/example', attachment: { id: 'card-218', label: 'Card 218 · BitsAndMettle/example' } }];
+	const commands: PromptCommand[] = [
+		{ name: 'plan', text: 'Plan the next Feature with me.' },
+		{ name: 'status', text: 'What is happening right now?' },
+		{ name: 'needs', text: 'What needs me?' }
+	];
+	let plan = $state<TodoItem[]>([
+		{ id: 'p1', label: 'Keep the return path', detail: 'Read next from the callback and keep it when it is a relative path.', status: 'pending' },
+		{ id: 'p2', label: 'Reject other origins', status: 'pending' },
+		{ id: 'p3', label: 'Test the redirects', status: 'pending' }
+	]);
+	let answering = $state<ApprovalCardAnswers>();
+	let decided = $state<ApprovalCardAnswers>();
 	let draft = $state('');
 	let log = $state<string[]>([]);
 	let n = 0;
@@ -90,7 +115,13 @@
 			bind:effort
 			onModelChange={(choice) => log.push(`model:${choice.model}:${choice.effort}`)}
 			onSend={send}
+			{contextOptions}
+			{commands}
 		>
+			{#snippet aside()}
+				<h2 class="px-1 text-[11px] font-medium text-fg-light">Needs you</h2>
+				<p class="px-1 text-[13px] text-fg-main">2 cards wait for an answer.</p>
+			{/snippet}
 			{#snippet headerActions({ button })}
 				<button type="button" class={button} onclick={() => log.push('pause')}>Pause</button>
 			{/snippet}
@@ -121,6 +152,25 @@
 				{/snippet}
 			</ChatWorkbench>
 		</div>
+	</section>
+
+	<section aria-labelledby="plan-heading" class="max-w-xl space-y-3">
+		<h2 id="plan-heading" class="text-sm font-medium text-fg-light">An editable plan and a decision the page records</h2>
+		<TodoList data-testid="plan" title="Draft plan" bind:items={plan} editable submitLabel="File plan" onSubmit={(rows) => log.push(`plan:${rows.map((row) => row.label).join('|')}`)} />
+		<ApprovalCard
+			title="Card 218 · Redirect policy"
+			questions={[{ id: 'q', question: 'Where should a foreign return path go?', options: [{ id: 'home', label: 'Home' }, { id: 'login', label: 'Sign-in' }] }]}
+			pending={answering !== undefined}
+			{decided}
+			onSubmit={(answers) => {
+				log.push(`answer:${answers.q?.join(',')}`);
+				answering = answers;
+			}}
+		/>
+		<button type="button" class={pillClass('secondary', 'xs')} disabled={!answering} onclick={() => {
+				decided = answering;
+				answering = undefined;
+			}}>Record the answer</button>
 	</section>
 
 	<section aria-labelledby="log-heading">
