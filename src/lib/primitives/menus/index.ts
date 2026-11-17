@@ -1,4 +1,4 @@
-/** Menus and pickers: DropdownMenu, ContextMenu, Select, Combobox, CommandPalette. */
+/** Menus and pickers: DropdownMenu, ContextMenu, Select, Combobox, CommandPalette, ThemeToggle. */
 
 export { default as DropdownMenu } from './DropdownMenu.svelte';
 export type { Props as DropdownMenuProps } from './DropdownMenu.svelte';
@@ -9,6 +9,9 @@ export { default as Combobox } from './Combobox.svelte';
 export type { Props as ComboboxProps } from './Combobox.svelte';
 export { default as CommandPalette } from './CommandPalette.svelte';
 export type { Props as CommandPaletteProps } from './CommandPalette.svelte';
+export { default as ThemeToggle } from './ThemeToggle.svelte';
+export type { Props as ThemeToggleProps } from './ThemeToggle.svelte';
+export { themeCookie, themeOf, type Theme } from './helpers';
 export type {
 	SelectProps,
 	MenuEntry,

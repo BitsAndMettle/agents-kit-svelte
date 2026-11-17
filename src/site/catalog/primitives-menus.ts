@@ -1,6 +1,6 @@
 import type { CatalogItemMeta } from '../catalog-registry.ts';
 
-/** Catalogue entries for the Primitives collection. Menus and pickers: DropdownMenu, ContextMenu, Select, Combobox, CommandPalette. Category: 'Primitives'. */
+/** Catalogue entries for the Primitives collection. Menus and pickers: DropdownMenu, ContextMenu, Select, Combobox, CommandPalette, ThemeToggle. Category: 'Primitives'. */
 export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
 	{
 		slug: 'dropdown-menu',
@@ -159,5 +159,26 @@ export const PRIMITIVES_MENUS: CatalogItemMeta[] = [
   triggerLabel="Search commands"
   onRun={(c) => (recent = [c.id, ...recent.filter((id) => id !== c.id)])}
 />`
+	},
+	{
+		slug: 'theme-toggle',
+		name: 'ThemeToggle',
+		category: 'Primitives',
+		sveltePath: 'src/lib/primitives/menus/ThemeToggle.svelte',
+		upstreamSource: 'Agents Kit Svelte · Primitives',
+		description:
+			'Light, Dark or System from a menu behind one icon button named Theme. `<html data-theme>` holds the choice: read when the toggle is drawn, written on a choice (a stale `dark` class is cleared). With `cookie`, the choice is also kept in that cookie for a year, so the server can render `data-theme` before first paint. The demo also shows the opt-in Studio palette, `data-palette="studio"`: zinc greys with purple at work, orange for needs-you, green for done and blue for info.',
+		usageSnippet: `<script lang="ts">
+  import { AppShell, ThemeToggle } from 'agents-kit-svelte/primitives';
+
+  // The server reads the "theme" cookie and renders <html data-theme="…" data-palette="studio">.
+  const places = [{ label: 'Board', href: '/board' }];
+</script>
+
+<AppShell title="Acme" items={places} path="/board">
+  {#snippet actions()}
+    <ThemeToggle cookie="theme" />
+  {/snippet}
+</AppShell>`
 	}
 ];

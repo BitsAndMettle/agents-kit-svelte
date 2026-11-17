@@ -8,6 +8,7 @@
 <script lang="ts" module>
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
+	import type { UiTone } from '../../ui/styles';
 
 	/** One place an `AppShell` goes to. */
 	export interface AppShellItem {
@@ -17,6 +18,8 @@
 		count?: number;
 		/** What the number counts, said after it to a screen reader, e.g. `open notices`. */
 		countLabel?: string;
+		/** The count's colour. Default `accent`; `warning` for a count that waits on you. */
+		countTone?: UiTone;
 		/** Its page gets exactly the space under the bar and does its own scrolling, e.g. a chat. */
 		fill?: boolean;
 	}
@@ -72,7 +75,7 @@
 							<a href={item.href} aria-current={item === here ? 'page' : undefined} class={cn(segmentClass(item === here), 'w-full justify-center max-sm:h-10')}>
 								{item.label}
 								{#if item.count}
-									<Badge tone="accent" size="sm">{item.count}{#if item.countLabel}<span class="sr-only">{` ${item.countLabel}`}</span>{/if}</Badge>
+									<Badge tone={item.countTone ?? 'accent'} size="sm">{item.count}{#if item.countLabel}<span class="sr-only">{` ${item.countLabel}`}</span>{/if}</Badge>
 								{/if}
 							</a>
 						</li>

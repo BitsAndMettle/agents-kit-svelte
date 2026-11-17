@@ -7,8 +7,35 @@ import {
 	isTextEntry,
 	matchesQuery,
 	matchesShortcut,
-	parseShortcut
+	parseShortcut,
+	themeCookie,
+	themeOf
 } from '../src/lib/primitives/menus/helpers.ts';
+import { ssr } from './ssr.ts';
+
+const { load, html } = ssr();
+
+test('themeOf: what the kit draws for <html>; the dark class wins, a missing or unknown data-theme is light', () => {
+	assert.equal(themeOf('dark', false), 'dark');
+	assert.equal(themeOf('system', false), 'system');
+	assert.equal(themeOf('light', false), 'light');
+	assert.equal(themeOf(null, false), 'light');
+	assert.equal(themeOf('sepia', false), 'light');
+	assert.equal(themeOf('light', true), 'dark');
+	assert.equal(themeOf(null, true), 'dark');
+});
+
+test('themeCookie keeps the theme for a year on every path, same-site and secure', () => {
+	assert.equal(themeCookie('theme', 'system'), 'theme=system; Max-Age=31536000; Path=/; SameSite=Lax; Secure');
+});
+
+test('ThemeToggle: one button named Theme opens the Light, Dark and System choice', async () => {
+	const ThemeToggle = await load('/src/lib/primitives/menus/ThemeToggle.svelte');
+	const out = html(ThemeToggle, { cookie: 'theme' });
+	assert.equal(out.match(/<button\b/g)?.length, 1);
+	assert.match(out, /<button aria-label="Theme"[^>]*aria-haspopup="menu"/);
+	assert.deepEqual([...out.matchAll(/role="menuitemradio"[^>]*>[\s\S]*?<span[^>]*>([^<]*)<\/span>/g)].map(([, label]) => label), ['Light', 'Dark', 'System']);
+});
 
 const key = (k: string, mods: Partial<Record<'ctrlKey' | 'metaKey' | 'altKey' | 'shiftKey', boolean>> = {}) => ({
 	key: k,

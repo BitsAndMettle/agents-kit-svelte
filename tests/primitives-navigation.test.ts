@@ -84,6 +84,14 @@ test('AppShell: one bar over the page, with the name, the places inside a named 
 	assert.match(bare, /<header[^>]*><div[^>]*>\s*<nav aria-label="Main"[^>]*>[\s\S]*<\/nav>\s*<\/div><\/header>/);
 });
 
+test('AppShell: a count takes the accent, or the tone its item gives', async () => {
+	const AppShell = await load('/src/lib/primitives/navigation/AppShell.svelte');
+	const countClass = (countTone?: string) => html(AppShell, { items: [{ label: 'Board', href: '/board', count: 3, countTone }], path: '/' }).match(/Board\s*<span class="([^"]*)"/)?.[1] ?? '';
+	assert.match(countClass(), /\bbg-accent-subtle\b/);
+	assert.match(countClass('warning'), /\bbg-status-warning-subtle\b/);
+	assert.doesNotMatch(countClass('warning'), /accent/);
+});
+
 test('AppShell: given the width of the page, the content of the bar lines up with it while the bar spans the window', async () => {
 	const AppShell = await load('/src/lib/primitives/navigation/AppShell.svelte');
 	assert.match(html(AppShell, { items: PLACES, path: '/', maxWidth: '72rem' }), /<header class="[^"]*border-b[^"]*"><div class="mx-auto [^"]*px-4 sm:px-6" style="max-width: 72rem;">/);
