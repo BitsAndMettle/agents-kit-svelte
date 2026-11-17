@@ -226,37 +226,37 @@
 				<header class="shrink-0 bg-chat-surface px-4 pt-1.5 sm:px-6 {tabsClass}">{@render tabs('flex items-center gap-1')}</header>
 			{/if}
 		{:else}
-		<header class="shrink-0 bg-chat-surface px-4 pt-3 sm:px-6 {hasList && layout === 'auto' ? 'lg:pb-3' : hasList ? '' : 'pb-3'}">
-			<div class="flex items-start justify-between gap-3">
-				<div class="flex min-w-0 items-center gap-3">
-					{#if headerMark}
-						<span aria-hidden="true" class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-chat-accent-subtle text-chat-accent">
-							<Sparkle class="size-4 fill-current" />
-						</span>
-					{/if}
-					<div class="min-w-0">
-						{#if title}
-							<svelte:element this={`h${headingLevel}`} class="truncate text-[15px] font-semibold text-fg-main">{title}</svelte:element>
+			<header class="shrink-0 bg-chat-surface px-4 pt-3 sm:px-6 {hasList && layout === 'auto' ? 'lg:pb-3' : hasList ? '' : 'pb-3'}">
+				<div class="flex items-start justify-between gap-3">
+					<div class="flex min-w-0 items-center gap-3">
+						{#if headerMark}
+							<span aria-hidden="true" class="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-chat-accent-subtle text-chat-accent">
+								<Sparkle class="size-4 fill-current" />
+							</span>
 						{/if}
-						{#if status || subtitle}
-							<p class="mt-0.5 flex min-w-0 items-center gap-1.5 truncate text-xs text-fg-light">
-								{#if status}
-									<span aria-hidden="true" class="size-1.5 shrink-0 rounded-full {TONES[status.tone ?? 'neutral']} {status.pulse ? 'ak-breathe' : ''}"></span>
-								{/if}
-								<span class="truncate">
-									{#if subtitle}<span class="text-fg-main">{subtitle}</span>{#if status}{' · '}{/if}{/if}{#if status}{status.text}{/if}
-								</span>
-							</p>
-						{/if}
+						<div class="min-w-0">
+							{#if title}
+								<svelte:element this={`h${headingLevel}`} class="truncate text-[15px] font-semibold text-fg-main">{title}</svelte:element>
+							{/if}
+							{#if status || subtitle}
+								<p class="mt-0.5 flex min-w-0 items-center gap-1.5 truncate text-xs text-fg-light">
+									{#if status}
+										<span aria-hidden="true" class="size-1.5 shrink-0 rounded-full {TONES[status.tone ?? 'neutral']} {status.pulse ? 'ak-breathe' : ''}"></span>
+									{/if}
+									<span class="truncate">
+										{#if subtitle}<span class="text-fg-main">{subtitle}</span>{#if status}{' · '}{/if}{/if}{#if status}{status.text}{/if}
+									</span>
+								</p>
+							{/if}
+						</div>
 					</div>
+					{#if headerActions}
+						<div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{@render headerActions(actionClasses)}</div>
+					{/if}
 				</div>
-				{#if headerActions}
-					<div class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{@render headerActions(actionClasses)}</div>
-				{/if}
-			</div>
 
-			{#if hasList}{@render tabs(`mt-2.5 flex items-center gap-1 ${tabsClass}`)}{/if}
-		</header>
+				{#if hasList}{@render tabs(`mt-2.5 flex items-center gap-1 ${tabsClass}`)}{/if}
+			</header>
 		{/if}
 
 		<div class="flex min-h-0 flex-1 overflow-hidden">

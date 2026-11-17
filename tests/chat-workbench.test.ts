@@ -148,6 +148,8 @@ test('quiet rail: one 14px leading slot per row, 32px sidebar rows with a mouse,
 	for (const list of [sidebar, panel]) {
 		assert.equal([...list.matchAll(/<span class="flex size-3\.5 shrink-0 items-center justify-center">/g)].length, 3);
 		assert.match(list, /<svg[^>]*role="img"[^>]*aria-label="Pinned"[\s\S]*?Questions/);
+		// Spoken, as the dot is: lucide hides an icon only when it is given no aria or role.
+		assert.doesNotMatch(list.match(/<svg[^>]*aria-label="Pinned"[^>]*>/)![0], /aria-hidden/);
 		assert.match(list, /aria-current="true" class="[^"]*bg-card-bg font-medium text-fg-main"/);
 		assert.doesNotMatch(list, /ak-shadow-soft-sm|text-\[11px\]/);
 	}
