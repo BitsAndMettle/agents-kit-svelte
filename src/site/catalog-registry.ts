@@ -46,7 +46,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/workbench/ChatWorkbench.svelte',
 		upstreamSource: 'AK-S Dynamic Agentic Workbench · components/beui/components/agents/*',
 		description:
-			'A whole chat from your data: messages with safe Markdown and tool results, a header with status and actions, past conversations (sidebar or tabs) and a composer with a model and effort picker. `demo` plays the scripted session shown here.',
+			'A whole chat from your data: messages with safe Markdown and tool results, a header with status and actions, past conversations (sidebar or tabs) and a composer with a model and effort picker. `chrome="quiet"` drops the header band from 1024px for one title line atop the chat, 32px rows and a compact composer. `demo` plays the scripted session shown here.',
 		usageSnippet: `<script lang="ts">
   import { ChatWorkbench, type ChatWorkbenchMessage } from 'agents-kit-svelte';
 

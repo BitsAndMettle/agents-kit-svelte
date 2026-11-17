@@ -47,7 +47,7 @@
 		}
 	]);
 	let conversations = $state<ChatWorkbenchConversation[]>([
-		{ id: 'q', title: 'Questions', subtitle: 'Asked by the agents' },
+		{ id: 'q', title: 'Questions', subtitle: 'Asked by the agents', pinned: true },
 		{ id: 'c1', title: 'What is blocked right now?', date: '14:02', group: 'Today', mark: 'example', active: true },
 		{ id: 'c3', title: 'Plan the sign-in redirects', date: '09:15', group: 'Today', mark: 'website' },
 		{ id: 'c2', title: 'Card 198 · BitsAndMettle/example', date: '1d', group: 'Yesterday', mark: 'example' },
@@ -131,6 +131,35 @@
 			{/snippet}
 		</ChatWorkbench>
 	</div>
+
+	<section aria-labelledby="quiet-heading" class="space-y-2">
+		<h2 id="quiet-heading" class="text-sm font-medium text-fg-light">chrome="quiet": no header band from 1024px, 32px rows, the empty state above a compact composer</h2>
+		<div class="h-[560px] overflow-hidden rounded-xl border border-card-border" data-testid="quiet">
+			<ChatWorkbench
+				aria-label="Referee quiet"
+				chrome="quiet"
+				title="Referee"
+				subtitle="devbox"
+				status={{ text: 'Online', tone: 'success' }}
+				messages={[]}
+				{conversations}
+				onSelectConversation={(id) => (conversations = conversations.map((row) => ({ ...row, active: row.id === id })))}
+				onNewConversation={() => log.push('new')}
+				placeholder="Message the Referee"
+				{models}
+				model="sonnet"
+				{efforts}
+				effort="medium"
+			>
+				{#snippet empty()}
+					<p class="text-[13px] text-fg-light">Ask the Referee what is happening.</p>
+				{/snippet}
+				{#snippet headerActions({ button })}
+					<button type="button" class={button}>Pause</button>
+				{/snippet}
+			</ChatWorkbench>
+		</div>
+	</section>
 
 	<section aria-labelledby="panel-heading" class="space-y-2">
 		<h2 id="panel-heading" class="text-sm font-medium text-fg-light">Panel layout, 380px wide</h2>

@@ -10,6 +10,26 @@ async function open(page: Page, width = 1280): Promise<void> {
 const events = (page: Page) => page.getByTestId('events');
 const full = (page: Page) => page.getByRole('region', { name: 'Referee', exact: true });
 const panel = (page: Page) => page.getByRole('region', { name: 'Referee panel' });
+const quiet = (page: Page) => page.getByRole('region', { name: 'Referee quiet' });
+
+test('ChatWorkbench quiet: from 1024px the rails start at the top and there are no tabs', async ({ page }) => {
+	await open(page);
+	const region = await quiet(page).boundingBox();
+	const sidebar = await quiet(page).getByRole('complementary', { name: 'Conversations' }).boundingBox();
+	expect(sidebar!.y).toBeCloseTo(region!.y, 0);
+	await expect(quiet(page).getByRole('tablist')).toBeHidden();
+	await expect(quiet(page).getByRole('heading', { level: 2, name: 'Referee' })).toBeVisible();
+});
+
+test('ChatWorkbench quiet on a phone: the tabs work and rows are 44px tall', async ({ page }) => {
+	await open(page, 390);
+	await quiet(page).getByRole('tab', { name: /Conversations/ }).click();
+	const row = quiet(page).getByRole('tabpanel').getByRole('button', { name: /Card 198/ });
+	expect((await row.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+	await row.click();
+	await expect(quiet(page).getByRole('tab', { name: 'Chat' })).toHaveAttribute('aria-selected', 'true');
+	await expect(quiet(page).getByRole('textbox', { name: 'Message the Referee' })).toBeVisible();
+});
 
 test('ChatWorkbench: sending calls onSend with the text and attachments and adds no reply of its own', async ({ page }) => {
 	await open(page);

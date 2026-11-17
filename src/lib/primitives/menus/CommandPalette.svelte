@@ -51,6 +51,8 @@
 		trigger?: Snippet<[part: Part<HTMLButtonElement>, hint: string]>;
 		/** Text of a default opener button. Without it and without `trigger`, none is rendered. */
 		triggerLabel?: string;
+		/** The default opener as a 32px ghost button: the search icon and the shortcut (from 640px), named by `triggerLabel`. */
+		triggerCompact?: boolean;
 		/** The `<dialog>`. Bindable. */
 		ref?: HTMLDialogElement | null;
 		class?: string;
@@ -73,6 +75,7 @@
 		onRun,
 		trigger,
 		triggerLabel,
+		triggerCompact = false,
 		ref = $bindable(null),
 		class: className = '',
 		...rest
@@ -167,6 +170,11 @@
 
 {#if trigger}
 	{@render trigger(dialog.trigger, hint)}
+{:else if triggerLabel && triggerCompact}
+	<button {...dialog.trigger} aria-label={triggerLabel} class={pillClass('ghost', 'md')}>
+		<Search aria-hidden="true" />
+		{#if hint}<span class="hidden text-xs sm:inline">{hint}</span>{/if}
+	</button>
 {:else if triggerLabel}
 	<button {...dialog.trigger} class={pillClass('secondary', 'md', 'justify-between gap-3')}>
 		<Search aria-hidden="true" class="text-fg-light" />
