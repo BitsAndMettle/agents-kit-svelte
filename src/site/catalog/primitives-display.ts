@@ -278,5 +278,29 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 
 <p>Run this on the machine you want to connect:</p>
 <CopyCommand command="curl -fsSL https://example.com/install.sh | sh -s -- connect {code}" copyLabel="Copy the connect command" />`
+	},
+	{
+		slug: 'table',
+		name: 'Table',
+		category: 'Primitives',
+		sveltePath: 'src/lib/primitives/display/Table.svelte',
+		upstreamSource: UPSTREAM,
+		description:
+			'A real table on a card: a header row and aligned columns over your rows. You write bare `<tr>`, `<td>` and `<th scope="row">`; the table pads them, draws a hairline between rows and sets the row name in medium. A column can hide its label from sight, and when every one does the header row is for screen readers only. A table too wide for its box scrolls inside it.',
+		usageSnippet: `<script lang="ts">
+  import { Table } from 'agents-kit-svelte/primitives';
+
+  let { machines }: { machines: { name: string; slots: string; seen: string }[] } = $props();
+</script>
+
+<Table aria-label="Machines" columns={[{ label: 'Machine' }, { label: 'Slots', class: 'w-28' }, { label: 'Last seen', class: 'w-28' }]}>
+  {#each machines as machine (machine.name)}
+    <tr>
+      <th scope="row">{machine.name}</th>
+      <td>{machine.slots}</td>
+      <td>{machine.seen}</td>
+    </tr>
+  {/each}
+</Table>`
 	}
 ];

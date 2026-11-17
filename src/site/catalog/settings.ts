@@ -11,7 +11,7 @@ export const SETTINGS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/settings/SettingsForm.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A form generated from a list of settings. Each row gets the control its value calls for: a switch for a boolean, a number box for a number, a select or a text box for a string. A change is reported at once and shows while your promise saves it; a change you refuse snaps back.',
+			'A form generated from a list of settings. Each row gets the control its value calls for: a switch for a boolean, a number box for a number or a row of buttons when it has options, a select or a text box for a string. A change is reported at once and shows while your promise saves it; a change you refuse snaps back.',
 		usageSnippet: `<script lang="ts">
   import { SettingsForm, type Setting } from 'agents-kit-svelte/settings';
 

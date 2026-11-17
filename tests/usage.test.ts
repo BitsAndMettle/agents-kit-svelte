@@ -146,3 +146,81 @@ test('TokenBurnChart names the switch point and speaks percent for a usage windo
 	assert.match(running, /Budget<\/dt>\s*<dd[^>]*text-status-danger[^>]*>\s*Runs out at 1:40/);
 	assert.match(running, /Projected at end<\/dt>\s*<dd[^>]*>10k</, 'a token projection still runs past its budget to the end');
 });
+
+const reading = Date.UTC(2026, 10, 17, 14, 6);
+const fiveHour = (used: number) => ({ used, resetsAt: Date.UTC(2026, 10, 17, 16, 40) });
+const week = (used: number) => ({ used, resetsAt: Date.UTC(2026, 10, 19, 20) });
+
+test('usageWindowText: what is left and when it resets, a week naming its day; a full window says when; none running has it all', () => {
+	const read: AccountUsage = { label: 'A', agent: 'Claude Code', at: reading, switchAt: 98, status: 'available', windows: { fiveHour: fiveHour(34), week: week(61) } };
+	assert.equal(usage.usageWindowText(read, 'fiveHour'), '66% left · 16:40');
+	assert.equal(usage.usageWindowText(read, 'week'), '39% left · Thu 20:00');
+	assert.equal(usage.usageWindowText(read, 'fiveHour', 'Europe/Berlin'), '66% left · 17:40');
+	assert.equal(usage.usageWindowText({ ...read, windows: { fiveHour: { used: 100, resetsAt: Date.UTC(2026, 10, 17, 18, 20) } } }, 'fiveHour'), 'Resets 18:20');
+	assert.equal(usage.usageWindowText({ ...read, windows: { week: week(100) } }, 'week'), 'Resets Thu 20:00');
+	assert.equal(usage.usageWindowText({ ...read, windows: {} }, 'fiveHour'), '100% left');
+	assert.equal(usage.usageWindowText({ ...read, at: undefined }, 'week'), undefined, 'never read');
+});
+
+test('UsageTable: one row per account, counted from 1, a named track per window and the status in its own column', async () => {
+	const UsageTable = await load('/src/lib/runtime/UsageTable.svelte');
+	const account = (label: string, rest: Partial<AccountUsage>): AccountUsage => ({ label, agent: 'Claude Code', at: reading, switchAt: 98, status: 'available', windows: {}, ...rest });
+	const accounts: AccountUsage[] = [
+		account('Personal', { windows: { fiveHour: fiveHour(34), week: week(66) } }),
+		account('Work', { status: 'out', windows: { fiveHour: { used: 100, resetsAt: Date.UTC(2026, 10, 17, 18, 20) }, week: week(72) } }),
+		account('Spare', { status: 'switched', windows: { week: week(98) } }),
+		account('New', { at: undefined }),
+		account('Old', { status: 'off', windows: { fiveHour: fiveHour(10), week: week(20) } }),
+		account('Refused', { status: 'out', at: undefined, until: Date.UTC(2026, 10, 17, 14, 36) }),
+		account('Low', { status: 'low', windows: { fiveHour: { used: 91, resetsAt: Date.UTC(2026, 10, 17, 17) }, week: week(40) } })
+	];
+	const out = html(UsageTable, { 'aria-label': 'Claude Code accounts on the build box', accounts, id: 'usage', class: 'mt-2' });
+	const rows = out.split('<tbody')[1].split('<tr').slice(1);
+	const row = (label: string) => rows.find((markup) => markup.includes(`<th scope="row">${label}</th>`))!;
+	const attr = (tag: string, name: string) => tag.match(new RegExp(` ${name}="([^"]*)"`))?.[1];
+	const tracks = (markup: string) => [...markup.matchAll(/<div[^>]*role="progressbar"[^>]*>/g)].map(([tag]) => [attr(tag, 'aria-label'), Number(attr(tag, 'aria-valuenow')), attr(tag, 'aria-valuetext')]);
+
+	assert.match(out, /^<div id="usage" class="[^"]* mt-2"><table aria-label="Claude Code accounts on the build box"/, 'the rest and your class reach the table');
+	assert.deepEqual([...out.matchAll(/<th scope="col"[^>]*>\s*([^<]*?)\s*<\/th>/g)].map(([, label]) => label), ['#', 'Account', '5-hour window', 'Week', 'Status']);
+	assert.deepEqual(rows.map((markup) => markup.match(/<td[^>]*>(\d+)<\/td>/)![1]), ['1', '2', '3', '4', '5', '6', '7'], 'counted from 1 in the given order');
+
+	// Read, both windows running: two named tracks and their captions, and Available on the success tint.
+	assert.deepEqual(tracks(row('Personal')), [['Personal 5-hour window', 34, '66% left · 16:40'], ['Personal Week', 66, '34% left · Thu 20:00']]);
+	assert.match(row('Personal'), /aria-hidden="true"[^>]*>66% left · 16:40<\/span>[\s\S]*aria-hidden="true"[^>]*>34% left · Thu 20:00<\/span>/);
+	assert.match(row('Personal'), /bg-status-success-subtle[^"]*"[^>]*>\s*Available/);
+
+	// A full window: a full neutral track, when it resets, and when the account is back.
+	assert.deepEqual(tracks(row('Work'))[0], ['Work 5-hour window', 100, 'Resets 18:20']);
+	assert.doesNotMatch(row('Work'), /bg-status-info/);
+	assert.match(row('Work'), /Out until Tue 18:20/);
+
+	// Past the switch point: that window in info, the other empty with all of it left.
+	assert.deepEqual(tracks(row('Spare')), [['Spare 5-hour window', 0, '100% left'], ['Spare Week', 98, '2% left · Thu 20:00']]);
+	const [emptyWindow, pastWindow] = row('Spare').split('aria-label="Spare Week"');
+	assert.doesNotMatch(emptyWindow, /bg-status-info[ "]/, 'the empty window is not info');
+	assert.match(pastWindow, /bg-status-info[ "][\s\S]*aria-hidden="true" class="[^"]*var\(--ak-color-info\)[^"]*">2% left · Thu 20:00</);
+	assert.match(row('Spare'), /bg-status-info-subtle[^"]*"[^>]*>\s*Past the 98% switch point/);
+
+	// Never read and free: no track, a dash spoken as no reading, and a status not on the success tint.
+	assert.doesNotMatch(row('New'), /role="progressbar"/);
+	assert.equal(row('New').match(/<span class="sr-only">No reading<\/span>/g)?.length, 2);
+	assert.match(row('New'), />\s*Not read yet\s*</);
+	assert.doesNotMatch(row('New'), /success/);
+	assert.match(html(UsageTable, { 'aria-label': 'A', accounts: [accounts[3]], unreadLabel: 'Signed in' }), />\s*Signed in\s*</);
+
+	// Off, in its own words or yours.
+	assert.match(row('Old'), />\s*Off\s*</);
+	assert.match(html(UsageTable, { 'aria-label': 'A', accounts: [accounts[4]], offLabel: 'Paused' }), />\s*Paused\s*</);
+
+	// Refused with an end and never read: when it is back, and no track.
+	assert.doesNotMatch(row('Refused'), /role="progressbar"/);
+	assert.match(row('Refused'), />\s*Out until Tue 14:36\s*</);
+
+	// Low is a warning, in usageText's words.
+	assert.match(row('Low'), /bg-status-warning-subtle[^"]*"[^>]*>\s*9% left · Tue 17:00/);
+
+	// Every time moves with the time zone, and nothing says "no new runs".
+	const berlin = html(UsageTable, { 'aria-label': 'A', accounts, timeZone: 'Europe/Berlin' });
+	for (const text of ['66% left · 17:40', '34% left · Thu 21:00', 'Resets 19:20', 'Out until Tue 19:20', 'Out until Tue 15:36', '9% left · Tue 18:00']) assert.ok(berlin.includes(text), text);
+	assert.doesNotMatch(out + berlin, /no new runs/i);
+});

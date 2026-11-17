@@ -19,3 +19,16 @@ test('UsagePill: Enter opens the per-account breakdown, Space closes it, focus s
 	await expect(panel).toHaveCount(0);
 	await expect(pill).toBeFocused();
 });
+
+test('UsageTable: on a phone the table scrolls inside its box and the page does not', async ({ page }) => {
+	const section = await openSection(page, 'usage-table');
+	await page.setViewportSize({ width: 390, height: 800 });
+	const table = section.getByRole('table', { name: 'Claude Code accounts on the build box' });
+	await table.scrollIntoViewIfNeeded();
+	await expect(table.getByRole('progressbar', { name: 'Personal Week' })).toHaveAttribute('aria-valuetext', '34% left · Sat 20:00');
+	const box = table.locator('xpath=..');
+	expect(await box.evaluate((root) => root.scrollWidth > root.clientWidth)).toBe(true);
+	const edge = (await box.boundingBox())!;
+	expect(edge.x + edge.width).toBeLessThanOrEqual(390);
+	expect(await section.evaluate((root) => root.scrollWidth <= root.clientWidth)).toBe(true);
+});

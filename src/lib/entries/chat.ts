@@ -43,6 +43,7 @@ export { default as Terminal } from '../runtime/Terminal.svelte';
 export { default as TestResults } from '../runtime/TestResults.svelte';
 export { default as UsagePill } from '../runtime/UsagePill.svelte';
 export { default as UsageRows } from '../runtime/UsageRows.svelte';
+export { default as UsageTable } from '../runtime/UsageTable.svelte';
 import ChatWorkbench from '../workbench/ChatWorkbench.svelte';
 export { ChatWorkbench };
 /**

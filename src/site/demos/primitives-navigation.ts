@@ -4,12 +4,14 @@ import AccordionDemo from './navigation/AccordionDemo.svelte';
 import BreadcrumbDemo from './navigation/BreadcrumbDemo.svelte';
 import PaginationDemo from './navigation/PaginationDemo.svelte';
 import AppShellDemo from './navigation/AppShellDemo.svelte';
+import SectionNavDemo from './navigation/SectionNavDemo.svelte';
 
-/** Showcase demos for the Primitives collection (navigation), keyed by catalogue slug. Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination, AppShell. */
+/** Showcase demos for the Primitives collection (navigation), keyed by catalogue slug. Navigation and disclosure: Tabs, Accordion, Breadcrumb, Pagination, AppShell, SectionNav. */
 export const DEMOS_NAVIGATION: Record<string, Component> = {
 	'tabs': TabsDemo,
 	'accordion': AccordionDemo,
 	'breadcrumb': BreadcrumbDemo,
 	'pagination': PaginationDemo,
-	'app-shell': AppShellDemo
+	'app-shell': AppShellDemo,
+	'section-nav': SectionNavDemo
 };

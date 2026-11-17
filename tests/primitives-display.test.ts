@@ -112,3 +112,20 @@ test('Progress: segments sit side by side in their tones, and the bar says what 
 	assert.deepEqual(widths.map(([, width]) => width), ['50', '20', '10']);
 	assert.equal(new Set(widths.map(([cls]) => cls)).size, 3, 'each segment has its own tone');
 });
+
+test('Table: a named table with a header cell per column, each column sized on its col, and your rows in the body', async () => {
+	const Table = await load('/src/lib/primitives/display/Table.svelte');
+	const columns = [{ label: '#', class: 'w-12' }, { label: 'Account' }, { label: 'Actions', hideLabel: true, class: 'w-28' }];
+	const out = html(Table, { 'aria-label': 'Accounts', columns, id: 'accounts', class: 'mt-4', children: snippet(() => '<tr><td>1</td><th scope="row">Personal</th><td></td></tr>') });
+	// The rest and your class reach the box, which scrolls a wide table inside itself.
+	assert.match(out, /^<div id="accounts" class="[^"]*overflow-x-auto[^"]* mt-4"><table aria-label="Accounts"/);
+	assert.deepEqual([...out.matchAll(/<col( class="([^"]*)")?\s*\/?>/g)].map(([, , name]) => name), ['w-12', undefined, 'w-28']);
+	const headers = [...out.matchAll(/<th scope="col"[^>]*>([\s\S]*?)<\/th>/g)].map(([, inner]) => inner.trim());
+	assert.deepEqual(headers, ['#', 'Account', '<span class="sr-only">Actions</span>']);
+	assert.match(out, /<thead><tr/, 'a header row with one label shown is drawn');
+	assert.match(out, /<tbody class="[^"]*"><tr><td>1<\/td><th scope="row">Personal<\/th><td><\/td><\/tr><\/tbody>/);
+
+	// With every label hidden the header row is for screen readers only.
+	const headless = html(Table, { 'aria-label': 'When they come back', columns: [{ label: 'Account', hideLabel: true }, { label: 'Back at', hideLabel: true }], children: snippet(() => '<tr><td>Work</td><td>Tue 18:20</td></tr>') });
+	assert.match(headless, /<thead class="sr-only"><tr[^>]*><th scope="col"[^>]*><span class="sr-only">Account<\/span>/);
+});

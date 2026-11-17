@@ -2,8 +2,11 @@
 	import { Card } from '$lib/primitives/display';
 	import { SettingsForm, type Setting } from '$lib/settings';
 
-	let saved = $state<Record<string, Setting['value']>>({ holds: true, limit: 40, model: 'balanced', prefix: 'agent/', share: false });
+	let saved = $state<Record<string, Setting['value']>>({ holds: true, limit: 40, model: 'balanced', prefix: 'agent/', slots: 2, reviewers: 1, share: false });
 	let note = $state('Nothing changed yet.');
+
+	/** A number's choices: each value is the number as text. */
+	const SLOTS = ['1', '2', '3', '4'].map((value) => ({ value, label: value }));
 
 	let settings = $derived<Setting[]>([
 		{ id: 'holds', label: 'Hold protected changes', description: 'A change to a protected path waits for your approval.', value: saved.holds },
@@ -20,14 +23,20 @@
 			]
 		},
 		{ id: 'prefix', label: 'Branch prefix', value: saved.prefix },
+		{ id: 'slots', label: 'Runs at once', description: 'How many runs one machine takes at a time.', value: saved.slots, options: SLOTS },
+		{ id: 'reviewers', label: 'Required reviewers', description: 'This server refuses it, so the choice snaps back.', value: saved.reviewers, options: SLOTS.slice(0, 3) },
 		{ id: 'share', label: 'Share runs publicly', description: 'This server refuses it, so the switch snaps back.', value: saved.share }
 	]);
 
-	/** A slow server that stores every change but one. */
+	/** A slow server that stores every change but two. */
 	async function save(id: string, value: Setting['value']): Promise<void> {
 		await new Promise((resolve) => setTimeout(resolve, 800));
 		if (id === 'share') {
 			note = 'Refused: runs stay private.';
+			return;
+		}
+		if (id === 'reviewers') {
+			note = 'Refused: one review is enough here.';
 			return;
 		}
 		saved = { ...saved, [id]: value };

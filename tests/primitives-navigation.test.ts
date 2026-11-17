@@ -126,3 +126,26 @@ test('AppShell: the item the path is under is the current page', async () => {
 	// With no item above the path, no page is current.
 	assert.deepEqual(currentAt('/elsewhere', PLACES.slice(1)), []);
 });
+
+const SECTIONS = [
+	{ label: 'General', href: '/settings' },
+	{ label: 'Subscriptions', href: '/settings/subscriptions' },
+	{ label: 'Machines', href: '/settings/machines' }
+];
+
+test('SectionNav: a named navigation of links in order, the section on screen marked as the current page', async () => {
+	const SectionNav = await load('/src/lib/primitives/navigation/SectionNav.svelte');
+	const out = html(SectionNav, { 'aria-label': 'Settings sections', items: SECTIONS, current: '/settings/subscriptions', id: 'sections', class: 'md:w-48' });
+	// The name, the rest and your class reach the nav.
+	assert.match(out, /^<nav [^>]*aria-label="Settings sections"/);
+	assert.match(out, /^<nav [^>]*id="sections"/);
+	assert.match(out, /^<nav [^>]*class="[^"]* md:w-48"/);
+	assert.match(out, /^<nav[^>]*><ul[^>]*>(<li[^>]*><a [^>]*>[^<]*<\/a><\/li>){3}<\/ul><\/nav>$/);
+	assert.deepEqual([...out.matchAll(/<a href="([^"]*)"[^>]*>\s*([^<]*?)\s*<\/a>/g)].map(([, href, label]) => [label, href]), SECTIONS.map(({ label, href }) => [label, href]));
+	assert.deepEqual([...out.matchAll(/<a href="([^"]*)" aria-current="page"/g)].map(([, href]) => href), ['/settings/subscriptions']);
+	assert.match(out, /aria-current="page" class="[^"]*bg-canvas-secondary[^"]*font-semibold/);
+
+	// A current that matches no section marks none.
+	assert.doesNotMatch(html(SectionNav, { 'aria-label': 'Settings sections', items: SECTIONS, current: '/elsewhere' }), /aria-current/);
+	assert.doesNotMatch(html(SectionNav, { 'aria-label': 'Settings sections', items: SECTIONS }), /aria-current/);
+});

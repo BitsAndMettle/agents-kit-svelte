@@ -1,4 +1,4 @@
-/** Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, Notice, EmptyState, ListRow, CopyCommand. */
+/** Display: Badge, Avatar, AvatarGroup, Card, Separator, Kbd, Skeleton, Spinner, Progress, Alert, Notice, EmptyState, ListRow, CopyCommand, Table. */
 
 export { default as Badge } from './Badge.svelte';
 export type { Props as BadgeProps, BadgeSize, BadgeVariant } from './Badge.svelte';
@@ -28,3 +28,5 @@ export { default as ListRow } from './ListRow.svelte';
 export type { Props as ListRowProps } from './ListRow.svelte';
 export { default as CopyCommand } from './CopyCommand.svelte';
 export type { Props as CopyCommandProps } from './CopyCommand.svelte';
+export { default as Table } from './Table.svelte';
+export type { TableColumn, TableProps } from './Table.svelte';

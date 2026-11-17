@@ -2116,6 +2116,26 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 <ToolResult tool="rotated" summary="Spare → Personal at 98% weekly" meta="Tue 08:00" />`
 	},
 	{
+		slug: 'usage-table',
+		name: 'UsageTable',
+		category: 'AI Elements & Coding',
+		sveltePath: 'src/lib/runtime/UsageTable.svelte',
+		upstreamSource: 'Agents Kit Svelte · Table, Progress, Badge',
+		description:
+			'The accounts of one agent on one machine as a table, in the order they are used: each window with its own track and what is left, and the status in a column of its own. A window past the switch point turns info, a full one says when it resets, an account read with no window running has 100% left, and one never read says so instead of looking available. Display only.',
+		usageSnippet: `<script lang="ts">
+  import { UsageTable, type AccountUsage } from 'agents-kit-svelte';
+
+  const accounts: AccountUsage[] = [
+    { label: 'Personal', agent: 'Claude Code', at: Date.now(), switchAt: 98, status: 'available',
+      windows: { fiveHour: { used: 34, resetsAt: Date.UTC(2026, 10, 17, 17) }, week: { used: 66, resetsAt: Date.UTC(2026, 10, 21, 20) } } },
+    { label: 'New', agent: 'Claude Code', status: 'available', windows: {} }
+  ];
+</script>
+
+<UsageTable aria-label="Claude Code accounts on the build box" {accounts} timeZone="Europe/Berlin" unreadLabel="Signed in" />`
+	},
+	{
 		slug: 'agent-checkpoint',
 		name: 'AgentCheckpoint',
 		category: 'AI Elements & Coding',
