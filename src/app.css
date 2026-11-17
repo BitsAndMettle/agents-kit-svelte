@@ -262,7 +262,8 @@
 		--ak-color-canvas: light-dark(#fafafa, #18181b);
 		--ak-color-canvas-subtle: light-dark(#f4f4f5, #202024);
 		--ak-color-surface: light-dark(#ffffff, #27272a);
-		--ak-color-fg: light-dark(#18181b, #fafafa);
+		/* The ink is an exact grey on both sides: the tone recipes mix toward it in oklch, where any hue would turn them (orange to plum). */
+		--ak-color-fg: light-dark(#191919, #fafafa);
 		--ak-color-fg-muted: light-dark(#52525b, #a1a1aa);
 		--ak-color-fg-inverse: light-dark(#fafafa, #18181b);
 		--ak-color-border: light-dark(#e4e4e7, #3f3f46);

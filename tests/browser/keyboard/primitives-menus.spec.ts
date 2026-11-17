@@ -22,6 +22,41 @@ async function optionNames(list: Locator): Promise<string[]> {
 	return list.getByRole('option').evaluateAll((els) => els.map((el) => el.querySelector('span span')?.textContent?.trim() ?? ''));
 }
 
+/** sRGB bytes to oklch [chroma, hue in degrees]. */
+function oklch([r, g, b]: number[]): [number, number] {
+	const [lr, lg, lb] = [r, g, b].map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+	const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+	const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+	const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+	const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s;
+	const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s;
+	return [Math.hypot(a, bb), (Math.atan2(bb, a) * 180) / Math.PI];
+}
+
+/**
+ * How many degrees of oklch hue a badge's text has turned from its tone. The recipes mix the tone toward the ink in
+ * oklch, so an ink with any hue turns the text toward it (orange to plum, green to petrol). A canvas reads both colours
+ * back as sRGB bytes, whatever form getComputedStyle gives them in; a grey (or an unparsed colour) counts as 180.
+ */
+async function hueDrift(badge: Locator, tone: string): Promise<number> {
+	const [text, own] = await badge.evaluate((el, tone) => {
+		const probe = el.appendChild(document.createElement('span'));
+		probe.style.color = `var(--ak-color-${tone})`;
+		const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+		const bytes = (css: string) => {
+			ctx.fillStyle = '#000';
+			ctx.fillStyle = css;
+			ctx.fillRect(0, 0, 1, 1);
+			return [...ctx.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+		};
+		const out = [bytes(getComputedStyle(el).color), bytes(getComputedStyle(probe).color)];
+		probe.remove();
+		return out;
+	}, tone);
+	const [[c1, h1], [c2, h2]] = [oklch(text), oklch(own)];
+	return Math.min(c1, c2) < 0.03 ? 180 : Math.abs(((h1 - h2 + 540) % 360) - 180);
+}
+
 test.describe('DropdownMenu', () => {
 	test('opens from the trigger with Enter, Space, ArrowDown and ArrowUp, and Escape returns focus', async ({ page }) => {
 		const section = await openSection(page, 'dropdown-menu');
@@ -130,9 +165,19 @@ test.describe('DropdownMenu', () => {
 });
 
 test.describe('ThemeToggle', () => {
-	test('a choice is written to <html data-theme> and clears the dark class', async ({ page }) => {
+	test('a choice is written to <html data-theme>, clears the dark class, and Studio badges keep their hue', async ({ page }) => {
 		const section = await openSection(page, 'theme-toggle');
 		const html = page.locator('html');
+		const studio = section.locator('[data-palette="studio"]');
+		const badges = [
+			[studio.getByText('Needs you', { exact: true }), 'warning'],
+			[studio.getByText('Done', { exact: true }), 'success']
+		] as const;
+		const expectTonesKeepHue = async (theme: string) => {
+			for (const [badge, tone] of badges) {
+				await expect.poll(() => hueDrift(badge, tone), { message: `${tone} badge text in Studio ${theme}` }).toBeLessThan(10);
+			}
+		};
 		await page.evaluate(() => document.documentElement.classList.add('dark'));
 		await section.getByRole('button', { name: 'Theme', exact: true }).click();
 		const dark = section.getByRole('menuitemradio', { name: 'Dark', exact: true });
@@ -140,6 +185,10 @@ test.describe('ThemeToggle', () => {
 		await expect(html).toHaveAttribute('data-theme', 'dark');
 		await expect(html).not.toHaveClass(/\bdark\b/);
 		await expect(dark).toHaveAttribute('aria-checked', 'true');
+		await expectTonesKeepHue('dark');
+		await section.getByRole('menuitemradio', { name: 'Light', exact: true }).click();
+		await expect(html).toHaveAttribute('data-theme', 'light');
+		await expectTonesKeepHue('light');
 		await section.getByRole('menuitemradio', { name: 'System', exact: true }).click();
 		await expect(html).toHaveAttribute('data-theme', 'system');
 	});

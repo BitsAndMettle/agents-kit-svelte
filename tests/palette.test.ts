@@ -53,6 +53,10 @@ const ratio = (a: string, b: string) => {
 };
 const t = (name: string) => tokens[name] ?? assert.fail(`Studio has no hex value for --ak-${name}`);
 
+test('Studio ink is an exact grey in both themes, so tones mixed toward it in oklch keep their hue', () => {
+	for (const ink of t('color-fg')) assert.match(ink, /^#([0-9a-f]{2})\1\1$/i);
+});
+
 const TONES = ['accent', 'success', 'warning', 'danger', 'info'];
 const SURFACES = ['color-canvas', 'color-canvas-subtle', 'color-surface', 'chat-bubble-user'];
 const TEXT = [
