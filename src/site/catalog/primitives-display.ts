@@ -150,7 +150,7 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/primitives/display/Progress.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'Progress bar, determinate or indeterminate, with tones, a visible label and value text. The value, range and text are exposed as a progressbar.',
+			'Progress bar, determinate or indeterminate, with tones, a visible label and value text. Segments split the bar into parts side by side, each in its own tone, and the value text names each part. The value, range and text are exposed as a progressbar.',
 		usageSnippet: `<script lang="ts">
   import { Progress } from 'agents-kit-svelte/primitives';
 
@@ -158,6 +158,16 @@ export const PRIMITIVES_DISPLAY: CatalogItemMeta[] = [
 </script>
 
 <Progress value={done} max={10} label="Tasks done" showValue valueText={(v) => v + ' of 10'} />
+<Progress
+  label="Cards"
+  max={10}
+  showValue
+  segments={[
+    { value: 5, tone: 'success', label: 'done' },
+    { value: 2, tone: 'accent', label: 'building' },
+    { value: 1, tone: 'warning', label: 'need you' }
+  ]}
+/>
 <Progress label="Waiting for the runner" />`
 	},
 	{

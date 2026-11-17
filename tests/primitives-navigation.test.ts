@@ -86,7 +86,7 @@ test('AppShell: one bar over the page, with the name, the places inside a named 
 
 test('AppShell: given the width of the page, the content of the bar lines up with it while the bar spans the window', async () => {
 	const AppShell = await load('/src/lib/primitives/navigation/AppShell.svelte');
-	assert.match(html(AppShell, { items: PLACES, path: '/', maxWidth: '72rem' }), /<header class="[^"]*border-b[^"]*"><div class="mx-auto [^"]*" style="max-width: 72rem;">/);
+	assert.match(html(AppShell, { items: PLACES, path: '/', maxWidth: '72rem' }), /<header class="[^"]*border-b[^"]*"><div class="mx-auto [^"]*px-4 sm:px-6" style="max-width: 72rem;">/);
 	assert.doesNotMatch(html(AppShell, { items: PLACES, path: '/' }), /max-width/);
 });
 

@@ -66,6 +66,7 @@ export default defineConfig({
 `,
 		'single.html': `<!doctype html><html><body><div id="app"></div><script type="module" src="/src/single.ts"></script></body></html>\n`,
 		'src/single.ts': `import { mount } from 'svelte';
+import 'agents-kit-svelte/fonts.css';
 import { TodoList } from 'agents-kit-svelte';
 mount(TodoList, { target: document.getElementById('app')!, props: { items: [] } });
 `,

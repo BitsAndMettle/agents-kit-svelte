@@ -34,8 +34,9 @@
 		/** Controls at the end of the bar, e.g. an account menu. */
 		actions?: Snippet;
 		/**
-		 * The widest the bar's content gets, centred, e.g. `72rem`: give it your page's max width so the
-		 * name and controls line up with the page under them. The bar's border and colour still span the window.
+		 * The widest the bar's content gets, centred, e.g. `72rem`. Give it the max width of a page laid
+		 * out as `mx-auto max-w-6xl px-4 sm:px-6`, and the name and controls line up with that page's
+		 * content. The bar's border and colour still span the window.
 		 */
 		maxWidth?: string;
 		/** The page. */
@@ -61,8 +62,8 @@
 </script>
 
 <div {...rest} class={cn('flex flex-col bg-canvas-primary text-fg-main', here?.fill ? 'h-dvh' : 'min-h-dvh', className)}>
-	<header class="sticky top-0 z-40 shrink-0 border-b border-canvas-border bg-canvas-primary px-4 py-2 sm:px-6">
-		<div class="mx-auto flex flex-wrap items-center gap-x-4 gap-y-2" style:max-width={maxWidth}>
+	<header class="sticky top-0 z-40 shrink-0 border-b border-canvas-border bg-canvas-primary py-2">
+		<div class="mx-auto flex flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-6" style:max-width={maxWidth}>
 			{#if title}<p class="m-0 text-sm font-semibold">{title}</p>{/if}
 			<nav aria-label={ariaLabel} class="order-last w-full sm:order-none sm:w-auto">
 				<ul class={cn(SEGMENT_GROUP_CLASS, 'm-0 flex list-none')}>
