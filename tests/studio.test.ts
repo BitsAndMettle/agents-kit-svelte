@@ -50,6 +50,7 @@ test('AppShell studio: a 56px bar on the card surface, the name bold from 640px,
 	assert.ok(count, 'the count and its label');
 	assert.match(count[1], /\bpx-\[7px\][^"]*\bleading-\[14px\][^"]*\bfont-semibold\b/);
 	assert.doesNotMatch(count[1], /-subtle\b/);
+	assert.match(count[1], /\btext-\[11px\]/);
 	assert.match(out, /<div class="ml-auto flex items-center gap-1\.5 lg:gap-6"><button type="button">Sign out<\/button><\/div>/);
 });
 
@@ -148,6 +149,8 @@ test('ChatWorkbench studio: the band keeps only the tabs; rails, title line, log
 	assert.match(out, /<div class="relative shrink-0 px-4 pt-2 pb-5\.5 sm:px-8">/);
 	assert.doesNotMatch(out, /ak-spark/);
 	assert.match(out, /Thinking…/);
+	assert.doesNotMatch(out, /bg-chat-accent-subtle/);
+	assert.match(out, /<header class="flex items-center gap-2 text-xs text-fg-light"><span>Assistant · <span class="tabular-nums">14:02<\/span><\/span>/);
 	// Without a status, the actions take the line's end.
 	assert.match(html(ChatWorkbench, { chrome: 'studio', title: 'Referee', headerActions: snippet(() => '<button type="button">Pause</button>') }), /<div class="ml-auto flex min-w-0 items-center gap-1\.5 \*:shrink">/);
 	const empty = html(ChatWorkbench, { chrome: 'studio', empty: snippet(() => '<p>Ask</p>') });

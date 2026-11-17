@@ -171,6 +171,7 @@ test('Studio on a phone: the places are a row of 40px links under the name, the 
 });
 
 test('Studio chrome passes axe (WCAG 2.2 A/AA) in light and dark', async ({ page }) => {
+	await page.emulateMedia({ reducedMotion: 'reduce' });
 	await open(page);
 	const theme = () => page.evaluate(() => document.documentElement.getAttribute('data-theme'));
 	for (const target of ['light', 'dark']) {
