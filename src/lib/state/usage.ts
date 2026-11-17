@@ -61,6 +61,7 @@ export function usageBurn(account: AccountUsage, key: keyof AccountUsage['window
 		end: hours,
 		budget: account.switchAt,
 		budgetLabel: 'Switch point',
+		budgetShare: false,
 		unit: '',
 		formatValue: (v: number) => `${Math.round(v)}%`,
 		formatTime: (t: number) => dayTime(start + t * HOUR, timeZone),

@@ -100,7 +100,11 @@ test('TokenBurnChart names the switch point and speaks percent for a usage windo
 	assert.match(chart, /Projected at end<\/dt>\s*<dd[^>]*>168%</, 'the average rate carried on to the reset');
 	assert.match(chart, />Switch point</);
 	assert.doesNotMatch(chart, /Budget|tokens/);
+	const clear = html(TokenBurnChart, usage.usageBurn(personal, 'fiveHour'));
+	assert.match(clear, /Switch point<\/dt>\s*<dd[^>]*>\s*Not reached/, 'no second percent beside the used one');
+	assert.doesNotMatch(clear, /% used/);
 	const tokens = html(TokenBurnChart, { points: [{ t: 0, spent: 0 }, { t: 60, spent: 1200 }], budget: 5000 });
 	assert.match(tokens, /of 5k tokens/);
 	assert.match(tokens, />Budget</);
+	assert.match(tokens, /[0-9]+% used/);
 });

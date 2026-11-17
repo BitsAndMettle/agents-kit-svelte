@@ -32,6 +32,8 @@
 		unit?: string;
 		/** Names the budget line, e.g. `Switch point`. */
 		budgetLabel?: string;
+		/** Shows spend as a share of the budget (`41% used`). Turn it off when `formatValue` already speaks a percent. */
+		budgetShare?: boolean;
 		/** Called when the person clicks a mark. */
 		onSelectMark?: (mark: RunMark) => void;
 		/** Called when the person clicks the plot: the spend at that time. */
@@ -52,6 +54,7 @@
 		formatValue = formatCompact,
 		unit = 'tokens',
 		budgetLabel = 'Budget',
+		budgetShare = true,
 		onSelectMark,
 		onSelectPoint,
 		class: className = '',
@@ -163,7 +166,7 @@
 					<dt class="text-fg-light">{budgetLabel}</dt>
 					{#key over}
 						<dd class={cn('mt-0.5 font-medium', over ? 'text-status-danger' : 'text-status-success')} in:rise={{ y: 4, duration: 180 }}>
-							{#if burn.crossesAt !== null}{last && burn.crossesAt <= last.t ? 'Over' : 'Runs out'} at {formatTime(burn.crossesAt)}{:else}{Math.round(pctUsed ?? 0)}% used{/if}
+							{#if burn.crossesAt !== null}{last && burn.crossesAt <= last.t ? 'Over' : 'Runs out'} at {formatTime(burn.crossesAt)}{:else if budgetShare}{Math.round(pctUsed ?? 0)}% used{:else}Not reached{/if}
 						</dd>
 					{/key}
 				</div>
@@ -299,7 +302,7 @@
 				style:left="{left}px"
 			>
 				<p class="font-medium text-fg-main tabular-nums">{formatTime(activeT)}</p>
-				<p class="mt-0.5 flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Spent</span><span class="text-fg-main">{formatValue(Math.round(spent))}{#if budget}<span class="ml-1 text-fg-light">{Math.round((spent / budget) * 100)}%</span>{/if}</span></p>
+				<p class="mt-0.5 flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Spent</span><span class="text-fg-main">{formatValue(Math.round(spent))}{#if budget && budgetShare}<span class="ml-1 text-fg-light">{Math.round((spent / budget) * 100)}%</span>{/if}</span></p>
 				<p class="flex justify-between gap-3 tabular-nums"><span class="text-fg-light">Rate</span><span class="text-fg-main">{formatCompact(Math.round(rateAt(activeT) * rateScale))}{rateLabel}</span></p>
 			</div>
 		{/if}
