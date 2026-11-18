@@ -78,6 +78,9 @@
 	let hoveredRailId = $state<string | null>(null);
 	let focusedRailId = $state<string | null>(null);
 
+	/** `smooth` animates only the reader's own presses (rail, Jump to latest); following output is always instant. */
+	const pressBehavior: ScrollBehavior = $derived(smooth ? 'smooth' : 'auto');
+
 	let programmaticScroll = false;
 	let didInitialScroll = false;
 	let scrollTimerId: ReturnType<typeof setTimeout> | undefined;
@@ -312,9 +315,9 @@
 	/**
 	 * Scrolls the conversation viewport to its bottom live edge without scrolling the outer document.
 	 *
-	 * @param behavior - Scroll animation behavior (`'smooth'` or `'auto'`).
+	 * @param behavior - Scroll behavior: instant when following output, `pressBehavior` for the reader's own presses.
 	 */
-	function scrollToEnd(behavior: ScrollBehavior = smooth ? 'smooth' : 'auto'): void {
+	function scrollToEnd(behavior: ScrollBehavior = 'instant'): void {
 		if (!viewportEl) return;
 
 		programmaticScroll = true;
@@ -346,7 +349,7 @@
 		activeRailId = item.id;
 
 		if (isLast) {
-			scrollToEnd(smooth ? 'smooth' : 'auto');
+			scrollToEnd(pressBehavior);
 			return;
 		}
 
@@ -365,7 +368,7 @@
 			targetRect.top -
 			viewportRect.top -
 			Math.max(16, (viewportEl.clientHeight - targetRect.height) / 2);
-		const behavior: ScrollBehavior = smooth ? 'smooth' : 'auto';
+		const behavior = pressBehavior;
 
 		viewportEl.scrollTo({
 			top: Math.max(0, centeredTop),
@@ -466,33 +469,18 @@
 			syncRailItems();
 			if (followOutput && !didInitialScroll) {
 				didInitialScroll = true;
-				scrollToEnd('auto');
+				scrollToEnd();
 			}
 		});
 
-		const resizeObserver =
-			typeof ResizeObserver !== 'undefined'
-				? new ResizeObserver(() => {
-						untrack(() => {
-							syncRailItems();
-							if (followOutput && isPinnedToBottom) {
-								scrollToEnd(smooth ? 'smooth' : 'auto');
-							}
-						});
-					})
-				: null;
-
-		const mutationObserver =
-			typeof MutationObserver !== 'undefined'
-				? new MutationObserver(() => {
-						untrack(() => {
-							syncRailItems();
-							if (followOutput && isPinnedToBottom) {
-								scrollToEnd(smooth ? 'smooth' : 'auto');
-							}
-						});
-					})
-				: null;
+		/** Content changed: at the end, follow it at once; scrolled up, the browser's scroll anchoring keeps the view still. */
+		const follow = () =>
+			untrack(() => {
+				syncRailItems();
+				if (followOutput && isPinnedToBottom) scrollToEnd();
+			});
+		const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(follow) : null;
+		const mutationObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(follow) : null;
 
 		resizeObserver?.observe(currentContent);
 		resizeObserver?.observe(currentViewport);
@@ -520,7 +508,7 @@
 		if (streaming && followOutput) {
 			untrack(() => {
 				if (isPinnedToBottom && viewportEl) {
-					scrollToEnd('auto');
+					scrollToEnd();
 				}
 			});
 		}
@@ -535,7 +523,7 @@
 		bind:this={viewportEl}
 		onscroll={handleScroll}
 		aria-label={label}
-		class="aks-scrollport h-full min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none [overflow-anchor:none] {navigation ===
+		class="aks-scrollport h-full min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none {navigation ===
 			'rail' && discoveredItems.length > 1
 			? 'pr-9 sm:pr-11'
 			: ''} {viewportClass}"
@@ -543,7 +531,7 @@
 		{#if canScrollUp}
 			<div
 				aria-hidden="true"
-				class="pointer-events-none sticky top-0 right-0 left-0 z-10 h-4 bg-gradient-to-b from-chat-surface to-transparent"
+				class="pointer-events-none sticky top-0 right-0 left-0 z-10 h-4 [overflow-anchor:none] bg-gradient-to-b from-chat-surface to-transparent"
 			></div>
 		{/if}
 
@@ -640,7 +628,7 @@
 		<button
 			type="button"
 			transition:rise={{ y: 4 }}
-			onclick={() => scrollToEnd('smooth')}
+			onclick={() => scrollToEnd(pressBehavior)}
 			class={pillClass('secondary', 'sm', 'absolute bottom-3 left-1/2 z-20 -translate-x-1/2 ak-shadow-soft')}
 		>
 			<ArrowDown aria-hidden="true" class="size-3" />
