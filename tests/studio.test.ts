@@ -220,3 +220,9 @@ test('MessageScroller merges contentClass, so a passed utility replaces the one 
 	assert.equal(content('pb-10'), 'mx-auto w-full max-w-3xl space-y-7 px-5 py-6 sm:px-8 pb-10');
 	assert.doesNotMatch(content('max-w-none'), /max-w-3xl/);
 });
+
+test('MessageScroller leaves scroll anchoring on, so growth above a reader who scrolled up does not move what they read', () => {
+	const viewport = html(MessageScroller, { navigation: 'none', children: snippet(() => '<p>x</p>') }).match(/<section[^>]*class="([^"]*)"/)![1];
+	assert.match(viewport, /aks-scrollport/);
+	assert.doesNotMatch(viewport, /overflow-anchor/);
+});
