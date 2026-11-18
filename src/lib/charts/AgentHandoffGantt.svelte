@@ -87,9 +87,13 @@
 		return running ? end + Math.ceil((work * 1.15) / step) * step - work : end;
 	});
 	const domainEnd = new Tween(untrack(() => domainTarget), { duration: 600, easing: cubicOut });
+	/** While live the end only grows, unless the folds change (Work time ↔ Calendar): then it fits again. */
+	let foldKey = $derived(breaks.map((b) => `${b.start}-${b.end}`).join());
+	let fitted = untrack(() => foldKey);
 	$effect(() => {
 		const target = domainTarget;
-		if (target > domainEnd.target || !running) void domainEnd.set(target, { duration: prefersReducedMotion.current ? 0 : 600 });
+		if (target > domainEnd.target || !running || foldKey !== fitted) void domainEnd.set(target, { duration: prefersReducedMotion.current ? 0 : 600 });
+		fitted = foldKey;
 	});
 
 	let innerW = $derived(Math.max(80, width - LABEL_W - PAD_R));
@@ -172,9 +176,9 @@
 			const y1 = laneY(from.lane) + (down ? BAR_H / 2 : -BAR_H / 2);
 			const x2 = x(to.start);
 			if (from.lane === to.lane) {
-				// Within one lane the arrow arcs over the bars' top edge, its label at the top of the arc.
-				const d = `M${x1},${y1} C${x1},${y1 - 18} ${x2},${y1 - 18} ${x2},${y1}`;
-				return [{ link, d, mx: (x1 + x2) / 2, my: y1 - 13.5 }];
+				// Within one lane the arrow arcs over the bars' top edge, its label at the top of the arc, under the axis.
+				const d = `M${x1},${y1} C${x1},${y1 - 12} ${x2},${y1 - 12} ${x2},${y1}`;
+				return [{ link, d, mx: (x1 + x2) / 2, my: y1 - 9 }];
 			}
 			const y2 = laneY(to.lane) + (down ? -BAR_H / 2 : BAR_H / 2);
 			const bend = Math.max(18, Math.abs(y2 - y1) * 0.55);
