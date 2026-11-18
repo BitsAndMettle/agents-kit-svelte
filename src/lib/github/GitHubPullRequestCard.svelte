@@ -121,7 +121,7 @@
 	<!-- Referee Verdict Banner -->
 	{#if pr.refereeSummary && quiet}
 		<p class="mt-3 flex items-start gap-2 rounded-lg border border-card-border bg-canvas-secondary/30 px-3 py-2 text-xs font-medium text-fg-main">
-			<CheckMark status={refereeMark} spoken={false} class="mt-0.5" />
+			<CheckMark status={refereeMark} spoken={false} class="mt-0.5 text-fg-light" />
 			<span class="leading-relaxed">{pr.refereeSummary}</span>
 		</p>
 	{:else if pr.refereeSummary}

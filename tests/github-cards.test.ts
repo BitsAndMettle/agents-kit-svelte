@@ -338,17 +338,17 @@ test('GitHubPullRequestCard: quiet, its chip is neutral unless merged and the re
 	assert.match(banner, /bg-status-success-subtle text-status-success"><svg[^>]*lucide-shield-check[ "]/);
 	assert.equal(chip(banner), 'bg-status-success-subtle text-status-success');
 
-	// Quiet, the verdict is a tick, a cross or a dot in its colour, and the words beside it say it.
+	// Quiet, the verdict is a neutral tick, cross or dot, so the sheet keeps one state colour, and the words beside it say it.
 	const marks: [GitHubPullRequestData['refereeStatus'], string, string][] = [
-		['pass', 'text-status-success', 'lucide-check[ "]'],
-		['send-back', 'text-status-danger', 'lucide-x[ "]'],
-		['pending', 'text-accent-primary', 'size-2 rounded-full bg-current'],
-		[undefined, 'text-accent-primary', 'size-2 rounded-full bg-current']
+		['pass', 'text-fg-light', 'lucide-check[ "]'],
+		['send-back', 'text-fg-light', 'lucide-x[ "]'],
+		['pending', 'text-fg-light', 'size-2 rounded-full bg-current'],
+		[undefined, 'text-fg-light', 'size-2 rounded-full bg-current']
 	];
 	for (const [refereeStatus, colour, glyph] of marks) {
 		const row = drawn({ refereeStatus, refereeSummary: 'Review by codex: Pass' });
 		assert.match(row, new RegExp(`<p class="mt-3 flex items-start [^"]*bg-canvas-secondary/30[^"]*text-fg-main"><span class="[^"]*${colour}[^"]*">[\\s\\S]*?${glyph}`), String(refereeStatus));
-		assert.doesNotMatch(row, /-subtle text-status|lucide-shield-check|sr-only/);
+		assert.doesNotMatch(row, /text-status-|text-accent-primary|lucide-shield-check|sr-only/);
 		assert.equal(said(row), 'Open PR #57 Review by codex: Pass');
 	}
 });
