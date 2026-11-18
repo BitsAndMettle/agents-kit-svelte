@@ -62,7 +62,8 @@ export function foldedTime(breaks: TimeBreak[], from: number, to: number): numbe
  * @param domain - Data extent `[min, max]`.
  * @param range - Pixel extent `[start, end]`, ascending.
  * @param breaks - Stretches to fold. Clipped to the domain and merged where they overlap.
- * @param width - Pixels each fold takes.
+ * @param width - Pixels each fold takes. When the folds' widths add up to more than the range, the open time gets
+ *   no pixels and the scale runs past the range end; callers keep `width * folds` within the range.
  */
 export function scaleBroken(domain: [number, number], range: [number, number], breaks: TimeBreak[], width: number): LinearScale {
 	const [d0, d1] = domain;
