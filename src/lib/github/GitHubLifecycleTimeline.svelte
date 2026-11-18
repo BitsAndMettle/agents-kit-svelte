@@ -2,6 +2,7 @@
 	import { cn } from '../ui/cn';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import {
+		Check,
 		CircleDot,
 		Eye,
 		GitBranch,
@@ -16,17 +17,26 @@
 	import type { Component } from 'svelte';
 	import { fade } from 'svelte/transition';
 	import { motionDuration, rise } from '../state/motion.svelte';
-	import { badgeClass, PROGRESS_TRACK_CLASS, progressFillClass } from '../ui/styles';
+	import { badgeClass, PROGRESS_TRACK_CLASS, progressFillClass, TONE_SOFT_CLASS, type UiTone } from '../ui/styles';
 	import type { GitHubLifecycleStage, GitHubLifecycleStageId } from '../types';
 	import { LiveLoop } from './live-loop.svelte';
 
-	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title' | 'description' | 'doneLabel' | 'headingLevel' | 'stages' | 'live' | 'current' | 'onSelectStage'> {
+	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'title' | 'description' | 'doneLabel' | 'status' | 'tone' | 'quiet' | 'headingLevel' | 'stages' | 'live' | 'current' | 'onSelectStage'> {
 		/** The heading, which also names the section. */
 		title?: string;
 		/** A line under the heading. */
 		description?: string;
 		/** The badge once the last stage is reached, such as "Shipped". */
 		doneLabel?: string;
+		/** Where the thing stands, as the badge says it, in place of the stage in hand's label or `doneLabel`. */
+		status?: string;
+		/**
+		 * Colour meaning of the status: the badge, the bar and the stage in hand take it. Left out, it is
+		 * `accent` until the last stage and `success` after it. The badge's dot breathes only in `accent`.
+		 */
+		tone?: UiTone;
+		/** Neutral stages: one that is done is a tick, one still ahead is muted, and only the stage in hand wears the tone. */
+		quiet?: boolean;
 		/** The heading's level. */
 		headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
 		stages?: GitHubLifecycleStage[];
@@ -55,6 +65,9 @@
 		title,
 		description,
 		doneLabel,
+		status,
+		tone,
+		quiet = false,
 		headingLevel = 3,
 		stages = [],
 		live = false,
@@ -76,8 +89,9 @@
 	const focusIndex = $derived(selected ?? activeIndex);
 	const focusStage = $derived(stages[Math.min(focusIndex, stages.length - 1)]);
 	const shipped = $derived(activeIndex >= stages.length - 1);
-	/** The header's badge: the stage in hand, or `doneLabel` once all are done. */
-	const badge = $derived(shipped ? doneLabel : stages[activeIndex]?.label);
+	const look = $derived(tone ?? (shipped ? 'success' : 'accent'));
+	/** The header's badge: the status, else the stage in hand, or `doneLabel` once all are done. */
+	const badge = $derived(status ?? (shipped ? doneLabel : stages[activeIndex]?.label));
 	const percent = $derived(Math.round((activeIndex / Math.max(1, stages.length - 1)) * 100));
 
 	/**
@@ -103,10 +117,11 @@
 				{#if description}<p class="text-xs text-fg-light">{description}</p>{/if}
 			</div>
 			{#if shipped && badge}
-				<span class={badgeClass('success')} in:fade={{ duration: motionDuration(160) }}>{badge}</span>
+				<span class={badgeClass(look)} in:fade={{ duration: motionDuration(160) }}>{badge}</span>
 			{:else if badge}
-				<span class={badgeClass('accent')}>
-					<span aria-hidden="true" class="ak-breathe size-1.5 rounded-full bg-accent-primary"></span>
+				<span class={badgeClass(look)}>
+					<!-- The accent is work under way; any other tone says nobody is at it now. -->
+					{#if look === 'accent'}<span aria-hidden="true" class="ak-breathe size-1.5 rounded-full bg-accent-primary"></span>{/if}
 					{badge}
 				</span>
 			{/if}
@@ -115,7 +130,7 @@
 
 	<div class="px-4 pt-4">
 		<div class={PROGRESS_TRACK_CLASS} role="progressbar" aria-label="Lifecycle progress" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
-			<span class={progressFillClass(shipped ? 'success' : 'accent')} style="width: {percent}%"></span>
+			<span class={progressFillClass(look)} style="width: {percent}%"></span>
 		</div>
 	</div>
 
@@ -133,18 +148,23 @@
 					class="flex w-full items-center gap-2.5 rounded-control px-2.5 py-1.5 text-left transition-colors @md:flex-col @md:items-start @md:gap-1.5 @md:py-2 {selected ===
 					i
 						? 'bg-canvas-secondary'
-						: 'hover:bg-canvas-primary'} {i > activeIndex ? 'opacity-45' : ''}"
+						: 'hover:bg-canvas-primary'} {i > activeIndex && !quiet ? 'opacity-45' : ''}"
 				>
+					<!-- The neutral tint is a stage ahead's, so a neutral stage in hand keeps its glyph in ink. -->
 					<span
 						class="inline-flex size-6 shrink-0 items-center justify-center rounded-full transition-colors @md:size-7 {done
-							? 'bg-status-success-subtle text-status-success'
+							? quiet
+								? 'bg-canvas-secondary text-fg-light'
+								: 'bg-status-success-subtle text-status-success'
 							: active
-								? 'bg-accent-subtle text-accent-primary'
+								? look === 'neutral'
+									? 'bg-canvas-secondary text-fg-main'
+									: TONE_SOFT_CLASS[look]
 								: 'bg-canvas-secondary text-fg-light'}"
 					>
-						<Icon aria-hidden="true" class="size-3.5" />
+						{#if done && quiet}<Check aria-hidden="true" class="size-3.5" />{:else}<Icon aria-hidden="true" class="size-3.5" />{/if}
 					</span>
-					<span class="text-xs font-medium text-fg-main">{stage.label}</span>
+					<span class="text-xs font-medium {quiet && i > activeIndex ? 'text-fg-light' : 'text-fg-main'}">{stage.label}</span>
 					{#if stage.timestamp && i <= activeIndex}
 						<span class="ml-auto font-mono text-[10px] text-fg-light tabular-nums @md:ml-0">{stage.timestamp}</span>
 					{/if}

@@ -248,3 +248,107 @@ test('GitHubLifecycleTimeline: stages are drawn as given, under a header only of
 	assert.doesNotMatch(html(GitHubLifecycleTimeline, { stages: [stages[0], { id: 'pull-request', label: 'In review', detail: 'PR 57' }], current: 1 }), />by </);
 	assert.doesNotMatch(drawn({ current: 0 }), /rounded-control bg-canvas-secondary px-3\.5/);
 });
+
+test('GitHubLifecycleTimeline: without status, tone or quiet it draws as it always has', async () => {
+	const GitHubLifecycleTimeline = await load('/src/lib/github/GitHubLifecycleTimeline.svelte');
+	const stages: GitHubLifecycleStage[] = [{ id: 'issue', label: 'Filed' }, { id: 'pull-request', label: 'In review' }, { id: 'merge', label: 'Merged' }];
+	const midway = html(GitHubLifecycleTimeline, { stages, current: 1 });
+
+	assert.match(midway, /<header[\s\S]*bg-accent-subtle text-accent-primary">\s*<span aria-hidden="true" class="ak-breathe [^"]*"><\/span>\s*In review/);
+	assert.match(midway, /bg-status-success-subtle text-status-success"><svg[^>]*lucide-circle-dot[ "]/);
+	assert.match(midway, /aria-current="step"[^>]*>\s*<span class="[^"]* bg-accent-subtle text-accent-primary">/);
+	assert.match(midway, /opacity-45/);
+	assert.match(midway, /transition-\[width\][^"]* bg-accent-primary"/);
+	assert.doesNotMatch(midway, /lucide-check[ "]/);
+	assert.match(html(GitHubLifecycleTimeline, { stages, doneLabel: 'Shipped' }), /bg-status-success-subtle text-status-success">Shipped</);
+});
+
+test('GitHubLifecycleTimeline: a status says where the thing stands, and its tone colours the badge, the bar and the stage in hand', async () => {
+	const GitHubLifecycleTimeline = await load('/src/lib/github/GitHubLifecycleTimeline.svelte');
+	const stages: GitHubLifecycleStage[] = [{ id: 'issue', label: 'Filed' }, { id: 'pull-request', label: 'In review' }, { id: 'merge', label: 'Merged' }];
+	const drawn = (props: Record<string, unknown>) => html(GitHubLifecycleTimeline, { stages, ...props });
+	const header = (markup: string) => /<header[\s\S]*<\/header>/.exec(markup)?.[0] ?? '';
+	const inHand = (markup: string) => /aria-current="step"[^>]*>\s*<span class="([^"]*)"/.exec(markup)?.[1] ?? '';
+	const bar = (markup: string) => /transition-\[width\][^"]* (bg-[a-z-]+)"/.exec(markup)?.[1];
+
+	// Nobody is at work on a stage that stopped, waits for a person or idles: its badge is still.
+	const tones: Record<string, [badge: string, fill: string, mark: string]> = {
+		danger: ['bg-status-danger-subtle text-status-danger', 'bg-status-danger', 'bg-status-danger-subtle text-status-danger'],
+		warning: ['bg-status-warning-subtle text-status-warning', 'bg-status-warning', 'bg-status-warning-subtle text-status-warning'],
+		// The neutral stage in hand keeps its glyph in ink, where a stage ahead is muted.
+		neutral: ['bg-canvas-secondary text-fg-light', 'bg-fg-light', 'bg-canvas-secondary text-fg-main']
+	};
+	for (const [tone, [badge, fill, mark]] of Object.entries(tones)) {
+		const out = drawn({ current: 1, status: 'Stopped: tests failed', tone });
+		assert.match(header(out), new RegExp(`${badge}">\\s*Stopped: tests failed\\s*</span>`), tone);
+		assert.doesNotMatch(header(out), /In review/);
+		assert.equal(bar(out), fill, tone);
+		assert.ok(inHand(out).endsWith(mark), tone);
+		assert.doesNotMatch(out, /ak-breathe/, tone);
+		// A stage that stopped is still the one in hand.
+		assert.match(out, /aria-current="step"[^>]*>[\s\S]*?In review/);
+	}
+
+	// Work under way breathes; a thing that is done does not, and its status wins over doneLabel.
+	assert.match(drawn({ current: 1, status: 'Implementing', tone: 'accent' }), /ak-breathe[^>]*><\/span>\s*Implementing/);
+	const merged = drawn({ status: 'Merged', tone: 'accent', doneLabel: 'Shipped' });
+	assert.match(header(merged), /bg-accent-subtle text-accent-primary">Merged<\/span>/);
+	assert.equal(bar(merged), 'bg-accent-primary');
+	assert.doesNotMatch(merged, /ak-breathe|Shipped/);
+});
+
+test('GitHubLifecycleTimeline: quiet stages are a tick once done and muted while ahead, so only the stage in hand is in colour', async () => {
+	const GitHubLifecycleTimeline = await load('/src/lib/github/GitHubLifecycleTimeline.svelte');
+	const stages: GitHubLifecycleStage[] = [{ id: 'issue', label: 'Filed' }, { id: 'branch', label: 'Branch' }, { id: 'pull-request', label: 'In review' }, { id: 'merge', label: 'Merged' }];
+	const ticks = (markup: string) => markup.match(/lucide-check[ "]/g)?.length ?? 0;
+
+	const midway = html(GitHubLifecycleTimeline, { stages, current: 2, quiet: true });
+	assert.equal(ticks(midway), 2);
+	assert.doesNotMatch(midway, /bg-status-success-subtle|opacity-45|lucide-circle-dot|lucide-git-branch/);
+	assert.match(midway, /lucide-git-pull-request[ "]/);
+	assert.match(midway, /<span class="text-xs font-medium text-fg-light">Merged<\/span>/);
+	assert.match(midway, /<span class="text-xs font-medium text-fg-main">In review<\/span>/);
+
+	const done = html(GitHubLifecycleTimeline, { stages, quiet: true });
+	assert.equal(ticks(done), stages.length);
+	assert.doesNotMatch(done, /lucide-(circle-dot|git-branch|git-pull-request|git-merge)[ "]/);
+});
+
+test('GitHubPullRequestCard: quiet, its chip is neutral unless merged and the review is a plain row with a check mark', async () => {
+	const GitHubPullRequestCard = await load('/src/lib/github/GitHubPullRequestCard.svelte');
+	const drawn = (more: Partial<GitHubPullRequestData>, quiet = true) => html(GitHubPullRequestCard, { pr: { number: 57, state: 'open', ...more }, quiet });
+	const chip = (markup: string) => /rounded-chip [^"]*font-medium ([^"]*)"/.exec(markup)?.[1];
+
+	// Each state keeps GitHub's icon and its word; only a merged one keeps its colour.
+	const states: Record<GitHubPRState, [word: string, icon: string, tone: string]> = {
+		open: ['Open', 'git-pull-request', 'bg-canvas-secondary text-fg-light'],
+		draft: ['Draft', 'git-pull-request-draft', 'bg-canvas-secondary text-fg-light'],
+		merged: ['Merged', 'git-merge', 'bg-accent-subtle text-accent-primary'],
+		closed: ['Closed', 'git-pull-request-closed', 'bg-canvas-secondary text-fg-light']
+	};
+	for (const [state, [word, icon, tone]] of Object.entries(states)) {
+		const markup = drawn({ state: state as GitHubPRState });
+		assert.equal(chip(markup), tone, state);
+		assert.match(markup, new RegExp(`lucide-${icon}[ "]`));
+		assert.equal(said(markup), `${word} PR #57`);
+	}
+
+	// Without quiet the review is the tinted banner it was.
+	const banner = drawn({ refereeStatus: 'pass', refereeSummary: 'Review by codex: Pass' }, false);
+	assert.match(banner, /bg-status-success-subtle text-status-success"><svg[^>]*lucide-shield-check[ "]/);
+	assert.equal(chip(banner), 'bg-status-success-subtle text-status-success');
+
+	// Quiet, the verdict is a tick, a cross or a dot in its colour, and the words beside it say it.
+	const marks: [GitHubPullRequestData['refereeStatus'], string, string][] = [
+		['pass', 'text-status-success', 'lucide-check[ "]'],
+		['send-back', 'text-status-danger', 'lucide-x[ "]'],
+		['pending', 'text-accent-primary', 'size-2 rounded-full bg-current'],
+		[undefined, 'text-accent-primary', 'size-2 rounded-full bg-current']
+	];
+	for (const [refereeStatus, colour, glyph] of marks) {
+		const row = drawn({ refereeStatus, refereeSummary: 'Review by codex: Pass' });
+		assert.match(row, new RegExp(`<p class="mt-3 flex items-start [^"]*bg-canvas-secondary/30[^"]*text-fg-main"><span class="[^"]*${colour}[^"]*">[\\s\\S]*?${glyph}`), String(refereeStatus));
+		assert.doesNotMatch(row, /-subtle text-status|lucide-shield-check|sr-only/);
+		assert.equal(said(row), 'Open PR #57 Review by codex: Pass');
+	}
+});

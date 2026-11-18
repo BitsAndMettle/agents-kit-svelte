@@ -30,6 +30,8 @@
 		onAnswer?: (option: string) => unknown;
 		/** Names the question. */
 		questionLabel?: string;
+		/** Colour meaning of the question's block. */
+		questionTone?: UiTone;
 		/** Buttons at the foot of the sheet. They are given a function that closes it. */
 		actions?: Snippet<[close: () => void]>;
 		/**
@@ -61,6 +63,7 @@
 		question,
 		onAnswer,
 		questionLabel = 'Question',
+		questionTone = 'accent',
 		actions,
 		initialFocus = () => body ?? null,
 		children,
@@ -104,7 +107,7 @@
 			</dl>
 		{/if}
 		{#if question}
-			<Alert tone="accent" title={questionLabel} aria-busy={answering !== undefined}>
+			<Alert tone={questionTone} title={questionLabel} aria-busy={answering !== undefined}>
 				{#snippet icon()}<CircleHelp />{/snippet}
 				<p class="m-0 [overflow-wrap:anywhere] whitespace-pre-line">{question.text}</p>
 				<!-- An option is a sentence as often as a word, so each is a full row that wraps. -->

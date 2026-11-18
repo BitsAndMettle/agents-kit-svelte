@@ -60,7 +60,8 @@ export const STATUS_TEXT_CLASS: Record<UiTone, string> = {
 	info: 'text-status-info'
 };
 
-const BADGE_TONES: Record<UiTone, string> = {
+/** Subtle fill and its text per tone, as a badge wears them: for a mark that is not a badge. */
+export const TONE_SOFT_CLASS: Record<UiTone, string> = {
 	neutral: 'bg-canvas-secondary text-fg-light',
 	accent: 'bg-accent-subtle text-accent-primary',
 	success: 'bg-status-success-subtle text-status-success',
@@ -77,7 +78,7 @@ const BADGE_TONES: Record<UiTone, string> = {
  * @returns Space-separated class string.
  */
 export function badgeClass(tone: UiTone = 'neutral', extra = ''): string {
-	return `inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium leading-4 whitespace-nowrap [&_svg]:size-3 ${BADGE_TONES[tone]} ${extra}`.trim();
+	return `inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium leading-4 whitespace-nowrap [&_svg]:size-3 ${TONE_SOFT_CLASS[tone]} ${extra}`.trim();
 }
 
 /** Background fill per tone for status dots and progress fills. */
