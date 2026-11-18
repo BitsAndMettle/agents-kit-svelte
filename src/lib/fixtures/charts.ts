@@ -42,6 +42,41 @@ export const SAMPLE_HANDOFF_SPANS: HandoffSpan[] = [
 	{ id: 'verify-2', lane: 'verifier', phase: 'verify', start: 254, end: 282, status: 'done', label: 'Verify', attempt: 2, tokens: 10_300 }
 ];
 
+/** Seconds from midnight of a Feature's first day, so the axis reads clock times. */
+const at = (h: number, m: number, day = 0) => day * 86_400 + h * 3600 + m * 60;
+
+/** A Feature's cards across two days and a night no one worked: a lane a card, its review a stretch of its own. */
+export const SAMPLE_FEATURE_LANES: HandoffLane[] = [
+	{ id: '311', label: '#311 Session cache' },
+	{ id: '312', label: '#312 Token refresh' },
+	{ id: '313', label: '#313 Sign-out' }
+];
+
+export const SAMPLE_FEATURE_SPANS: HandoffSpan[] = [
+	{ id: '311-b1', lane: '311', phase: 'implement', start: at(9, 10), end: at(9, 55), status: 'superseded', label: 'Build' },
+	{ id: '311-r1', lane: '311', phase: 'review', start: at(9, 55), end: at(10, 20), status: 'done', label: 'Review' },
+	{ id: '311-b2', lane: '311', phase: 'implement', start: at(10, 22), end: at(11, 5), status: 'done', label: 'Build · 2' },
+	{ id: '311-q', lane: '311', phase: 'queue', start: at(11, 5), end: at(13, 40), status: 'done', label: 'Queue' },
+	{ id: '312-b1', lane: '312', phase: 'implement', start: at(13, 0), end: at(14, 10), status: 'failed', label: 'Build' },
+	{ id: '312-b2', lane: '312', phase: 'implement', start: at(14, 20), end: at(16, 45), status: 'superseded', label: 'Build · 2' },
+	{ id: '312-r1', lane: '312', phase: 'review', start: at(16, 45), end: at(17, 30), status: 'done', label: 'Review' },
+	{ id: '312-b3', lane: '312', phase: 'implement', start: at(9, 20, 1), end: at(10, 0, 1), status: 'done', label: 'Build · 3' },
+	{ id: '313-b1', lane: '313', phase: 'implement', start: at(9, 5, 1), end: at(10, 10, 1), status: 'done', label: 'Build' },
+	{ id: '313-r1', lane: '313', phase: 'review', start: at(10, 10, 1), end: at(10, 35, 1), status: 'done', label: 'Review' },
+	{ id: '313-q', lane: '313', phase: 'queue', start: at(10, 35, 1), end: at(11, 0, 1), status: 'done', label: 'Queue' }
+];
+
+export const SAMPLE_FEATURE_HANDOFFS: HandoffLink[] = [
+	{ id: '311-h1', from: '311-b1', to: '311-r1', artifact: 'diff', kind: 'diff' },
+	{ id: '311-h2', from: '311-r1', to: '311-b2', artifact: 'findings', kind: 'review' },
+	{ id: '311-h3', from: '311-b2', to: '311-q', artifact: 'pass by Codex', kind: 'note' },
+	{ id: '312-h1', from: '312-b1', to: '312-b2', artifact: 'checks failed', kind: 'tests' },
+	{ id: '312-h2', from: '312-b2', to: '312-r1', artifact: 'diff', kind: 'diff' },
+	{ id: '312-h3', from: '312-r1', to: '312-b3', artifact: 'send-back', kind: 'note', reason: 'Keep the old cookie name' },
+	{ id: '313-h1', from: '313-b1', to: '313-r1', artifact: 'diff', kind: 'diff' },
+	{ id: '313-h2', from: '313-r1', to: '313-q', artifact: 'pass by Claude', kind: 'note' }
+];
+
 /** A file changed in a handoff's diff, in the shape `FileDiff` takes. */
 export interface SampleDiffFile {
 	filename: string;

@@ -1,6 +1,7 @@
 /**
  * Small, dependency-free scale and path helpers shared by the chart components.
  */
+import type { HandoffSpan, TimeBreak } from './types';
 
 /** A linear map from a data domain to a pixel range. */
 export interface LinearScale {
@@ -26,6 +27,118 @@ export function scaleLinear(domain: [number, number], range: [number, number]): 
 	fn.domain = domain;
 	fn.range = range;
 	return fn;
+}
+
+/** The breaks inside `[from, to]`, clipped to it, sorted and merged where they overlap. */
+function foldsIn(breaks: TimeBreak[], from: number, to: number): TimeBreak[] {
+	const out: TimeBreak[] = [];
+	for (const b of [...breaks].sort((a, c) => a.start - c.start)) {
+		const start = Math.max(b.start, from);
+		const end = Math.min(b.end, to);
+		const last = out.at(-1);
+		if (end <= start) continue;
+		if (last && start <= last.end) last.end = Math.max(last.end, end);
+		else out.push({ ...b, start, end });
+	}
+	return out;
+}
+
+/**
+ * How much of `[from, to]` the breaks fold away.
+ *
+ * @param breaks - Folded stretches, in any order.
+ * @param from - Start of the stretch measured.
+ * @param to - End of the stretch measured.
+ */
+export function foldedTime(breaks: TimeBreak[], from: number, to: number): number {
+	return foldsIn(breaks, from, to).reduce((sum, b) => sum + b.end - b.start, 0);
+}
+
+/**
+ * A linear scale that gives each break `width` of the range, however long it is, and shares the rest out evenly
+ * over the time left. Without breaks it is `scaleLinear`. At width 0 it drops the folded time altogether, so a
+ * scrubber can run on it; `invert` at a fold's pixel then returns the fold's start.
+ *
+ * @param domain - Data extent `[min, max]`.
+ * @param range - Pixel extent `[start, end]`, ascending.
+ * @param breaks - Stretches to fold. Clipped to the domain and merged where they overlap.
+ * @param width - Pixels each fold takes.
+ */
+export function scaleBroken(domain: [number, number], range: [number, number], breaks: TimeBreak[], width: number): LinearScale {
+	const [d0, d1] = domain;
+	const [r0, r1] = range;
+	const folds = foldsIn(breaks, d0, d1);
+	if (folds.length === 0) return scaleLinear(domain, range);
+	const open = d1 - d0 - foldedTime(folds, d0, d1);
+	const k = open > 0 ? Math.max(0, r1 - r0 - folds.length * width) / open : 0;
+	const knots: [number, number][] = [[d0, r0]];
+	let t = d0;
+	let p = r0;
+	for (const f of folds) {
+		p += (f.start - t) * k;
+		knots.push([f.start, p], [f.end, (p += width)]);
+		t = f.end;
+	}
+	knots.push([d1, p + (d1 - t) * k]);
+	const fn = ((value: number) => along(knots, value, 0)) as LinearScale;
+	fn.invert = (pixel: number) => along(knots, pixel, 1);
+	fn.domain = domain;
+	fn.range = range;
+	return fn;
+}
+
+/** Interpolates along a piecewise-linear line of `[t, px]` knots, keyed on coordinate `a`. */
+function along(knots: [number, number][], v: number, a: 0 | 1): number {
+	const b = a === 0 ? 1 : 0;
+	let i = 0;
+	while (i < knots.length - 2 && v > knots[i + 1][a]) i++;
+	const [p, q] = [knots[i], knots[i + 1]];
+	const span = q[a] - p[a];
+	return span ? p[b] + ((v - p[a]) / span) * (q[b] - p[b]) : p[b];
+}
+
+/**
+ * Every stretch of at least `min` in which no span of any lane runs, oldest first: work time's folds. A span with
+ * no `end` runs to `now`, or on for good without it; with `now`, the stretch from the last span to `now` counts too.
+ *
+ * @param spans - Spans of every lane.
+ * @param min - Shortest stretch to fold, e.g. `3600` for an hour.
+ * @param now - The current time, if the spans are live.
+ */
+export function idleBreaks(spans: Pick<HandoffSpan, 'start' | 'end'>[], min: number, now?: number): TimeBreak[] {
+	const runs = spans.map((s) => [s.start, s.end ?? now ?? Infinity]).sort((a, b) => a[0] - b[0]);
+	const out: TimeBreak[] = [];
+	let reach = runs[0]?.[0] ?? 0;
+	for (const [start, end] of runs) {
+		if (start > reach && start - reach >= min) out.push({ start: reach, end: start });
+		reach = Math.max(reach, end);
+	}
+	if (runs.length > 0 && now !== undefined && now > reach && now - reach >= min) out.push({ start: reach, end: now });
+	return out;
+}
+
+const TIME_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 10_800, 21_600, 43_200, 86_400];
+
+/**
+ * Tick values on round time steps (seconds, minutes, hours, days), spaced for about `count` ticks across the time
+ * left once the breaks are folded, and none inside a break.
+ *
+ * @param domain - Seconds `[min, max]`.
+ * @param count - Desired number of ticks.
+ * @param breaks - Folded stretches.
+ */
+export function timeTicks(domain: [number, number], count = 5, breaks: TimeBreak[] = []): number[] {
+	const [d0, d1] = domain;
+	const folds = foldsIn(breaks, d0, d1);
+	const raw = (d1 - d0 - foldedTime(folds, d0, d1)) / Math.max(1, count);
+	const step = TIME_STEPS.find((s) => s >= raw) ?? Math.ceil(raw / 86_400) * 86_400;
+	const out: number[] = [];
+	let from = d0;
+	for (const f of [...folds, { start: d1, end: d1 }]) {
+		for (let t = Math.ceil(from / step) * step; t <= f.start; t += step) out.push(t);
+		from = f.end;
+	}
+	return out;
 }
 
 /**
