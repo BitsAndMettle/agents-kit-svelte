@@ -36,6 +36,14 @@ export interface HandoffSpan {
 	data?: unknown;
 }
 
+/** A stretch of time `AgentHandoffGantt` folds into one narrow hatched band, e.g. a night no one worked. */
+export interface TimeBreak {
+	start: number;
+	end: number;
+	/** Drawn on the band. Defaults to the stretch's length, e.g. `14h 05m`. */
+	label?: string;
+}
+
 /** What kind of thing a handoff passed. Sets the icon on its label. */
 export type HandoffArtifactKind = 'file' | 'diff' | 'tests' | 'review' | 'note';
 

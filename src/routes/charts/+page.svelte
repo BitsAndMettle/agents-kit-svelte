@@ -5,10 +5,15 @@
 	import RunReplayScrubber from '$lib/charts/RunReplayScrubber.svelte';
 	import TokenBurnChart from '$lib/charts/TokenBurnChart.svelte';
 	import { eventsAt, handoffsAt, seriesAt, spansAt } from '$lib/charts/replay';
+	import { idleBreaks } from '$lib/charts/scale';
+	import ToggleGroup from '$lib/primitives/actions/ToggleGroup.svelte';
 	import type { ChartPoint, ChartSpec, RunMark } from '$lib/charts/types';
 	import RunDetailSheet, { type RunDetail } from './RunDetailSheet.svelte';
 	import {
 		SAMPLE_CHART_SPECS,
+		SAMPLE_FEATURE_HANDOFFS,
+		SAMPLE_FEATURE_LANES,
+		SAMPLE_FEATURE_SPANS,
 		SAMPLE_HANDOFFS,
 		SAMPLE_HANDOFF_LANES,
 		SAMPLE_HANDOFF_SPANS,
@@ -30,6 +35,7 @@
 	let linked = $state<string | null>(null);
 	let detail = $state<RunDetail | null>(null);
 	let selectedId = $derived(detail?.kind === 'handoff' ? detail.link.id : detail?.kind === 'span' ? detail.span.id : null);
+	let axis = $state<string | string[] | null>('work');
 	let specKey = $state<keyof typeof SAMPLE_CHART_SPECS>('latency');
 	let asked = $state<{ point: ChartPoint; answer: string } | null>(null);
 
@@ -150,6 +156,18 @@
 			t = point.t;
 		}}
 	/>
+
+	<section aria-label="Work time" class="space-y-3">
+		<ToggleGroup aria-label="Time axis" bind:value={axis} items={[{ value: 'work', label: 'Work time' }, { value: 'calendar', label: 'Calendar' }]} />
+		<AgentHandoffGantt
+			title="Sign-in that remembers you · a Feature over two days"
+			lanes={SAMPLE_FEATURE_LANES}
+			spans={SAMPLE_FEATURE_SPANS}
+			handoffs={SAMPLE_FEATURE_HANDOFFS}
+			breaks={axis === 'work' ? idleBreaks(SAMPLE_FEATURE_SPANS, 3600) : []}
+			formatTime={(s) => `${String(Math.floor(s / 3600) % 24).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`}
+		/>
+	</section>
 
 	<section aria-label="Generative chart" class="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
 		<div class="space-y-3">

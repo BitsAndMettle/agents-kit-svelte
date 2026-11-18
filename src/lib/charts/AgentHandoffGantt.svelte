@@ -7,8 +7,10 @@
 	import type { TransitionConfig } from 'svelte/transition';
 	import { ArrowRightLeft, Clock, FileCode, FileDiff, FileText, FlaskConical, MessageSquare } from '@lucide/svelte';
 	import { motionDuration, rise } from '../state/motion.svelte';
-	import { formatClock, formatCompact, niceStep, phaseColor, scaleLinear, ticks } from './scale';
-	import type { HandoffArtifactKind, HandoffLane, HandoffLink, HandoffSpan } from './types';
+	import { untrack } from 'svelte';
+	import { foldedTime, formatClock, formatCompact, niceStep, phaseColor, scaleBroken, timeTicks } from './scale';
+	import { formatMetricDuration } from './metrics';
+	import type { HandoffArtifactKind, HandoffLane, HandoffLink, HandoffSpan, TimeBreak } from './types';
 
 	interface Props extends Omit<HTMLAttributes<HTMLDivElement>, 'class' | 'children'> {
 		/** One row per agent or model, top to bottom. */
@@ -19,6 +21,10 @@
 		handoffs?: HandoffLink[];
 		/** Seconds since the run started. Running spans end here and the cursor sits here. */
 		now?: number;
+		/** Stretches to fold into a narrow hatched band each, e.g. `idleBreaks(spans, 3600, now)` for work time. */
+		breaks?: TimeBreak[];
+		/** Formats a point in time on the axis and in spoken labels. Defaults to `m:ss`. */
+		formatTime?: (t: number) => string;
 		/** Heading over the chart. */
 		title?: string;
 		/** Lane to emphasise; the rest dim. Pair with `onHighlight` to link charts. */
@@ -41,6 +47,8 @@
 		spans,
 		handoffs = [],
 		now,
+		breaks = [],
+		formatTime = formatClock,
 		title,
 		highlight = null,
 		onHighlight,
@@ -57,32 +65,57 @@
 	const LANE_H = 46;
 	const BAR_H = 24;
 	const PAD_R = 20;
+	const BREAK_W = 36;
 
 	let width = $state(720);
 	let hoverSpan = $state<string | null>(null);
 	let hoverLink = $state<string | null>(null);
 	let hoverLane = $state<string | null>(null);
 
-	let latestEnd = $derived(Math.max(0, ...spans.map((s) => s.end ?? s.start)));
+	let domainStart = $derived(spans.length > 0 ? Math.min(...spans.map((s) => s.start)) : 0);
+	let latestEnd = $derived(Math.max(domainStart, ...spans.map((s) => s.end ?? s.start)));
 	let clock = $derived(now ?? latestEnd);
 	let running = $derived(spans.some((s) => s.status === 'running'));
+	/** Time worked from the first span to `t`: folded stretches do not count. */
+	const worked = (t: number) => t - domainStart - foldedTime(breaks, domainStart, t);
 
-	/** Domain end leaves headroom while live so bars have room to grow. */
-	const domainEnd = new Tween(60, { duration: 600, easing: cubicOut });
-	let primed = false;
+	/** Domain end leaves headroom while live so bars have room to grow, measured on worked time. */
+	let domainTarget = $derived.by(() => {
+		const end = Math.max(clock, latestEnd, domainStart + 1);
+		const work = worked(end);
+		const step = niceStep(work, 6);
+		return running ? end + Math.ceil((work * 1.15) / step) * step - work : end;
+	});
+	const domainEnd = new Tween(untrack(() => domainTarget), { duration: 600, easing: cubicOut });
+	/** While live the end only grows, unless the folds change (Work time ↔ Calendar): then it fits again. */
+	let foldKey = $derived(breaks.map((b) => `${b.start}-${b.end}`).join());
+	let fitted = untrack(() => foldKey);
 	$effect(() => {
-		const end = Math.max(clock, latestEnd, 1);
-		const target = running ? Math.ceil((end * 1.15) / niceStep(end, 6)) * niceStep(end, 6) : end;
-		if (!primed || target > domainEnd.target || !running) {
-			void domainEnd.set(target, { duration: !primed || prefersReducedMotion.current ? 0 : 600 });
-			primed = true;
-		}
+		const target = domainTarget;
+		if (target > domainEnd.target || !running || foldKey !== fitted) void domainEnd.set(target, { duration: prefersReducedMotion.current ? 0 : 600 });
+		fitted = foldKey;
 	});
 
 	let innerW = $derived(Math.max(80, width - LABEL_W - PAD_R));
-	let x = $derived(scaleLinear([0, domainEnd.current], [LABEL_W, LABEL_W + innerW]));
+	// A fold is BREAK_W wide unless the folds would take more than half the plot; then each narrows and drops its label.
+	let foldW = $derived(Math.min(BREAK_W, innerW / (2 * breaks.length)));
+	let x = $derived(scaleBroken([domainStart, domainEnd.current], [LABEL_W, LABEL_W + innerW], breaks, foldW));
 	let height = $derived(AXIS_H + lanes.length * LANE_H + 8);
-	let axisTicks = $derived(ticks(0, domainEnd.current, Math.max(2, Math.floor(innerW / 90))));
+	let bands = $derived(
+		breaks
+			.filter((b) => b.end > domainStart && b.start < domainEnd.current)
+			.map((b) => ({ x0: x(Math.max(b.start, domainStart)), x1: x(Math.min(b.end, domainEnd.current)), label: b.label ?? formatMetricDuration(b.end - b.start) }))
+	);
+	/** Round time steps, none in or beside a band, and none on top of the tick before. */
+	let axisTicks = $derived.by(() => {
+		const kept: number[] = [];
+		for (const t of timeTicks([domainStart, domainEnd.current], Math.max(2, Math.floor(innerW / 90)), breaks)) {
+			const px = x(t);
+			const last = kept.at(-1);
+			if ((last === undefined || px - x(last) >= 40) && !bands.some((b) => px > b.x0 - 24 && px < b.x1 + 24)) kept.push(t);
+		}
+		return kept;
+	});
 
 	let laneIndex = $derived(new Map(lanes.map((lane, i) => [lane.id, i])));
 	let spanById = $derived(new Map(spans.map((s) => [s.id, s])));
@@ -140,12 +173,18 @@
 			const from = spanById.get(link.from);
 			const to = spanById.get(link.to);
 			if (!from || !to || from.end === undefined) return [];
+			const down = laneY(to.lane) > laneY(from.lane);
 			const x1 = x(from.end);
-			const y1 = laneY(from.lane) + (laneY(to.lane) > laneY(from.lane) ? BAR_H / 2 : -BAR_H / 2);
+			const y1 = laneY(from.lane) + (down ? BAR_H / 2 : -BAR_H / 2);
 			const x2 = x(to.start);
-			const y2 = laneY(to.lane) + (laneY(to.lane) > laneY(from.lane) ? -BAR_H / 2 : BAR_H / 2);
+			if (from.lane === to.lane) {
+				// Within one lane the arrow arcs over the bars' top edge, its label at the top of the arc, under the axis.
+				const d = `M${x1},${y1} C${x1},${y1 - 12} ${x2},${y1 - 12} ${x2},${y1}`;
+				return [{ link, d, mx: (x1 + x2) / 2, my: y1 - 9 }];
+			}
+			const y2 = laneY(to.lane) + (down ? -BAR_H / 2 : BAR_H / 2);
 			const bend = Math.max(18, Math.abs(y2 - y1) * 0.55);
-			const d = `M${x1},${y1} C${x1},${y1 + Math.sign(y2 - y1 || 1) * bend} ${x2},${y2 - Math.sign(y2 - y1 || 1) * bend} ${x2},${y2}`;
+			const d = `M${x1},${y1} C${x1},${y1 + Math.sign(y2 - y1) * bend} ${x2},${y2 - Math.sign(y2 - y1) * bend} ${x2},${y2}`;
 			return [{ link, d, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 }];
 		})
 	);
@@ -206,6 +245,8 @@
 	let tipSpan = $derived(hoverSpan ? spanById.get(hoverSpan) : undefined);
 	let tipLane = $derived(tipSpan ? lanes.find((l) => l.id === tipSpan?.lane) : undefined);
 	let phases = $derived([...new Set(spans.map((s) => s.phase))]);
+	/** One colour per phase, the legend's, so an unnamed phase is the same colour on every bar. */
+	const color = (phase: string) => phaseColor(phase, phases.indexOf(phase));
 	let tokenTotal = $derived(spans.reduce((sum, s) => sum + (s.tokens ?? 0), 0));
 
 	function statusLabel(span: HandoffSpan): string {
@@ -233,7 +274,7 @@
 			{/if}
 		</div>
 		<dl class="flex items-center gap-3 text-[11px] text-fg-light tabular-nums">
-			<div class="flex items-center gap-1"><Clock class="size-3" aria-hidden="true" /><dt class="sr-only">Elapsed</dt><dd>{formatClock(clock)}</dd></div>
+			<div class="flex items-center gap-1"><Clock class="size-3" aria-hidden="true" /><dt class="sr-only">Elapsed</dt><dd>{formatClock(worked(clock))}</dd></div>
 			<div class="flex items-center gap-1"><ArrowRightLeft class="size-3" aria-hidden="true" /><dt class="sr-only">Handoffs</dt><dd>{routes.length} handoffs</dd></div>
 			{#if tokenTotal > 0}<div><dt class="sr-only">Tokens</dt><dd>{formatCompact(tokenTotal)} tokens</dd></div>{/if}
 		</dl>
@@ -245,9 +286,24 @@
 			{#each axisTicks as t (t)}
 				<g transform="translate({x(t)},0)" class="text-fg-light">
 					<line y1={AXIS_H - 4} y2={height} class="stroke-canvas-border" stroke-dasharray="2 4" />
-					<text y={AXIS_H - 10} text-anchor="middle" class="fill-current text-[10px] tabular-nums">{formatClock(t)}</text>
+					<text y={AXIS_H - 10} text-anchor="middle" class="fill-current text-[10px] tabular-nums">{formatTime(t)}</text>
 				</g>
 			{/each}
+
+			<!-- Folded time -->
+			{#if bands.length > 0}
+				<defs>
+					<pattern id="ak-gantt-fold" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+						<line y2="6" class="stroke-canvas-border" stroke-width="2" />
+					</pattern>
+				</defs>
+				{#each bands as band, i (i)}
+					<rect x={band.x0} y={AXIS_H - 4} width={band.x1 - band.x0} height={height - AXIS_H + 4} fill="url(#ak-gantt-fold)"><title>{band.label}</title></rect>
+					{#if foldW >= BREAK_W}
+						<text x={(band.x0 + band.x1) / 2} y={AXIS_H - 10} text-anchor="middle" class="fill-fg-light text-[10px] tabular-nums">{band.label}</text>
+					{/if}
+				{/each}
+			{/if}
 
 			<!-- Lanes -->
 			{#each lanes as lane, i (lane.id)}
@@ -292,7 +348,7 @@
 				<g
 					role="button"
 					tabindex="0"
-					aria-label="{span.label ?? span.phase}, {statusLabel(span)}, {formatClock(span.start)} to {formatClock(spanEnd(span))}"
+					aria-label="{span.label ?? span.phase}, {statusLabel(span)}, {formatTime(span.start)} to {formatTime(spanEnd(span))}"
 					class={cn('outline-none', onSelectSpan ? 'cursor-pointer' : 'cursor-default')}
 					onpointerenter={() => (hoverSpan = span.id)}
 					onpointerleave={() => (hoverSpan = null)}
@@ -308,10 +364,10 @@
 							rx="6"
 							style:y="{by}px"
 							style:height="{bh}px"
-							style:fill={phaseColor(span.phase, i)}
+							style:fill={color(span.phase)}
 							style:opacity={spanOpacity(span)}
 							style:fill-opacity={span.status === 'failed' ? 0.28 : ghost ? 0.5 : 0.9}
-							style:stroke={span.status === 'failed' ? 'var(--ak-color-danger)' : phaseColor(span.phase, i)}
+							style:stroke={span.status === 'failed' ? 'var(--ak-color-danger)' : color(span.phase)}
 							stroke-width={lit.has(span.id) || selected === span.id ? 2 : 1}
 							stroke-dasharray={ghost ? '3 3' : undefined}
 							class="transition-[opacity,y,height,stroke-width] duration-300 ease-out"
@@ -426,7 +482,7 @@
 				in:rise={{ y: 3, duration: 120 }}
 			>
 				<p class="flex items-center gap-1.5 font-medium text-fg-main">
-					<span class="size-2 rounded-full" style:background={phaseColor(tipSpan.phase)}></span>
+					<span class="size-2 rounded-full" style:background={color(tipSpan.phase)}></span>
 					<span class="capitalize">{tipSpan.phase}</span>
 					{#if tipSpan.attempt}<span class="text-fg-light">· attempt {tipSpan.attempt}</span>{/if}
 				</p>
@@ -443,8 +499,8 @@
 
 	{#if phases.length > 0}
 		<ul class="mt-2 flex flex-wrap gap-3 text-[11px] text-fg-light" aria-label="Phases">
-			{#each phases as phase, i (phase)}
-				<li class="flex items-center gap-1.5 capitalize"><span class="size-2 rounded-sm" style:background={phaseColor(phase, i)}></span>{phase}</li>
+			{#each phases as phase (phase)}
+				<li class="flex items-center gap-1.5 capitalize"><span class="size-2 rounded-sm" style:background={color(phase)}></span>{phase}</li>
 			{/each}
 			<li class="flex items-center gap-1.5"><span class="size-2 rounded-sm border border-dashed border-fg-light"></span>Superseded attempt</li>
 		</ul>

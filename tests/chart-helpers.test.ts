@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { formatClock, linePath, niceMax, scaleLinear, stack, ticks } from '../src/lib/charts/scale.ts';
+import { foldedTime, formatClock, idleBreaks, linePath, niceMax, scaleBroken, scaleLinear, stack, ticks, timeTicks } from '../src/lib/charts/scale.ts';
 import { eventsAt, handoffsAt, seriesAt, spansAt } from '../src/lib/charts/replay.ts';
 import {
 	SAMPLE_HANDOFFS,
@@ -13,6 +13,48 @@ test('scales map and invert', () => {
 	const x = scaleLinear([0, 100], [0, 500]);
 	assert.equal(x(50), 250);
 	assert.equal(x.invert(250), 50);
+});
+
+test('scaleBroken gives each break its width, shares the rest out evenly and inverts', () => {
+	const x = scaleBroken([0, 1100], [0, 236], [{ start: 100, end: 1000 }], 36);
+	assert.equal(x(100), 100);
+	assert.equal(x(1000), 136);
+	assert.equal(x(550), 118);
+	assert.equal(x(1100), 236);
+	for (const t of [0, 50, 550, 1050]) assert.equal(x.invert(x(t)), t);
+	// No break in the domain: plain linear.
+	assert.equal(scaleBroken([0, 100], [0, 500], [{ start: 200, end: 300 }], 36)(50), scaleLinear([0, 100], [0, 500])(50));
+	// Overlapping breaks fold as one, clipped to the domain.
+	const merged = scaleBroken([0, 300], [0, 136], [{ start: 100, end: 250 }, { start: 200, end: 400 }], 36);
+	assert.equal(merged(100), 100);
+	assert.equal(merged(300), 136);
+});
+
+test('scaleBroken at width 0 drops the folded time, so a scrubber runs on work time', () => {
+	const x = scaleBroken([0, 1100], [0, 200], [{ start: 100, end: 1000 }], 0);
+	assert.equal(x(100), 100);
+	assert.equal(x(1000), 100);
+	assert.equal(x.invert(100), 100);
+	assert.equal(x.invert(150), 1050);
+});
+
+test('idleBreaks finds a gap across lanes, none under a running span', () => {
+	const spans = [{ start: 0, end: 50 }, { start: 40, end: 100 }, { start: 5000, end: 5100 }, { start: 5050, end: 5200 }];
+	assert.deepEqual(idleBreaks(spans, 3600), [{ start: 100, end: 5000 }]);
+	assert.deepEqual(idleBreaks(spans, 6000), []);
+	// A span still running covers everything after its start.
+	assert.deepEqual(idleBreaks([{ start: 0, end: 50 }, { start: 60 }, { start: 9000, end: 9100 }], 3600), []);
+	assert.deepEqual(idleBreaks([{ start: 0 }], 3600, 9000), []);
+	// With `now`, the quiet stretch since the last span folds too.
+	assert.deepEqual(idleBreaks([{ start: 0, end: 50 }], 3600, 9000), [{ start: 50, end: 9000 }]);
+	assert.equal(foldedTime([{ start: 100, end: 5000 }], 0, 1000), 900);
+});
+
+test('timeTicks fall on time steps over the unfolded time, none in a break', () => {
+	assert.deepEqual(timeTicks([0, 284], 5), [0, 60, 120, 180, 240]);
+	const hours = timeTicks([9 * 3600, 33 * 3600], 4, [{ start: 18 * 3600, end: 32 * 3600 }]);
+	assert.deepEqual(hours, [9, 12, 15, 18, 33].map((h) => h * 3600));
+	assert.deepEqual(timeTicks([0, 3 * 86_400], 3), [0, 86_400, 172_800, 259_200]);
 });
 
 test('ticks land on round steps and niceMax rounds up', () => {
