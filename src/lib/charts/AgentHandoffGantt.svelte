@@ -97,7 +97,9 @@
 	});
 
 	let innerW = $derived(Math.max(80, width - LABEL_W - PAD_R));
-	let x = $derived(scaleBroken([domainStart, domainEnd.current], [LABEL_W, LABEL_W + innerW], breaks, Math.min(BREAK_W, innerW / (2 * breaks.length))));
+	// A fold is BREAK_W wide unless the folds would take more than half the plot; then each narrows and drops its label.
+	let foldW = $derived(Math.min(BREAK_W, innerW / (2 * breaks.length)));
+	let x = $derived(scaleBroken([domainStart, domainEnd.current], [LABEL_W, LABEL_W + innerW], breaks, foldW));
 	let height = $derived(AXIS_H + lanes.length * LANE_H + 8);
 	let bands = $derived(
 		breaks
@@ -296,8 +298,8 @@
 					</pattern>
 				</defs>
 				{#each bands as band, i (i)}
-					<rect x={band.x0} y={AXIS_H - 4} width={band.x1 - band.x0} height={height - AXIS_H + 4} fill="url(#ak-gantt-fold)" />
-					{#if band.x1 - band.x0 >= BREAK_W}
+					<rect x={band.x0} y={AXIS_H - 4} width={band.x1 - band.x0} height={height - AXIS_H + 4} fill="url(#ak-gantt-fold)"><title>{band.label}</title></rect>
+					{#if foldW >= BREAK_W}
 						<text x={(band.x0 + band.x1) / 2} y={AXIS_H - 10} text-anchor="middle" class="fill-fg-light text-[10px] tabular-nums">{band.label}</text>
 					{/if}
 				{/each}
