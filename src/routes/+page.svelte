@@ -1649,7 +1649,10 @@
 							{:else if item.slug === 'github-issue-card'}
 								<GitHubIssueCard issue={sampleIssue} onClaimToggle={() => {}} onDispatchRun={() => {}} />
 							{:else if item.slug === 'github-pr-card'}
-								<GitHubPullRequestCard pr={samplePR} onRequestChanges={() => {}} onApproveMerge={() => {}} />
+								<div class="flex flex-col gap-4">
+									<GitHubPullRequestCard pr={samplePR} onRequestChanges={() => {}} onApproveMerge={() => {}} />
+									<GitHubPullRequestCard quiet pr={SAMPLE_PULL_REQUEST} />
+								</div>
 							{:else if item.slug === 'github-pr-badge'}
 								<div class="flex flex-wrap items-center gap-4">
 									{#each samplePRBadges as pr (pr.number)}<GitHubPullRequestBadge {pr} />{/each}
@@ -1665,7 +1668,10 @@
 							{:else if item.slug === 'github-bento-layout'}
 								<GitHubBentoLayout repoName="RSynapse/trailside" repoDetail="GitHub App installation active" branchDetail="Protected · Referee merge queue" stats={SAMPLE_BENTO_STATS} pullRequest={SAMPLE_PULL_REQUEST} checks={SAMPLE_CHECKS} issue={SAMPLE_ISSUE} commit={SAMPLE_COMMIT} thread={SAMPLE_REVIEW_THREAD} />
 							{:else if item.slug === 'github-lifecycle-timeline'}
-								<GitHubLifecycleTimeline title="From issue to release" description="Every hand-off between people, agents and GitHub, in order." doneLabel="Shipped" stages={SAMPLE_LIFECYCLE_STAGES} live={visibleSlugs.has(item.slug)} />
+								<div class="flex flex-col gap-4">
+									<GitHubLifecycleTimeline title="From issue to release" description="Every hand-off between people, agents and GitHub, in order." doneLabel="Shipped" stages={SAMPLE_LIFECYCLE_STAGES} live={visibleSlugs.has(item.slug)} />
+									<GitHubLifecycleTimeline quiet title="Stopped in review" status="Stopped: tests failed" tone="danger" stages={SAMPLE_LIFECYCLE_STAGES} current={5} />
+								</div>
 							{:else if item.slug === 'github-issue-triage'}
 								<GitHubIssueTriage issue={SAMPLE_TRIAGE_ISSUE} live={visibleSlugs.has(item.slug)} />
 							{:else if item.slug === 'github-branch-card'}

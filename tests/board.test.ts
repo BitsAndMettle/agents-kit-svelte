@@ -130,3 +130,14 @@ test('StatusStrip: the status with its tone, numbers formatted like metrics, the
 
 	assert.doesNotMatch(html(StatusStrip, { status: 'Running' }), /<dl|<button/);
 });
+
+test('CardSheet: the question block is the accent unless the sheet is given a tone for it', async () => {
+	const CardSheet = await load('/src/lib/board/CardSheet.svelte');
+	const question: CardQuestion = { text: 'Which key?', options: ['The signing key'] };
+	/** The classes of the question's block: the element marked busy while an answer is on its way. */
+	const block = (props: Record<string, unknown>) => /<div(?=[^>]*aria-busy=)[^>]*class="([^"]*)"/.exec(html(CardSheet, { title: 'Rotate the key', question, ...props }))?.[1] ?? '';
+
+	assert.match(block({}), /bg-accent-subtle/);
+	assert.match(block({ questionTone: 'neutral' }), /border-card-border bg-canvas-secondary/);
+	assert.doesNotMatch(block({ questionTone: 'neutral' }), /accent/);
+});

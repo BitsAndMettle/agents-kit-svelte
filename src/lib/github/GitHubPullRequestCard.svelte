@@ -1,17 +1,22 @@
 <script lang="ts">
 	import { cn } from '../ui/cn';
 	import type { HTMLAttributes } from 'svelte/elements';
-	import { buttonClass } from '../ui/styles';
+	import { buttonClass, TONE_SOFT_CLASS } from '../ui/styles';
 	import { ArrowRight, ChevronDown, ShieldCheck } from '@lucide/svelte';
 	import type { Snippet } from 'svelte';
 	import AgentDisclosure from '../agents/AgentDisclosure.svelte';
 	import CheckMark from './CheckMark.svelte';
 	import { PR_STATES } from './pr-state';
-	import type { GitHubPullRequestData } from '../types';
+	import type { GitHubCheckItem, GitHubPullRequestData } from '../types';
 
-	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'pr' | 'defaultChecksOpen' | 'headingLevel' | 'actions' | 'onApproveMerge' | 'onRequestChanges'> {
+	interface Props extends Omit<HTMLAttributes<HTMLElement>, 'class' | 'children' | 'pr' | 'defaultChecksOpen' | 'quiet' | 'headingLevel' | 'actions' | 'onApproveMerge' | 'onRequestChanges'> {
 		pr: GitHubPullRequestData;
 		defaultChecksOpen?: boolean;
+		/**
+		 * The state chip is neutral unless the pull request is merged, and the review line is a plain row
+		 * with a check mark, where it was a tinted banner.
+		 */
+		quiet?: boolean;
 		/** The title's heading level. */
 		headingLevel?: 1 | 2 | 3 | 4 | 5 | 6;
 		/** Gives the card its "Approve & Queue Merge" button. */
@@ -26,6 +31,7 @@
 	let {
 		pr,
 		defaultChecksOpen = true,
+		quiet = false,
 		headingLevel = 3,
 		onApproveMerge,
 		onRequestChanges,
@@ -54,6 +60,8 @@
 			(checks.some((c) => c.status === 'failed') ? 'failed' : checks.some((c) => c.status === 'running') ? 'running' : 'passed')
 	);
 	let prState = $derived(PR_STATES[pr.state]);
+	/** The review's verdict as a check's mark, for the quiet row. */
+	let refereeMark = $derived<GitHubCheckItem['status']>(pr.refereeStatus === 'pass' ? 'passed' : pr.refereeStatus === 'send-back' ? 'failed' : 'running');
 	const panelId = $props.id();
 </script>
 
@@ -64,7 +72,7 @@
 	<!-- Header Row -->
 	<div class="flex flex-wrap items-center justify-between gap-2 text-xs">
 		<div class="flex flex-wrap items-center gap-2">
-			<span class="inline-flex items-center gap-1.5 rounded-chip px-1.5 py-px text-[11px] font-medium {prState.class}">
+			<span class="inline-flex items-center gap-1.5 rounded-chip px-1.5 py-px text-[11px] font-medium {quiet && pr.state !== 'merged' ? TONE_SOFT_CLASS.neutral : prState.class}">
 				<prState.icon aria-hidden="true" class="size-3" />
 				<span>{prState.label}</span>
 			</span>
@@ -111,7 +119,12 @@
 	{/if}
 
 	<!-- Referee Verdict Banner -->
-	{#if pr.refereeSummary}
+	{#if pr.refereeSummary && quiet}
+		<p class="mt-3 flex items-start gap-2 rounded-lg border border-card-border bg-canvas-secondary/30 px-3 py-2 text-xs font-medium text-fg-main">
+			<CheckMark status={refereeMark} spoken={false} class="mt-0.5 text-fg-light" />
+			<span class="leading-relaxed">{pr.refereeSummary}</span>
+		</p>
+	{:else if pr.refereeSummary}
 		<div
 			class="mt-3 flex items-start gap-2.5 rounded-lg border border-card-border px-3 py-2 text-xs {pr.refereeStatus ===
 			'pass'
