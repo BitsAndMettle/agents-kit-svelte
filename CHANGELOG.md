@@ -1,5 +1,15 @@
 # agents-kit-svelte
 
+## 0.17.0
+
+### Minor Changes
+
+- d3cc05a: BoardLanes: `BoardLane.tone?: UiTone` colours a lane's heading and count, and `BoardGroup.fold?: number` shows a group's first that many cards and a Show all button (Show fewer once open) while the lane still counts every card. A group stays open when the lanes are handed over anew. Without either prop a board renders as before.
+- 7a95410: AgentHandoffGantt draws what is planned, a note a lane and who works it now. A span with `status: 'planned'` is an estimate: outlined in the neutral ink, never pressed or focused, and outside Live, Elapsed and the token sum, while still stretching the axis. `HandoffLane.note` puts one short line in a column at the lane's end, as wide as the longest note. `HandoffLane.worker` draws that name's `Avatar`, breathing, at the end of the lane's label, clips the label short of it, and says ", worked by …" in the lane's name. `laneHeight` (bars 24px in the default 46px lanes, 14px in 30px ones, with no words inside a bar under 20px) and `labelWidth` size the chart. With `breaks`, each stretch of open time is labelled at its own start, when its label fits before the next fold and the chart's end. `Avatar` and `AvatarGroup` take `size="2xs"`, 16px.
+  
+  What moves without the new props: grid lines are solid hairlines (a dash is kept for what has not happened), and the phases `gate` and `queue`, where no agent holds the work, are drawn in the neutral ink rather than a series colour.
+- 5ca0db6: FeatureLineage: `node`, a snippet that draws each node yourself, makes the graph a canvas. It opens on the whole graph fitted to its width (never under 0.7 of a node's size, then centred on the node that runs); a drag pans and opens nothing; the wheel zooms about the pointer and hands the page its scroll back at either end; two fingers pinch; −, Fit and + sit in the foot, and `+`, `−`, `0` and the arrows work with focus in the graph; keyboard focus pans a node into view. `nodeSize`, `direction` (`auto` stands upright under 40rem), `levels` (a label a level) and `legend` go with it, and a line that skips a level goes round the nodes between. A `LineageEdge` takes `met` (false is dashed) and `route` (`live` flows, `stopped`, `longest`), and its `rel` is optional. CardFace takes `density="compact"` (tighter, the title two lines at most) and `mark`, a mark of at most 16px at the end of the reference line. Without the new props both render as before.
+
 ## 0.16.0
 
 ### Minor Changes
