@@ -11,6 +11,8 @@ export interface BoardGroup<T> {
 	id: string;
 	label?: string;
 	items: T[];
+	/** Shows this many cards, then a Show all button. The lane still counts every card. */
+	fold?: number;
 }
 
 /** One lane of a board, with its cards already sorted into groups. */
@@ -18,6 +20,8 @@ export interface BoardLane<T> {
 	id: string;
 	label: string;
 	groups: BoardGroup<T>[];
+	/** Colours the lane's heading and count, e.g. `warning` for a lane that needs you. */
+	tone?: UiTone;
 }
 
 export interface BoardLanesProps<T> {

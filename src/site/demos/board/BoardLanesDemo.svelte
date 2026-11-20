@@ -11,25 +11,28 @@
 		tone?: UiTone;
 	}
 
-	const LANES = ['Ready', 'Running', 'Review', 'Needs you', 'Done'];
+	/** A lane's heading takes the tone of what it holds; Ready and Review stay quiet. */
+	const LANES: [string, UiTone?][] = [['Ready'], ['Running', 'accent'], ['Review'], ['Needs you', 'warning'], ['Done', 'success']];
 
 	let tasks = $state<Task[]>([
 		{ id: 218, title: 'Send the digest every Monday', lane: 'Ready', feature: 'Weekly digest email' },
 		{ id: 219, title: 'Add the unsubscribe link', lane: 'Ready', feature: 'Weekly digest email' },
 		{ id: 224, title: 'Fix the flaky upload test', lane: 'Ready' },
+		{ id: 225, title: 'Retry the webhook on a 502', lane: 'Ready' },
+		{ id: 226, title: 'Drop the legacy CSV export', lane: 'Ready' },
 		{ id: 217, title: 'Render the digest template', lane: 'Running', feature: 'Weekly digest email', status: 'Implementing', tone: 'accent' },
 		{ id: 221, title: 'Rotate the signing key', lane: 'Needs you', status: 'Waiting for your approval', tone: 'warning' },
 		{ id: 209, title: 'Bump the base image', lane: 'Done', status: 'Merged', tone: 'success' }
 	]);
 
-	/** The app sorts its cards into lanes and groups; the board draws what it is given. */
-	let lanes = $derived(LANES.map((label): BoardLane<Task> => ({ id: label, label, groups: byFeature(tasks.filter((task) => task.lane === label)) })));
+	/** The app sorts its cards into lanes and groups; the board draws what it is given. A group of more than two folds. */
+	let lanes = $derived(LANES.map(([label, tone]): BoardLane<Task> => ({ id: label, label, tone, groups: byFeature(tasks.filter((task) => task.lane === label)) })));
 
 	function byFeature(items: Task[]): BoardGroup<Task>[] {
 		const groups = new Map<string, BoardGroup<Task>>();
 		for (const item of items) {
 			const id = item.feature ?? '';
-			const group = groups.get(id) ?? { id, label: item.feature, items: [] };
+			const group = groups.get(id) ?? { id, label: item.feature, items: [], fold: 2 };
 			groups.set(id, group);
 			group.items.push(item);
 		}
