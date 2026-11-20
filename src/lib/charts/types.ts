@@ -4,8 +4,8 @@
  * an index) for `GenerativeChart`.
  */
 
-/** A phase of agent work. Any string works; these four get their own colours. */
-export type AgentPhase = 'plan' | 'implement' | 'review' | 'verify' | (string & {});
+/** A phase of agent work. Any string works; these four get their own colours, and `gate` and `queue`, where no agent holds the work, the neutral ink. */
+export type AgentPhase = 'plan' | 'implement' | 'review' | 'verify' | 'gate' | 'queue' | (string & {});
 
 /** One agent or model's row in `AgentHandoffGantt`. */
 export interface HandoffLane {
@@ -14,9 +14,14 @@ export interface HandoffLane {
 	label: string;
 	/** Model or agent id shown under the label, e.g. `claude-opus`. */
 	model?: string;
+	/** Who works the lane now, by name, e.g. `Claude Code`: drawn as their breathing avatar at the end of the label and spoken in its name. */
+	worker?: string;
+	/** One short line in a column at the lane's end, e.g. `merged 22:45` or why the lane has no bar yet. */
+	note?: string;
 }
 
-export type HandoffSpanStatus = 'running' | 'done' | 'failed' | 'superseded';
+/** `planned` is an estimate: drawn outlined in the neutral ink, never pressed, and outside Live, Elapsed and the token sum. */
+export type HandoffSpanStatus = 'running' | 'done' | 'failed' | 'superseded' | 'planned';
 
 /** A stretch of time one lane held the work. */
 export interface HandoffSpan {

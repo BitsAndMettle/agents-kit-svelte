@@ -8,6 +8,7 @@
 	import { ArrowRightLeft, Clock, FileCode, FileDiff, FileText, FlaskConical, MessageSquare } from '@lucide/svelte';
 	import { motionDuration, rise } from '../state/motion.svelte';
 	import { untrack } from 'svelte';
+	import Avatar from '../primitives/display/Avatar.svelte';
 	import { foldedTime, formatClock, formatCompact, niceStep, phaseColor, scaleBroken, timeTicks } from './scale';
 	import { formatMetricDuration } from './metrics';
 	import type { HandoffArtifactKind, HandoffLane, HandoffLink, HandoffSpan, TimeBreak } from './types';
@@ -27,6 +28,10 @@
 		formatTime?: (t: number) => string;
 		/** Heading over the chart. */
 		title?: string;
+		/** Height of a lane in px. Bars are 24px in the default 46px lanes and 14px in 30px ones. */
+		laneHeight?: number;
+		/** Width of the label column in px. */
+		labelWidth?: number;
 		/** Lane to emphasise; the rest dim. Pair with `onHighlight` to link charts. */
 		highlight?: string | null;
 		/** Called with a lane id when the person hovers its row, and `null` when they leave. */
@@ -50,6 +55,8 @@
 		breaks = [],
 		formatTime = formatClock,
 		title,
+		laneHeight = 46,
+		labelWidth = 136,
 		highlight = null,
 		onHighlight,
 		onSelectSpan,
@@ -60,12 +67,11 @@
 		...rest
 	}: Props = $props();
 
-	const LABEL_W = 136;
 	const AXIS_H = 26;
-	const LANE_H = 46;
-	const BAR_H = 24;
 	const PAD_R = 20;
 	const BREAK_W = 36;
+	const uid = $props.id();
+	let barH = $derived(Math.min(24, laneHeight - 16));
 
 	let width = $state(720);
 	let hoverSpan = $state<string | null>(null);
@@ -73,7 +79,8 @@
 	let hoverLane = $state<string | null>(null);
 
 	let domainStart = $derived(spans.length > 0 ? Math.min(...spans.map((s) => s.start)) : 0);
-	let latestEnd = $derived(Math.max(domainStart, ...spans.map((s) => s.end ?? s.start)));
+	let latestEnd = $derived(Math.max(domainStart, ...spans.filter((s) => s.status !== 'planned').map((s) => s.end ?? s.start)));
+	let plannedEnd = $derived(Math.max(domainStart, ...spans.filter((s) => s.status === 'planned').map((s) => s.end ?? s.start)));
 	let clock = $derived(now ?? latestEnd);
 	let running = $derived(spans.some((s) => s.status === 'running'));
 	/** Time worked from the first span to `t`: folded stretches do not count. */
@@ -81,7 +88,7 @@
 
 	/** Domain end leaves headroom while live so bars have room to grow, measured on worked time. */
 	let domainTarget = $derived.by(() => {
-		const end = Math.max(clock, latestEnd, domainStart + 1);
+		const end = Math.max(clock, latestEnd, plannedEnd, domainStart + 1);
 		const work = worked(end);
 		const step = niceStep(work, 6);
 		return running ? end + Math.ceil((work * 1.15) / step) * step - work : end;
@@ -96,23 +103,28 @@
 		fitted = foldKey;
 	});
 
-	let innerW = $derived(Math.max(80, width - LABEL_W - PAD_R));
+	/** The notes' column fits the longest note, at about 6px a character. */
+	let noteW = $derived(Math.max(0, ...lanes.map((lane) => (lane.note ? lane.note.length * 6 + 16 : 0))));
+	let innerW = $derived(Math.max(80, width - labelWidth - PAD_R - noteW));
 	// A fold is BREAK_W wide unless the folds would take more than half the plot; then each narrows and drops its label.
 	let foldW = $derived(Math.min(BREAK_W, innerW / (2 * breaks.length)));
-	let x = $derived(scaleBroken([domainStart, domainEnd.current], [LABEL_W, LABEL_W + innerW], breaks, foldW));
-	let height = $derived(AXIS_H + lanes.length * LANE_H + 8);
+	let x = $derived(scaleBroken([domainStart, domainEnd.current], [labelWidth, labelWidth + innerW], breaks, foldW));
+	let height = $derived(AXIS_H + lanes.length * laneHeight + 8);
 	let bands = $derived(
 		breaks
 			.filter((b) => b.end > domainStart && b.start < domainEnd.current)
 			.map((b) => ({ x0: x(Math.max(b.start, domainStart)), x1: x(Math.min(b.end, domainEnd.current)), label: b.label ?? formatMetricDuration(b.end - b.start) }))
 	);
-	/** Round time steps, none in or beside a band, and none on top of the tick before. */
+	/** With folds, each stretch of open time is labelled at its start. Between them, round time steps: none in or beside a band, and none on top of the label before. */
+	let edges = $derived(breaks.length > 0 ? [domainStart, ...breaks.map((b) => b.end).filter((t) => t > domainStart && t < domainEnd.current)] : []);
 	let axisTicks = $derived.by(() => {
 		const kept: number[] = [];
-		for (const t of timeTicks([domainStart, domainEnd.current], Math.max(2, Math.floor(innerW / 90)), breaks)) {
+		const steps = timeTicks([domainStart, domainEnd.current], Math.max(2, Math.floor(innerW / 90)), breaks);
+		for (const t of [...edges, ...steps].sort((a, b) => a - b)) {
 			const px = x(t);
 			const last = kept.at(-1);
-			if ((last === undefined || px - x(last) >= 40) && !bands.some((b) => px > b.x0 - 24 && px < b.x1 + 24)) kept.push(t);
+			const room = last === undefined || px - x(last) >= (edges.includes(last) ? formatTime(last).length * 6 + 24 : 40);
+			if (t !== last && (edges.includes(t) || (room && !bands.some((b) => px > b.x0 - 24 && px < b.x1 + 24)))) kept.push(t);
 		}
 		return kept;
 	});
@@ -122,7 +134,7 @@
 	let ordered = $derived([...spans].sort((a, b) => Number(b.status === 'superseded') - Number(a.status === 'superseded')));
 
 	function laneY(laneId: string): number {
-		return AXIS_H + (laneIndex.get(laneId) ?? 0) * LANE_H + LANE_H / 2;
+		return AXIS_H + (laneIndex.get(laneId) ?? 0) * laneHeight + laneHeight / 2;
 	}
 	function spanEnd(span: HandoffSpan): number {
 		return span.end ?? Math.max(span.start, clock);
@@ -175,14 +187,14 @@
 			if (!from || !to || from.end === undefined) return [];
 			const down = laneY(to.lane) > laneY(from.lane);
 			const x1 = x(from.end);
-			const y1 = laneY(from.lane) + (down ? BAR_H / 2 : -BAR_H / 2);
+			const y1 = laneY(from.lane) + (down ? barH / 2 : -barH / 2);
 			const x2 = x(to.start);
 			if (from.lane === to.lane) {
 				// Within one lane the arrow arcs over the bars' top edge, its label at the top of the arc, under the axis.
 				const d = `M${x1},${y1} C${x1},${y1 - 12} ${x2},${y1 - 12} ${x2},${y1}`;
 				return [{ link, d, mx: (x1 + x2) / 2, my: y1 - 9 }];
 			}
-			const y2 = laneY(to.lane) + (down ? -BAR_H / 2 : BAR_H / 2);
+			const y2 = laneY(to.lane) + (down ? -barH / 2 : barH / 2);
 			const bend = Math.max(18, Math.abs(y2 - y1) * 0.55);
 			const d = `M${x1},${y1} C${x1},${y1 + Math.sign(y2 - y1) * bend} ${x2},${y2 - Math.sign(y2 - y1) * bend} ${x2},${y2}`;
 			return [{ link, d, mx: (x1 + x2) / 2, my: (y1 + y2) / 2 }];
@@ -244,10 +256,11 @@
 
 	let tipSpan = $derived(hoverSpan ? spanById.get(hoverSpan) : undefined);
 	let tipLane = $derived(tipSpan ? lanes.find((l) => l.id === tipSpan?.lane) : undefined);
-	let phases = $derived([...new Set(spans.map((s) => s.phase))]);
+	let planned = $derived(spans.some((s) => s.status === 'planned'));
+	let phases = $derived([...new Set(spans.filter((s) => s.status !== 'planned').map((s) => s.phase))]);
 	/** One colour per phase, the legend's, so an unnamed phase is the same colour on every bar. */
 	const color = (phase: string) => phaseColor(phase, phases.indexOf(phase));
-	let tokenTotal = $derived(spans.reduce((sum, s) => sum + (s.tokens ?? 0), 0));
+	let tokenTotal = $derived(spans.reduce((sum, s) => sum + (s.status === 'planned' ? 0 : (s.tokens ?? 0)), 0));
 
 	function statusLabel(span: HandoffSpan): string {
 		switch (span.status) {
@@ -257,6 +270,8 @@
 				return 'Failed';
 			case 'superseded':
 				return 'Superseded by a retry';
+			case 'planned':
+				return 'Planned';
 			default:
 				return 'Done';
 		}
@@ -284,9 +299,10 @@
 		<svg {width} {height} class="block overflow-visible" aria-label={title ?? 'Agent handoff timeline'} role="group">
 			<!-- Axis -->
 			{#each axisTicks as t (t)}
+				{@const edge = edges.includes(t)}
 				<g transform="translate({x(t)},0)" class="text-fg-light">
-					<line y1={AXIS_H - 4} y2={height} class="stroke-canvas-border" stroke-dasharray="2 4" />
-					<text y={AXIS_H - 10} text-anchor="middle" class="fill-current text-[10px] tabular-nums">{formatTime(t)}</text>
+					<line y1={AXIS_H - 4} y2={height} class="stroke-canvas-border" />
+					<text x={edge && t > domainStart ? 4 : undefined} y={AXIS_H - 10} text-anchor={edge ? 'start' : 'middle'} class="fill-current text-[10px] tabular-nums">{formatTime(t)}</text>
 				</g>
 			{/each}
 
@@ -306,34 +322,42 @@
 			{/if}
 
 			<!-- Lanes -->
+			{#if lanes.some((lane) => lane.worker)}
+				<defs><clipPath id="{uid}-label"><rect width={labelWidth - 28} {height} /></clipPath></defs>
+			{/if}
 			{#each lanes as lane, i (lane.id)}
-				{@const top = AXIS_H + i * LANE_H}
+				{@const top = AXIS_H + i * laneHeight}
+				{@const clip = lane.worker ? `url(#${uid}-label)` : undefined}
 				<g
 					role="presentation"
 					onpointerenter={() => setLane(lane.id)}
 					onpointerleave={() => setLane(null)}
 				>
-					<rect x="0" y={top} width={width} height={LANE_H} class={cn('transition-colors duration-200', laneFocus === lane.id ? 'fill-canvas-secondary' : 'fill-transparent')} rx="8" />
+					<rect x="0" y={top} width={width} height={laneHeight} class={cn('transition-colors duration-200', laneFocus === lane.id ? 'fill-canvas-secondary' : 'fill-transparent')} rx="8" />
 					{#if onSelectLane}
 						<g
 							role="button"
 							tabindex="0"
-							aria-label="{lane.label}{lane.model ? `, ${lane.model}` : ''}"
+							aria-label="{lane.label}{lane.model ? `, ${lane.model}` : ''}{lane.worker ? `, worked by ${lane.worker}` : ''}"
 							class="group/lane cursor-pointer outline-none"
 							onclick={() => onSelectLane?.(lane)}
 							onkeydown={(event) => handleLaneKey(event, lane)}
 						>
-							<rect x="2" y={top + 4} width={LABEL_W - 12} height={LANE_H - 8} rx="6" class="fill-transparent transition-colors group-hover/lane:fill-card-bg group-focus-visible/lane:fill-card-bg group-focus-visible/lane:stroke-accent-primary/50" />
-							<text x="10" y={top + LANE_H / 2 - (lane.model ? 3 : -4)} class="fill-fg-main text-[12px] font-medium underline-offset-2 group-hover/lane:underline">{lane.label}</text>
+							<rect x="2" y={top + 4} width={labelWidth - 12} height={laneHeight - 8} rx="6" class="fill-transparent transition-colors group-hover/lane:fill-card-bg group-focus-visible/lane:fill-card-bg group-focus-visible/lane:stroke-accent-primary/50" />
+							<text x="10" y={top + laneHeight / 2 - (lane.model ? 3 : -4)} clip-path={clip} class="fill-fg-main text-[12px] font-medium underline-offset-2 group-hover/lane:underline">{lane.label}</text>
 							{#if lane.model}
-								<text x="10" y={top + LANE_H / 2 + 11} class="fill-fg-light font-mono text-[10px]">{lane.model}</text>
+								<text x="10" y={top + laneHeight / 2 + 11} clip-path={clip} class="fill-fg-light font-mono text-[10px]">{lane.model}</text>
 							{/if}
 						</g>
 					{:else}
-						<text x="10" y={top + LANE_H / 2 - (lane.model ? 3 : -4)} class="fill-fg-main text-[12px] font-medium">{lane.label}</text>
+						<!-- The worker's words are clipped from sight and read with the label, as a pressable lane's name says them. -->
+						<text x="10" y={top + laneHeight / 2 - (lane.model ? 3 : -4)} clip-path={clip} class="fill-fg-main text-[12px] font-medium">{lane.label}{#if lane.worker}<tspan class="fill-transparent">, worked by {lane.worker}</tspan>{/if}</text>
 						{#if lane.model}
-							<text x="10" y={top + LANE_H / 2 + 11} class="fill-fg-light font-mono text-[10px]">{lane.model}</text>
+							<text x="10" y={top + laneHeight / 2 + 11} clip-path={clip} class="fill-fg-light font-mono text-[10px]">{lane.model}</text>
 						{/if}
+					{/if}
+					{#if lane.note}
+						<text x={labelWidth + innerW + 16} y={top + laneHeight / 2} dy="0.34em" class="fill-fg-light text-[11px] tabular-nums">{lane.note}</text>
 					{/if}
 				</g>
 			{/each}
@@ -341,21 +365,24 @@
 			<!-- Spans -->
 			{#each ordered as span, i (span.id)}
 				{@const ghost = span.status === 'superseded'}
+				{@const plan = span.status === 'planned'}
 				{@const bx = x(span.start)}
 				{@const bw = Math.max(3, x(spanEnd(span)) - bx)}
-				{@const by = laneY(span.lane) - (ghost ? BAR_H / 2 - 5 : BAR_H / 2)}
-				{@const bh = ghost ? BAR_H - 10 : BAR_H}
+				{@const bh = ghost ? (barH * 7) / 12 : barH}
+				{@const by = laneY(span.lane) - bh / 2}
+				<!-- A planned span is a picture and takes no focus; every other span is a button. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 				<g
-					role="button"
-					tabindex="0"
+					role={plan ? 'img' : 'button'}
+					tabindex={plan ? undefined : 0}
 					aria-label="{span.label ?? span.phase}, {statusLabel(span)}, {formatTime(span.start)} to {formatTime(spanEnd(span))}"
-					class={cn('outline-none', onSelectSpan ? 'cursor-pointer' : 'cursor-default')}
+					class={cn('outline-none', onSelectSpan && !plan ? 'cursor-pointer' : 'cursor-default')}
 					onpointerenter={() => (hoverSpan = span.id)}
 					onpointerleave={() => (hoverSpan = null)}
 					onfocus={() => (hoverSpan = span.id)}
 					onblur={() => (hoverSpan = null)}
-					onclick={() => select(span)}
-					onkeydown={(event) => handleSpanKey(event, span)}
+					onclick={() => !plan && select(span)}
+					onkeydown={(event) => !plan && handleSpanKey(event, span)}
 				>
 					<g style="transform-box: fill-box; transform-origin: left center;" in:grow={{ delay: Math.min(i, 8) * 40 }}>
 						<rect
@@ -364,12 +391,12 @@
 							rx="6"
 							style:y="{by}px"
 							style:height="{bh}px"
-							style:fill={color(span.phase)}
+							style:fill={plan ? 'none' : color(span.phase)}
 							style:opacity={spanOpacity(span)}
 							style:fill-opacity={span.status === 'failed' ? 0.28 : ghost ? 0.5 : 0.9}
-							style:stroke={span.status === 'failed' ? 'var(--ak-color-danger)' : color(span.phase)}
+							style:stroke={span.status === 'failed' ? 'var(--ak-color-danger)' : plan ? 'var(--ak-color-fg-muted)' : color(span.phase)}
 							stroke-width={lit.has(span.id) || selected === span.id ? 2 : 1}
-							stroke-dasharray={ghost ? '3 3' : undefined}
+							stroke-dasharray={ghost || plan ? '3 3' : undefined}
 							class="transition-[opacity,y,height,stroke-width] duration-300 ease-out"
 						/>
 						{#if selected === span.id}
@@ -378,7 +405,7 @@
 						{#if span.status === 'running'}
 							<rect x={bx + bw - 3} y={by} width="3" height={bh} rx="1.5" class="animate-pulse fill-card-bg/80" />
 						{/if}
-						{#if span.label && bw > span.label.length * 6.2 + 14 && !ghost}
+						{#if span.label && bw > span.label.length * 6.2 + 14 && !ghost && !plan && barH >= 20}
 							<text
 								x={bx + 8}
 								y={by + bh / 2}
@@ -429,6 +456,13 @@
 			{/if}
 		</svg>
 
+		<!-- Who works each lane now, at the end of its label -->
+		{#each lanes as lane (lane.id)}
+			{#if lane.worker}
+				<Avatar size="2xs" decorative name={lane.worker} class="ak-breathe pointer-events-none absolute" style="left: {labelWidth - 22}px; top: {laneY(lane.id) - 8}px" />
+			{/if}
+		{/each}
+
 		<!-- Handoff artifact pills -->
 		{#each routes as route (route.link.id)}
 			{@const Icon = KIND_ICONS[route.link.kind ?? 'file']}
@@ -474,11 +508,11 @@
 
 		<!-- Span tooltip -->
 		{#if tipSpan}
-			{@const left = Math.min(width - 200, Math.max(LABEL_W, x(tipSpan.start)))}
+			{@const left = Math.min(width - 200, Math.max(labelWidth, x(tipSpan.start)))}
 			<div
 				class="pointer-events-none absolute z-20 w-48 rounded-chip border border-card-border bg-card-bg p-2.5 text-[11px] shadow-soft"
 				style:left="{left}px"
-				style:top="{laneY(tipSpan.lane) + BAR_H / 2 + 6}px"
+				style:top="{laneY(tipSpan.lane) + barH / 2 + 6}px"
 				in:rise={{ y: 3, duration: 120 }}
 			>
 				<p class="flex items-center gap-1.5 font-medium text-fg-main">
@@ -492,7 +526,7 @@
 					{#if tipSpan.tokens}<dt class="text-fg-light">Tokens</dt><dd class="text-right text-fg-main">{formatCompact(tipSpan.tokens)}</dd>{/if}
 					<dt class="text-fg-light">Status</dt><dd class={cn('text-right', tipSpan.status === 'failed' ? 'text-status-danger' : 'text-fg-main')}>{statusLabel(tipSpan)}</dd>
 				</dl>
-				{#if onSelectSpan}<p class="mt-1.5 border-t border-canvas-border pt-1.5 text-accent-primary">Click for details</p>{/if}
+				{#if onSelectSpan && tipSpan.status !== 'planned'}<p class="mt-1.5 border-t border-canvas-border pt-1.5 text-accent-primary">Click for details</p>{/if}
 			</div>
 		{/if}
 	</div>
@@ -502,7 +536,7 @@
 			{#each phases as phase (phase)}
 				<li class="flex items-center gap-1.5 capitalize"><span class="size-2 rounded-sm" style:background={color(phase)}></span>{phase}</li>
 			{/each}
-			<li class="flex items-center gap-1.5"><span class="size-2 rounded-sm border border-dashed border-fg-light"></span>Superseded attempt</li>
+			<li class="flex items-center gap-1.5"><span class="size-2 rounded-sm border border-dashed border-fg-light"></span>Superseded attempt</li>{#if planned}<li class="flex items-center gap-1.5"><span class="size-2 rounded-sm border border-dashed border-fg-light"></span>Planned</li>{/if}
 		</ul>
 	{/if}
 </div>

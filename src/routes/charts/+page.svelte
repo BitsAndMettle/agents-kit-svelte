@@ -13,6 +13,7 @@
 		SAMPLE_CHART_SPECS,
 		SAMPLE_FEATURE_HANDOFFS,
 		SAMPLE_FEATURE_LANES,
+		SAMPLE_FEATURE_NOW,
 		SAMPLE_FEATURE_SPANS,
 		SAMPLE_HANDOFFS,
 		SAMPLE_HANDOFF_LANES,
@@ -164,7 +165,9 @@
 			lanes={SAMPLE_FEATURE_LANES}
 			spans={SAMPLE_FEATURE_SPANS}
 			handoffs={SAMPLE_FEATURE_HANDOFFS}
-			breaks={axis === 'work' ? idleBreaks(SAMPLE_FEATURE_SPANS, 3600) : []}
+			now={SAMPLE_FEATURE_NOW}
+			laneHeight={30}
+			breaks={axis === 'work' ? idleBreaks(SAMPLE_FEATURE_SPANS, 3600, SAMPLE_FEATURE_NOW) : []}
 			formatTime={(s) => `${String(Math.floor(s / 3600) % 24).padStart(2, '0')}:${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}`}
 		/>
 	</section>

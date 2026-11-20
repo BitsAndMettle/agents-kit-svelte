@@ -45,12 +45,18 @@ export const SAMPLE_HANDOFF_SPANS: HandoffSpan[] = [
 /** Seconds from midnight of a Feature's first day, so the axis reads clock times. */
 const at = (h: number, m: number, day = 0) => day * 86_400 + h * 3600 + m * 60;
 
-/** A Feature's cards across two days and a night no one worked: a lane a card, its review a stretch of its own. */
+/** A Feature's cards across two days and a night no one worked: a lane a card, its review a stretch of its own, a note at each lane's end. */
 export const SAMPLE_FEATURE_LANES: HandoffLane[] = [
-	{ id: '311', label: '#311 Session cache' },
-	{ id: '312', label: '#312 Token refresh' },
-	{ id: '313', label: '#313 Sign-out' }
+	{ id: '311', label: '#311 Session cache', note: 'merged 13:40' },
+	{ id: '312', label: '#312 Token refresh', note: 'Held' },
+	{ id: '313', label: '#313 Sign-out', note: 'merged 11:00' },
+	{ id: '314', label: '#314 Remember device', note: 'checks running' },
+	{ id: '315', label: '#315 Sign-in alerts', worker: 'Claude Code', note: '≈ 12:05' },
+	{ id: '316', label: '#316 Document it', note: '≈ 12:35, then your press' }
 ];
+
+/** The second morning, 11:40: #314 waits at the gate, Claude Code builds #315, and the rest is planned. */
+export const SAMPLE_FEATURE_NOW = at(11, 40, 1);
 
 export const SAMPLE_FEATURE_SPANS: HandoffSpan[] = [
 	{ id: '311-b1', lane: '311', phase: 'implement', start: at(9, 10), end: at(9, 55), status: 'superseded', label: 'Build' },
@@ -63,7 +69,13 @@ export const SAMPLE_FEATURE_SPANS: HandoffSpan[] = [
 	{ id: '312-b3', lane: '312', phase: 'implement', start: at(9, 20, 1), end: at(10, 0, 1), status: 'done', label: 'Build · 3' },
 	{ id: '313-b1', lane: '313', phase: 'implement', start: at(9, 5, 1), end: at(10, 10, 1), status: 'done', label: 'Build' },
 	{ id: '313-r1', lane: '313', phase: 'review', start: at(10, 10, 1), end: at(10, 35, 1), status: 'done', label: 'Review' },
-	{ id: '313-q', lane: '313', phase: 'queue', start: at(10, 35, 1), end: at(11, 0, 1), status: 'done', label: 'Queue' }
+	{ id: '313-q', lane: '313', phase: 'queue', start: at(10, 35, 1), end: at(11, 0, 1), status: 'done', label: 'Queue' },
+	{ id: '314-b1', lane: '314', phase: 'implement', start: at(10, 40, 1), end: at(11, 10, 1), status: 'done', label: 'Build' },
+	{ id: '314-r1', lane: '314', phase: 'review', start: at(11, 10, 1), end: at(11, 25, 1), status: 'done', label: 'Review' },
+	{ id: '314-g', lane: '314', phase: 'gate', start: at(11, 25, 1), status: 'running', label: 'Gate' },
+	{ id: '315-b1', lane: '315', phase: 'implement', start: at(11, 15, 1), status: 'running', label: 'Build' },
+	{ id: '315-p', lane: '315', phase: 'implement', start: at(11, 40, 1), end: at(12, 5, 1), status: 'planned', label: 'Estimate' },
+	{ id: '316-p', lane: '316', phase: 'implement', start: at(12, 5, 1), end: at(12, 35, 1), status: 'planned', label: 'Estimate' }
 ];
 
 export const SAMPLE_FEATURE_HANDOFFS: HandoffLink[] = [
