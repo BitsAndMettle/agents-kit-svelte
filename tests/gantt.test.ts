@@ -74,6 +74,36 @@ test('AgentHandoffGantt: with folds, each stretch of open time is labelled at it
 	assert.doesNotMatch(out, /stroke-dasharray="2 4"/, 'grid lines are solid');
 });
 
+test('AgentHandoffGantt: a short stretch before a fold draws no overlapping words on the axis', async () => {
+	const H = 3600;
+	const M = 60;
+	const clock = (s: number) => `${s >= 24 * H ? 'Fri ' : ''}${String(Math.floor(s / H) % 24).padStart(2, '0')}:${String(Math.floor((s % H) / M)).padStart(2, '0')}`;
+	const run = (id: string, start: number, end: number): HandoffSpan => ({ id, lane: 'a', phase: 'implement', start, end, status: 'done' });
+	const night = { start: 22 * H + 56 * M, end: 31 * H + 59 * M };
+	const cases = [
+		{ spans: [run('x', 22 * H + 32 * M, night.start), run('y', night.end, 34 * H)], breaks: [night] },
+		{ spans: [run('x', 22 * H + 52 * M, night.start), run('y', night.end, 34 * H)], breaks: [night] },
+		{
+			spans: [run('x', 20 * H, 22 * H), run('y', 26 * H, 26 * H + 6 * M), run('z', 32 * H, 34 * H)],
+			breaks: [{ start: 22 * H, end: 26 * H }, { start: 26 * H + 6 * M, end: 32 * H }]
+		}
+	];
+	const Gantt = await load(GANTT);
+	for (const { spans, breaks } of cases) {
+		for (let plot = 150; plot <= 640; plot += 10) {
+			const out = html(Gantt, { lanes: [{ id: 'a', label: 'A' }], spans, breaks, formatTime: clock, labelWidth: 720 - 20 - plot });
+			// Each word on the axis, from where it starts to where it ends, at the chart’s own 6px a character.
+			const words = [...out.matchAll(/(?:translate\(([\d.]+),0\)[^>]*><line[^>]*><\/line>)?<text(?: x="([\d.]+)")? y="16" text-anchor="(start|middle)"[^>]*>([^<]+)<\/text>/g)]
+				.map(([, g, dx, anchor, word]) => {
+					const from = Number(g ?? 0) + Number(dx ?? 0) - (anchor === 'middle' ? word.length * 3 : 0);
+					return { word, from, to: from + word.length * 6 };
+				})
+				.sort((a, b) => a.from - b.from);
+			for (const [i, w] of words.slice(1).entries()) assert.ok(w.from >= words[i].to, `${words[i].word} runs into ${w.word} on a ${plot}px plot`);
+		}
+	}
+});
+
 test('phaseColor: gate and queue take the neutral ink', () => {
 	assert.equal(phaseColor('gate'), 'var(--ak-color-fg-muted)');
 	assert.equal(phaseColor('queue', 3), 'var(--ak-color-fg-muted)');

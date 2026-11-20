@@ -115,7 +115,7 @@
 			.filter((b) => b.end > domainStart && b.start < domainEnd.current)
 			.map((b) => ({ x0: x(Math.max(b.start, domainStart)), x1: x(Math.min(b.end, domainEnd.current)), label: b.label ?? formatMetricDuration(b.end - b.start) }))
 	);
-	/** With folds, each stretch of open time is labelled at its start. Between them, round time steps: none in or beside a band, and none on top of the label before. */
+	/** With folds, each stretch of open time is labelled at its start, when the stretch is wide enough for it. Between them, round time steps: none in or beside a band, and none on top of the label before. */
 	let edges = $derived(breaks.length > 0 ? [domainStart, ...breaks.map((b) => b.end).filter((t) => t > domainStart && t < domainEnd.current)] : []);
 	let axisTicks = $derived.by(() => {
 		const kept: number[] = [];
@@ -123,8 +123,11 @@
 		for (const t of [...edges, ...steps].sort((a, b) => a - b)) {
 			const px = x(t);
 			const last = kept.at(-1);
-			const room = last === undefined || px - x(last) >= (edges.includes(last) ? formatTime(last).length * 6 + 24 : 40);
-			if (t !== last && (edges.includes(t) || (room && !bands.some((b) => px > b.x0 - 24 && px < b.x1 + 24)))) kept.push(t);
+			const room = last === undefined || px - x(last) >= (edges.includes(last) ? formatTime(last).length * 6 + formatTime(t).length * 3 + 8 : 40);
+			const fits = edges.includes(t)
+				? !bands.some((b) => b.x0 >= px && b.x0 - px < formatTime(t).length * 6 + 8)
+				: room && !bands.some((b) => px > b.x0 - 24 && px < b.x1 + 24);
+			if (t !== last && fits) kept.push(t);
 		}
 		return kept;
 	});
