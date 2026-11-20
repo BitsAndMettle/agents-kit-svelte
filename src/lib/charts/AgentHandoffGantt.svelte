@@ -88,10 +88,10 @@
 
 	/** Domain end leaves headroom while live so bars have room to grow, measured on worked time. */
 	let domainTarget = $derived.by(() => {
-		const end = Math.max(clock, latestEnd, plannedEnd, domainStart + 1);
+		const end = Math.max(clock, latestEnd, domainStart + 1);
 		const work = worked(end);
 		const step = niceStep(work, 6);
-		return running ? end + Math.ceil((work * 1.15) / step) * step - work : end;
+		return Math.max(plannedEnd, running ? end + Math.ceil((work * 1.15) / step) * step - work : end);
 	});
 	const domainEnd = new Tween(untrack(() => domainTarget), { duration: 600, easing: cubicOut });
 	/** While live the end only grows, unless the folds change (Work time ↔ Calendar): then it fits again. */
@@ -391,7 +391,7 @@
 							rx="6"
 							style:y="{by}px"
 							style:height="{bh}px"
-							style:fill={plan ? 'none' : color(span.phase)}
+							style:fill={plan ? 'transparent' : color(span.phase)}
 							style:opacity={spanOpacity(span)}
 							style:fill-opacity={span.status === 'failed' ? 0.28 : ghost ? 0.5 : 0.9}
 							style:stroke={span.status === 'failed' ? 'var(--ak-color-danger)' : plan ? 'var(--ak-color-fg-muted)' : color(span.phase)}

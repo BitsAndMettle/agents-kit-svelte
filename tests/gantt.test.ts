@@ -32,6 +32,12 @@ test('AgentHandoffGantt: a planned span is outlined, no button, and outside Live
 	assert.match(out, /<dd>100 tokens<\/dd>/);
 	assert.match(out, /stroke-dasharray="3 3"/);
 	assert.match(out, /Planned<\/li>/);
+
+	// While live, the headroom is measured on real work, and the axis ends where the estimate does when that is later.
+	const live = html(await load(GANTT), { lanes: LANES, spans: [{ ...SPANS[0], end: undefined, status: 'running' }, SPANS[1]], now: 60 });
+	const [, x0, w] = live.match(/<g role="img"[^>]*><g[^>]*><rect x="([\d.]+)" width="([\d.]+)"/) ?? [];
+	assert.equal(Math.round(Number(x0) + Number(w)), 136 + 564);
+	assert.match(live, />Live</);
 });
 
 test('AgentHandoffGantt: a note a lane, at its end, and lanes as tall as asked', async () => {
