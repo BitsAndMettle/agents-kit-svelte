@@ -263,7 +263,9 @@
 	const lift = (e: PointerEvent): boolean => pointers.delete(e.pointerId);
 	/** A drag of more than 4px is a pan, and opens nothing, wherever it began. */
 	function swallow(e: MouseEvent): void {
-		if (travel <= 4) return;
+		const dragged = travel > 4;
+		travel = 0;
+		if (!dragged) return;
 		e.stopPropagation();
 		e.preventDefault();
 	}

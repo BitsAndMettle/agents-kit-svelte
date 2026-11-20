@@ -40,7 +40,10 @@
 		{#snippet mark()}
 			<span aria-hidden="true" class="contents">
 				{#if c.worker}
-					<Avatar name={c.worker} decorative size="xs" class="size-4 text-[8px] ak-breathe" />
+					<span class="relative grid size-4 place-items-center">
+						<span class="ak-breathe absolute inset-0 rounded-full border border-accent-primary"></span>
+						<Avatar name={c.worker} decorative size="xs" class="size-3.5 text-[8px]" />
+					</span>
 				{:else if c.merged}
 					<Check class="size-3.5 text-status-success" />
 				{:else}

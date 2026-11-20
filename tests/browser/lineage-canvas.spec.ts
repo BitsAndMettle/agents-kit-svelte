@@ -35,6 +35,11 @@ test('FeatureLineage canvas: a drag pans and opens nothing; a press opens the no
 	expect(after.y - before.y).toBeCloseTo(30, 0);
 	await expect(section.getByText(/would open here/)).toHaveCount(0);
 
+	// A press with no pointer down first (Enter, a screen reader's click) still opens a node after a drag.
+	await section.getByRole('button', { name: 'Prove a write path to the theme store' }).focus();
+	await page.keyboard.press('Enter');
+	await expect(section.getByText('#69 would open here, in its sheet. Its route stays lit.')).toBeVisible();
+
 	await node.click();
 	await expect(section.getByText('#71 would open here, in its sheet. Its route stays lit.')).toBeVisible();
 });
@@ -109,5 +114,5 @@ test('FeatureLineage canvas: no axe violations', async ({ page }) => {
 		.include('section[aria-label="Cards of Theme Studio"]')
 		.withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
 		.analyze();
-	expect(results.violations.map((v) => `${v.id}: ${v.nodes[0]?.target.join(' ')}`)).toEqual([]);
+	expect(results.violations.flatMap((v) => v.nodes.map((n) => `${v.id}: ${n.target.join(' ')}`))).toEqual([]);
 });
