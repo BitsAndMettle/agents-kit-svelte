@@ -246,7 +246,7 @@
 	}
 	function drag(e: PointerEvent): void {
 		const was = pointers.get(e.pointerId);
-		if (!was) return;
+		if (!was || (e.pointerType === 'mouse' && !e.buttons && lift(e))) return;
 		const now = spot(e);
 		pointers.set(e.pointerId, now);
 		const [dx, dy] = [now[0] - was[0], now[1] - was[1]];
@@ -267,10 +267,10 @@
 		e.stopPropagation();
 		e.preventDefault();
 	}
-	/** The wheel zooms about the pointer; at either end of the zoom it is the page's again. */
+	/** The wheel zooms about the pointer; at either end of the zoom it is the page's again. A trackpad's pinch (ctrl) never zooms the page. */
 	function wheel(e: WheelEvent): void {
 		const next = zoomAt(view, ...spot(e), Math.exp(-e.deltaY * 0.0022), fit().k);
-		if (Math.abs(next.k - view.k) < 1e-4) return;
+		if (Math.abs(next.k - view.k) < 1e-4 && !e.ctrlKey) return;
 		e.preventDefault();
 		show(next);
 	}

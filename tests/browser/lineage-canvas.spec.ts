@@ -41,8 +41,12 @@ test('FeatureLineage canvas: a drag pans and opens nothing; a press opens the no
 
 test('FeatureLineage canvas: the wheel zooms about the pointer, and at either end of the zoom it scrolls the page', async ({ page }) => {
 	const { pane, world } = await canvas(page);
-	const box = (await pane.boundingBox())!;
-	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	// The page moves under the pointer when it scrolls, so the pointer goes back over the graph each time.
+	const over = async () => {
+		const box = (await pane.boundingBox())!;
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+	};
+	await over();
 	const opening = await view(world);
 
 	// It opens on the whole graph, so a wheel down is the page's at once.
@@ -52,11 +56,12 @@ test('FeatureLineage canvas: the wheel zooms about the pointer, and at either en
 	expect((await view(world)).k).toBe(opening.k);
 
 	// A wheel up zooms in, and the page stays where it is, until the zoom can go no closer.
+	await over();
 	y = await scrollY(page);
 	await page.mouse.wheel(0, -200);
 	await expect.poll(async () => (await view(world)).k).toBeGreaterThan(opening.k);
 	expect(await scrollY(page)).toBe(y);
-	for (let i = 0; i < 12; i++) await page.mouse.wheel(0, -400);
+	await page.mouse.wheel(0, -400);
 	await expect.poll(async () => (await view(world)).k).toBe(1.5);
 	y = await scrollY(page);
 	await page.mouse.wheel(0, -200);

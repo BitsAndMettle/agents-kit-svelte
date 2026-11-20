@@ -80,7 +80,7 @@ export const BOARD: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/board/CardFace.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A card in a lane: a reference, the title, one status line with a tone, your badges and your actions. With href or onSelect the whole card opens through its title, the single tab stop, and the actions stay separately clickable.',
+			'A card in a lane: a reference, the title, one status line with a tone, your badges and your actions. With href or onSelect the whole card opens through its title, the single tab stop, and the actions stay separately clickable. A compact density makes it a node in a graph, and a mark puts a small sign, such as who works the card, at the end of its reference line.',
 		usageSnippet: `<script lang="ts">
   import { CardFace } from 'agents-kit-svelte/board';
   import { Badge, Button } from 'agents-kit-svelte/primitives';
