@@ -38,7 +38,7 @@ export const BOARD: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/board/BoardLanes.svelte',
 		upstreamSource: UPSTREAM,
 		description:
-			'A board whose lanes are data and whose cards are your snippet. Each lane shows its label and count, with its cards under group headings. As many lanes sit side by side as fit; the rest wrap, down to one column on a phone.',
+			'A board whose lanes are data and whose cards are your snippet. Each lane shows its label and count, in a tone if you give it one, with its cards under group headings. A group with a fold shows that many cards and a Show all button, and its lane still counts every card. As many lanes sit side by side as fit; the rest wrap, down to one column on a phone.',
 		usageSnippet: `<script lang="ts">
   import { BoardLanes, CardFace, type BoardLane } from 'agents-kit-svelte/board';
 
@@ -55,12 +55,13 @@ export const BOARD: CatalogItemMeta[] = [
       label: 'Ready',
       groups: [
         { id: 'digest', label: 'Weekly digest email', items: [{ id: 218, title: 'Send the digest every Monday' }] },
-        { id: 'loose', items: [{ id: 224, title: 'Fix the flaky upload test' }] }
+        { id: 'loose', items: [{ id: 224, title: 'Fix the flaky upload test' }], fold: 4 }
       ]
     },
     {
       id: 'running',
       label: 'Running',
+      tone: 'accent',
       groups: [{ id: 'digest', label: 'Weekly digest email', items: [{ id: 217, title: 'Render the digest template', status: 'Implementing' }] }]
     },
     { id: 'done', label: 'Done', groups: [] }

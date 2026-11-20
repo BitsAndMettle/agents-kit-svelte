@@ -35,6 +35,20 @@ test('BoardLanes: lanes in order with their counts, cards under group headings, 
 	assert.ok(out.indexOf('aria-label="Ready"') < out.indexOf('aria-label="Done"'));
 
 	assert.match(html(BoardLanes, { lanes: LANES, card, headingLevel: 4 }), /<h4[^>]*>Ready<\/h4>[\s\S]*<h5[^>]*>Weekly digest<\/h5>/);
+	assert.doesNotMatch(out, /<button/);
+});
+
+test('BoardLanes: a toned heading, and a folded group shows its first cards while the lane counts every one', async () => {
+	const BoardLanes = await load('/src/lib/board/BoardLanes.svelte');
+	const card = snippet((task: Task) => `<article>${task.title}</article>`);
+	const items = [1, 2, 3, 4, 5].map((id) => ({ id, title: `Card ${id}` }));
+	const lane = (fold: number): BoardLane<Task> => ({ id: 'ready', label: 'Ready', tone: 'warning', groups: [{ id: 'all', items, fold }] });
+	const out = html(BoardLanes, { lanes: [lane(2)], card });
+
+	assert.match(out, /<header class="[^"]*text-status-warning[^"]*"><h2[^>]*>Ready<\/h2>\s*<span[^>]*>5<\/span><\/header>/);
+	assert.match(out, /<ul[^>]*><li[^>]*><article>Card 1<\/article><\/li><li[^>]*><article>Card 2<\/article><\/li><\/ul>\s*<button type="button"[^>]*aria-expanded="false"[^>]*>\s*Show all 5\s*<\/button>/);
+	// A group no longer than its fold draws all its cards and no button.
+	assert.doesNotMatch(html(BoardLanes, { lanes: [lane(5)], card }), /<button/);
 });
 
 test('CardFace: the title alone opens the card, with the reference, status and actions around it', async () => {

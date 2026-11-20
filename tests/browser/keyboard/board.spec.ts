@@ -40,6 +40,28 @@ test('BoardLanes: a card that changes lane leaves one list for the other, and th
 	await expect(done.getByRole('heading', { name: 'Rotate the signing key' })).toBeVisible();
 });
 
+test('BoardLanes: a folded group opens with Show all and closes again, and the lane counts every card throughout', async ({ page }) => {
+	const section = await openSection(page, 'board-lanes');
+	const ready = section.getByRole('region', { name: 'Ready' });
+	const showAll = ready.getByRole('button', { name: 'Show all 3' });
+	await expect(ready.getByText('5', { exact: true })).toBeVisible();
+	await expect(ready.getByRole('listitem')).toHaveCount(4);
+	await expect(showAll).toHaveAttribute('aria-expanded', 'false');
+
+	await showAll.click();
+	await expect(ready.getByRole('listitem')).toHaveCount(5);
+	await expect(ready.getByRole('heading', { name: 'Drop the legacy CSV export' })).toBeVisible();
+	// The same button, so focus stays on it.
+	const showFewer = ready.getByRole('button', { name: 'Show fewer' });
+	await expect(showFewer).toHaveAttribute('aria-expanded', 'true');
+	await expect(showFewer).toBeFocused();
+
+	await press(page, 'Enter');
+	await expect(ready.getByRole('listitem')).toHaveCount(4);
+	await expect(showAll).toBeFocused();
+	await expect(ready.getByText('5', { exact: true })).toBeVisible();
+});
+
 test('CardSheet: a card opens as a sheet named by it, with its facts as a list, and closing it returns to the card', async ({ page }) => {
 	const section = await openSection(page, 'card-sheet');
 	const card = section.getByRole('button', { name: 'Render the digest template' });
