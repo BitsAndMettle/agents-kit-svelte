@@ -14,6 +14,7 @@
 	} from '$lib/fixtures/charts';
 	import { cn } from '$lib/ui/cn';
 	import { rise } from '$lib/state/motion.svelte';
+	import LineageCanvas from './LineageCanvas.svelte';
 	import LineageDetailSheet from './LineageDetailSheet.svelte';
 
 	let open = $state<LineageNode | null>(null);
@@ -78,6 +79,8 @@
 		selected={open?.id ?? null}
 		onSelectNode={(node) => (open = node)}
 	/>
+
+	<LineageCanvas />
 </div>
 
 <LineageDetailSheet node={open} nodes={SAMPLE_LINEAGE_NODES} edges={SAMPLE_LINEAGE_EDGES} onOpen={(node) => (open = node)} onClose={() => (open = null)} />
