@@ -36,7 +36,7 @@ test('AgentHandoffGantt: a planned span is outlined, no button, and outside Live
 	// While live, the headroom is measured on real work, and the axis ends where the estimate does when that is later.
 	const live = html(await load(GANTT), { lanes: LANES, spans: [{ ...SPANS[0], end: undefined, status: 'running' }, SPANS[1]], now: 60 });
 	const [, x0, w] = live.match(/<g role="img"[^>]*><g[^>]*><rect x="([\d.]+)" width="([\d.]+)"/) ?? [];
-	assert.equal(Math.round(Number(x0) + Number(w)), 136 + 564);
+	assert.equal(Math.round(Number(x0) + Number(w)), 720 - 20 - 94, 'the plot ends at the estimate: the chart less its right pad and the notes');
 	assert.match(live, />Live</);
 });
 
