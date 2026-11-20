@@ -74,7 +74,7 @@ test('AgentHandoffGantt: with folds, each stretch of open time is labelled at it
 	assert.doesNotMatch(out, /stroke-dasharray="2 4"/, 'grid lines are solid');
 });
 
-test('AgentHandoffGantt: a short stretch before a fold draws no overlapping words on the axis', async () => {
+test('AgentHandoffGantt: a short stretch draws no overlapping words on the axis, and none past the card', async () => {
 	const H = 3600;
 	const M = 60;
 	const clock = (s: number) => `${s >= 24 * H ? 'Fri ' : ''}${String(Math.floor(s / H) % 24).padStart(2, '0')}:${String(Math.floor((s % H) / M)).padStart(2, '0')}`;
@@ -86,7 +86,8 @@ test('AgentHandoffGantt: a short stretch before a fold draws no overlapping word
 		{
 			spans: [run('x', 20 * H, 22 * H), run('y', 26 * H, 26 * H + 6 * M), run('z', 32 * H, 34 * H)],
 			breaks: [{ start: 22 * H, end: 26 * H }, { start: 26 * H + 6 * M, end: 32 * H }]
-		}
+		},
+		{ spans: [run('x', 20 * H, 23 * H), run('y', night.end, night.end + M)], breaks: [{ start: 23 * H, end: night.end }] }
 	];
 	const Gantt = await load(GANTT);
 	for (const { spans, breaks } of cases) {
@@ -100,6 +101,9 @@ test('AgentHandoffGantt: a short stretch before a fold draws no overlapping word
 				})
 				.sort((a, b) => a.from - b.from);
 			for (const [i, w] of words.slice(1).entries()) assert.ok(w.from >= words[i].to, `${words[i].word} runs into ${w.word} on a ${plot}px plot`);
+			// The card pads the chart by 16px; no word leaves it.
+			const last = words.reduce((a, b) => (b.to > a.to ? b : a));
+			assert.ok(last.to <= 720 + 16, `${last.word} leaves the card on a ${plot}px plot`);
 		}
 	}
 });

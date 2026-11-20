@@ -115,7 +115,7 @@
 			.filter((b) => b.end > domainStart && b.start < domainEnd.current)
 			.map((b) => ({ x0: x(Math.max(b.start, domainStart)), x1: x(Math.min(b.end, domainEnd.current)), label: b.label ?? formatMetricDuration(b.end - b.start) }))
 	);
-	/** With folds, each stretch of open time is labelled at its start, when the stretch is wide enough for it. Between them, round time steps: none in or beside a band, and none on top of the label before. */
+	/** With folds, each stretch of open time is labelled at its start, when the label fits before the next fold and the chart's end. Between them, round time steps: none in or beside a band, and none on top of the label before. */
 	let edges = $derived(breaks.length > 0 ? [domainStart, ...breaks.map((b) => b.end).filter((t) => t > domainStart && t < domainEnd.current)] : []);
 	let axisTicks = $derived.by(() => {
 		const kept: number[] = [];
@@ -124,8 +124,10 @@
 			const px = x(t);
 			const last = kept.at(-1);
 			const room = last === undefined || px - x(last) >= (edges.includes(last) ? formatTime(last).length * 6 + formatTime(t).length * 3 + 8 : 40);
+			// A stretch's label sits 4px past its start and wants 4px after it: clear of the next fold, and inside the card.
+			const end = px + formatTime(t).length * 6 + 8;
 			const fits = edges.includes(t)
-				? !bands.some((b) => b.x0 >= px && b.x0 - px < formatTime(t).length * 6 + 8)
+				? end <= width + 12 && !bands.some((b) => b.x0 >= px && b.x0 < end)
 				: room && !bands.some((b) => px > b.x0 - 24 && px < b.x1 + 24);
 			if (t !== last && fits) kept.push(t);
 		}
