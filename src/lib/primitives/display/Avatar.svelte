@@ -5,7 +5,7 @@
 	import { cn } from '../../ui/cn';
 	import { AVATAR_TINTS, initialsFromName, toneIndexFromName } from './helpers';
 
-	export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+	export type AvatarSize = '2xs' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 	export type AvatarStatus = 'online' | 'away' | 'busy' | 'offline';
 
 	export interface Props extends Omit<HTMLAttributes<HTMLSpanElement>, 'class' | 'children'> {
@@ -43,6 +43,7 @@
 	}: Props = $props();
 
 	const SIZES: Record<AvatarSize, string> = {
+		'2xs': 'size-4 text-[8px] [&_svg]:size-2.5',
 		xs: 'size-5 text-[9px] [&_svg]:size-3',
 		sm: 'size-6 text-[10px] [&_svg]:size-3.5',
 		md: 'size-8 text-xs [&_svg]:size-4',
@@ -50,6 +51,7 @@
 		xl: 'size-14 text-lg [&_svg]:size-7'
 	};
 	const DOTS: Record<AvatarSize, string> = {
+		'2xs': 'size-1',
 		xs: 'size-1.5',
 		sm: 'size-2',
 		md: 'size-2.5',

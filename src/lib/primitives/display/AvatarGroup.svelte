@@ -32,6 +32,7 @@
 	}: Props = $props();
 
 	const COUNT_SIZES: Record<AvatarSize, string> = {
+		'2xs': 'size-4 text-[8px]',
 		xs: 'size-5 text-[9px]',
 		sm: 'size-6 text-[10px]',
 		md: 'size-8 text-xs',

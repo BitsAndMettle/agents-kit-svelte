@@ -292,7 +292,7 @@ export function seriesColor(index: number): string {
 	return `var(--ak-chart-${(index % 6) + 1})`;
 }
 
-/** CSS colour for an agent phase. Unknown phases cycle through the series colours. */
+/** CSS colour for an agent phase. `gate` and `queue`, where no agent holds the work, take the neutral ink; unknown phases cycle through the series colours. */
 export function phaseColor(phase: string, fallbackIndex = 0): string {
 	switch (phase) {
 		case 'plan':
@@ -303,6 +303,9 @@ export function phaseColor(phase: string, fallbackIndex = 0): string {
 			return 'var(--ak-chart-3)';
 		case 'verify':
 			return 'var(--ak-chart-4)';
+		case 'gate':
+		case 'queue':
+			return 'var(--ak-color-fg-muted)';
 		default:
 			return seriesColor(fallbackIndex + 4);
 	}

@@ -9,7 +9,7 @@
 
 <div class="flex flex-col gap-5">
 	<div class="flex flex-wrap items-end gap-3">
-		{#each ['xs', 'sm', 'md', 'lg', 'xl'] as const as size (size)}
+		{#each ['2xs', 'xs', 'sm', 'md', 'lg', 'xl'] as const as size (size)}
 			<Avatar name="Ada Lovelace" {size} />
 		{/each}
 	</div>
