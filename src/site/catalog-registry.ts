@@ -2793,7 +2793,7 @@ const COLLECTION_ITEMS: CatalogItemMeta[] = [
 		sveltePath: 'src/lib/charts/FeatureLineage.svelte',
 		upstreamSource: 'Agents Kit Svelte · Charts & Timelines',
 		description:
-			'Where a Feature came from and everything it turned into: cards, agent attempts, PRs, releases and incidents as a graph. Hover a node to trace its ancestry, fold a branch away, and click a node to open what is behind it.',
+			'Where a Feature came from and everything it turned into: cards, agent attempts, PRs, releases and incidents as a graph. Hover a node to trace its ancestry, fold a branch away, and click a node to open what is behind it. Give it your own node and it is a canvas you drag, zoom and fit, with live, stopped and longest routes, standing upright on a phone.',
 		usageSnippet: `<script lang="ts">
   import { FeatureLineage, type LineageNode, type LineageEdge } from 'agents-kit-svelte';
 

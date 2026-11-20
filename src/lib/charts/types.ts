@@ -171,9 +171,14 @@ export type LineageRelation = 'spawned' | 'attempted' | 'retried' | 'opened' | '
 export interface LineageEdge {
 	from: string;
 	to: string;
-	rel: LineageRelation;
+	/** Named on the line while it is traced. Leave it out for a line that needs no name, e.g. a card's need. */
+	rel?: LineageRelation;
 	/** Drawn as a loop back to an earlier column without moving the target, e.g. an incident pointing at the card that fixes it. */
 	backlink?: boolean;
+	/** False draws the line dashed: a need not met yet. */
+	met?: boolean;
+	/** A route the line is on: `live` flows in the accent, `stopped` (to a node that waits for a person) is in the warning colour, `longest` is ink and heavier. */
+	route?: 'live' | 'stopped' | 'longest';
 }
 
 /** One Feature at a glance, for `FeatureCard`. */
